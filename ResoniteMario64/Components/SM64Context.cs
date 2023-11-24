@@ -1,9 +1,12 @@
 using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
+using HarmonyLib;
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Remoting.Contexts;
 
@@ -49,6 +52,103 @@ public class SM64Context {
         if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_PLAY_RANDOM_MUSIC)) Interop.PlayRandomMusic();
 
         return mario;
+    }
+
+    public float2 joystick;
+    public bool jump;
+    public bool kick;
+    public bool stomp;
+
+    public Comment inputBlock;
+
+    private void HandleInputs()
+    {
+        var root = World.LocalUser.Root;
+        if (root == null) return;
+        var loco = root.GetRegisteredComponent<LocomotionController>();
+        if (loco == null) return;
+
+        var inp = World.InputInterface;
+
+        if (inp.VR_Active)
+        {
+            var main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
+            joystick = main.Inputs.Axis.CurrentValue;
+            jump = (main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held);
+            stomp = main.Inputs.Grab.Held;
+            kick = main.Inputs.Interact.Held;
+        }
+        else
+        {
+            var w = inp.GetKey(Key.W);
+            var s = inp.GetKey(Key.S);
+            var d = inp.GetKey(Key.D);
+            var a = inp.GetKey(Key.A);
+            joystick = GetDekstopJoystick(w, s, d, a);
+
+            jump = inp.GetKey(Key.Space);
+            stomp = inp.GetKey(Key.Shift);
+            kick = inp.Mouse.LeftButton.Held;
+        }
+
+
+        if (inputBlock == null || inputBlock.IsRemoved)
+        {
+            var block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == "Mario64InputBlock");
+            block.Text.Value = "Mario64InputBlock";
+            inputBlock = block;
+        }
+        if (_marios.Count > 0 && !(inp.GetKey(Key.Control) || inp.VR_Active))
+        {
+            var currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == "Mario64InputBlock");
+            if (currentBlock == null)
+            {
+                loco.SupressSources.Add(inputBlock);
+            }
+        }
+        else
+        {
+            loco.SupressSources.RemoveAll(inputBlock);
+        }
+    }
+
+    [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
+    public class JumpInputBlocker
+    {
+        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            var lookFor = AccessTools.Field(typeof(InteractionHandler), "_blockUserspaceOpen");
+            foreach (var code in codes)
+            {
+                yield return code;
+                if (code.LoadsField(lookFor))
+                {
+                    yield return new(OpCodes.Ldarg_0);
+                    yield return new(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
+                }
+            }
+        }
+
+        public static bool Injection(bool b, InteractionHandler c)
+        {
+            if (_instance?.World == c.World 
+                && _instance._marios.Count > 0 
+                && !c.SharesUserspaceToggleAndMenus
+                && c.InputInterface.VR_Active
+                && c.Side.Value == c.LocalUser.Primaryhand)
+            {
+                return true;
+            }
+            return b;
+        }
+    }
+    private float2 GetDekstopJoystick(bool up, bool down, bool left, bool right)
+    {
+        // prioritize Top Right when all inputs are held
+        float hori = (up ? 1 : (down ? -1 : 0));
+        float vert = (right ? 1 : (left ? -1 : 0));
+        // could normalize but I think mario engine does it at some point down the line anyway
+        return new float2(hori, vert);
     }
 
     private void SetAudioSource() {
@@ -98,6 +198,8 @@ public class SM64Context {
 
     public void OnCommonUpdate()
     {
+        HandleInputs();
+
         if (World.Time.WorldTime - LastTick >= ResoniteMario64.config.GetValue(ResoniteMario64.KEY_GAME_TICK_MS) / 1000f)
         {
             SM64GameTick();

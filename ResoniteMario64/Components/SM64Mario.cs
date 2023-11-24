@@ -39,10 +39,14 @@ public class SM64Mario {
         CreateMarioRenderer();
 
         var vars = MarioObject.AddSlot("MarioInputs");
-        vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>().VariableName.Value = "joystick";
-        vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>().VariableName.Value = "jump";
-        vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>().VariableName.Value = "kick";
-        vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>().VariableName.Value = "stomp";
+        joystick = vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
+        joystick.VariableName.Value = "joystick";
+        jump = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+        jump.VariableName.Value = "jump";
+        kick = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+        kick.VariableName.Value = "kick";
+        stomp = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+        stomp.VariableName.Value = "stomp";
     }
 
     // Inputs
@@ -73,10 +77,6 @@ public class SM64Mario {
     private bool _initializedByRemote;
     private bool _isDying;
     private bool _isNuked;
-
-    // Teleporters (NonSerialized)
-    private float _startedTeleporting = float.MinValue;
-    private Transform _teleportTarget;
 
     // Threading
     private readonly object _lock = new();
@@ -278,19 +278,23 @@ public class SM64Mario {
 
     private float2 GetJoystickAxes()
     {
-        return joystick.Reference.Target?.Value ?? float2.Zero;
+        if (SM64Context._instance == null) return float2.Zero;
+
+        return joystick?.Reference.Target?.Value ?? SM64Context._instance.joystick;
     }
 
     private bool GetButtonHeld(Button button)
     {
+        if (SM64Context._instance == null) return false;
+
         switch (button)
         {
             case Button.Jump:
-                return jump.Reference.Target?.Value ?? false;
+                return jump?.Reference.Target?.Value ?? SM64Context._instance.jump;
             case Button.Kick:
-                return kick.Reference.Target?.Value ?? false;
+                return kick?.Reference.Target?.Value ?? SM64Context._instance.kick;
             case Button.Stomp:
-                return stomp.Reference.Target?.Value ?? false;
+                return stomp?.Reference.Target?.Value ?? SM64Context._instance.stomp;
         }
         return false;
     }

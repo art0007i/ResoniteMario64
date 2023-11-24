@@ -101,7 +101,7 @@ public class ResoniteMario64 : ResoniteMod
     {
         public static void Prefix(World __instance)
         {
-            if (SM64Context._instance != null && SM64Context._instance.World == __instance)
+            if (SM64Context._instance?.World == __instance)
             {
                 SM64Context._instance.DestroyInstance();
             }
@@ -113,7 +113,7 @@ public class ResoniteMario64 : ResoniteMod
     {
         public static void Prefix(UpdateManager __instance)
         {
-            if (SM64Context._instance != null && SM64Context._instance.World == __instance.World)
+            if (SM64Context._instance?.World == __instance.World)
             {
                 SM64Context._instance.OnCommonUpdate();
             }

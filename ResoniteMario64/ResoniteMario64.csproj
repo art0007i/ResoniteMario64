@@ -16,7 +16,7 @@
     <GamePath Condition="Exists('E:\Programs\Steam\steamapps\common\Resonite')">E:\Programs\Steam\steamapps\common\Resonite\</GamePath>
     <CopyLocal>false</CopyLocal>
     <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
-    <AutoWeaver Condition="'$(AutoWeaver)'==''">true</AutoWeaver>
+    <AutoWeaver Condition="'$(AutoWeaver)'==''">false</AutoWeaver>
     <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
     <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
   </PropertyGroup>
