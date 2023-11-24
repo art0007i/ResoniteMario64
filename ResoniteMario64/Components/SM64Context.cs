@@ -129,7 +129,7 @@ public class SM64Context : Component {
         }
     }
 
-    protected override void OnDestroy() {
+    protected override void OnDestroying() {
         Interop.GlobalTerminate();
         _instance = null;
     }
@@ -160,7 +160,7 @@ public class SM64Context : Component {
 
     private void StaticTerrainUpdate() {
         if (_instance == null) return;
-        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces());
+        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
     }
 
     public static void UpdateMarioCount() {

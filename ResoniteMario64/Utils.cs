@@ -39,7 +39,7 @@ internal static class Utils
             && col.Type.Value != ColliderType.Trigger;
     }
 
-    internal static Interop.SM64Surface[] GetAllStaticSurfaces()
+    internal static Interop.SM64Surface[] GetAllStaticSurfaces(World wld)
     {
 
         var surfaces = new List<Interop.SM64Surface>();
@@ -53,7 +53,7 @@ internal static class Utils
         }*/
         var shouldAutoLoad = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_ATTEMPT_LOADING_WORLD_COLLIDERS);
 
-        foreach (var obj in Engine.Current.WorldManager.FocusedWorld.RootSlot.GetComponentsInChildren<Collider>())
+        foreach (var obj in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
 
             var cvrSM64ColliderStatic = obj.Slot.GetComponent<SM64ColliderStatic>();
