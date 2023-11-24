@@ -90,23 +90,7 @@ internal static class Utils
         {
             var meshTrisCount = meshCollider.Mesh.Asset.Data.TotalTriangleCount;
             var newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
-            if (newTotalMeshColliderTris > ResoniteMario64.config.GetValue(ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS))
-            {
-#if DEBUG
-                ResoniteMario64.Warn($"[MeshCollider] {meshCollider.Slot.Name} will be ignored because it exceeds the " +
-                                    $"maximum mesh collider total tris count. Tris: {meshTrisCount}, Total Tris: " +
-                                    $"{newTotalMeshColliderTris}/{ResoniteMario64.config.GetValue(ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS)}");
-#endif
-            }
-            else
-            {
-                GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
-#if DEBUG
-                ResoniteMario64.Msg($"[MeshCollider] {meshCollider.Slot.Name} will be added. Tris: {meshTrisCount}, Total " +
-                                $"Tris: {newTotalMeshColliderTris}/{ResoniteMario64.config.GetValue(ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS)}");
-#endif
-            }
-            totalMeshColliderTris = newTotalMeshColliderTris;
+            GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
         }
 
         return surfaces.ToArray();

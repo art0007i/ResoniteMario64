@@ -1,14 +1,11 @@
+using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
-using FrooxEngine.UIX;
 using HarmonyLib;
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using System.Runtime.Remoting.Contexts;
 
 namespace ResoniteMario64;
 
@@ -23,11 +20,14 @@ public class SM64Context {
     //private readonly List<SM64ColliderDynamic> _surfaceObjects = new();
 
     // Audio
-    private AudioOutput _audioSource;
     private const int BufferSize = 544 * 2 * 2;
     private int _bufferPosition = BufferSize;
     private readonly short[] _audioBuffer = new short[BufferSize];
     private readonly float[] _processedAudioBuffer = new float[BufferSize];
+
+    OpusStream<MonoSample> MarioAudio;
+    CircularBufferWriteState<MonoSample> _writeState = default;
+
 
     protected SM64Context(World wld) {
         World = wld;
@@ -38,10 +38,10 @@ public class SM64Context {
 
         // Update context's colliders
         Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
-        ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS.OnChanged += (newValue) => {
+        /*ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS.OnChanged += (newValue) => {
             Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
         };
-
+        */
         QueueStaticSurfacesUpdate();
     }
 
@@ -111,6 +111,14 @@ public class SM64Context {
             loco.SupressSources.RemoveAll(inputBlock);
         }
     }
+    private float2 GetDekstopJoystick(bool up, bool down, bool left, bool right)
+    {
+        // prioritize Top Right when all inputs are held
+        float vert = (up ? 1 : (down ? -1 : 0));
+        float hori = (left ? 1 : (right ? -1 : 0));
+        // could normalize but I think mario engine does it at some point down the line anyway
+        return new float2(hori, vert);
+    }
 
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker
@@ -142,30 +150,61 @@ public class SM64Context {
             return b;
         }
     }
-    private float2 GetDekstopJoystick(bool up, bool down, bool left, bool right)
+
+
+    private void ProcessAudio()
     {
-        // prioritize Top Right when all inputs are held
-        float hori = (up ? 1 : (down ? -1 : 0));
-        float vert = (right ? 1 : (left ? -1 : 0));
-        // could normalize but I think mario engine does it at some point down the line anyway
-        return new float2(hori, vert);
+        if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_DISABLE_AUDIO)) return;
+        Interop.AudioTick(_audioBuffer, BufferSize);
+        if (MarioAudio != null)
+        {
+            MarioAudio.Write(ConvertSamples(_audioBuffer, ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_PITCH)), ref _writeState);
+        }
     }
 
+    public static Span<MonoSample> ConvertSamples(short[] audioBuffer, float pitchShiftFactor)
+    {
+        int newLength = (int)(audioBuffer.Length / pitchShiftFactor);
+        MonoSample[] shiftedAudio = new MonoSample[newLength];
+
+        for (int i = 0; i < newLength; i++)
+        {
+            int index = (int)(i * pitchShiftFactor);
+
+            if (index >= 0 && index < audioBuffer.Length)
+            {
+                // Linear interpolation
+                float fraction = index % 1;
+                int floorIndex = index;
+                int ceilIndex = floorIndex + 1;
+
+                float floorValue = MathX.Min((float)audioBuffer[floorIndex] / short.MaxValue, 1f);
+                float ceilValue = MathX.Min((float)audioBuffer[ceilIndex] / short.MaxValue, 1f);
+
+                float interpolatedValue = MathX.Lerp(floorValue, ceilValue, fraction);
+
+                shiftedAudio[i] = interpolatedValue;
+            }
+        }
+
+        return shiftedAudio.AsSpan();
+    }
+
+
     private void SetAudioSource() {
-
-        // TODO: what the fuck is audio anyway
-
-        //_audioSource = Slot.AttachComponent<AudioOutput>();
-        //_audioSource.SpatialBlend.Value = 0f;
-
-        //_audioSource.Volume.Value = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_VOLUME);
-        //Config.MeAudioVolume.OnEntryValueChanged.Subscribe((_, newValue) => _audioSource.volume = newValue);
-
-        //_audioSource.pitch = Config.MeAudioPitch.Value;
-        //Config.MeAudioPitch.OnEntryValueChanged.Subscribe((_, newValue) => _audioSource.pitch = newValue);
-
-        //_audioSource.loop = true;
-        //_audioSource.Play();
+        OpusStream<MonoSample> stream = World.LocalUser.GetStreamOrAdd<OpusStream<MonoSample>>("Mario64Audio", (s) =>
+        {
+            s.Name = "Mario64Audio";
+        });
+        MarioAudio = stream;
+        var userSlot = World.LocalUser.Root.Slot;
+        var audio = World.AddSlot("mario audio");
+        var output = audio.AttachComponent<AudioOutput>();
+        output.Source.Target = stream;
+        output.SpatialBlend.Value = 0;
+        output.Spatialize.Value = false;
+        output.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+        output.Volume.Value = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_VOLUME);
     }
 
     private void ProcessMoreSamples() {
@@ -200,6 +239,12 @@ public class SM64Context {
     {
         HandleInputs();
 
+
+        if (World.InputInterface.GetKeyDown(Key.Semicolon))
+        {
+            QueueStaticSurfacesUpdate();
+        }
+
         if (World.Time.WorldTime - LastTick >= ResoniteMario64.config.GetValue(ResoniteMario64.KEY_GAME_TICK_MS) / 1000f)
         {
             SM64GameTick();
@@ -215,6 +260,8 @@ public class SM64Context {
     }
 
     private void SM64GameTick() {
+        ProcessAudio();
+
         /*lock (_surfaceObjects) {
             foreach (var o in _surfaceObjects) {
                 o.ContextFixedUpdateSynced();
@@ -256,7 +303,7 @@ public class SM64Context {
     }
 
     public static void QueueStaticSurfacesUpdate() {
-        // TODO: implement queue maybe?
+        // TODO: implement buffer (so it will execute the update after 1.5s, and you can call it multiple times within that time)
         if (_instance == null) return;
         _instance.StaticTerrainUpdate();
     }

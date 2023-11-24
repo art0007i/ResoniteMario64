@@ -136,7 +136,12 @@ public class SM64Mario {
 
     public void DestroyMario() {
 
-        if (_marioRendererObject != null) {
+        if(MarioObject != null && !MarioObject.IsRemoved)
+        {
+            MarioObject.Destroy();
+        }
+
+        if (_marioRendererObject != null && !_marioRendererObject.IsRemoved) {
             _marioRendererObject.Destroy();
         }
 
