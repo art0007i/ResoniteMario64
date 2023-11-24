@@ -30,11 +30,6 @@ internal static class Utils
             && col.Slot.IsActive
             // Ignore non character colliders
             && col.CharacterCollider.Value
-            // Ignore other mario's colliders
-            && col.Slot.GetComponentInChildren<SM64Mario>() == null
-            && col.Slot.GetComponentInParents<SM64Mario>() == null
-            // Ignore colliders in pickup scripts // TODO: mabe ignore grabbables (equivalent of cvrpickupobjects??)
-
             // Ignore triggers
             && col.Type.Value != ColliderType.Trigger;
     }
@@ -45,43 +40,24 @@ internal static class Utils
         var surfaces = new List<Interop.SM64Surface>();
         var meshColliders = new List<MeshCollider>();
 
-        // Should attempt to load world colliders for this world?
-        // TODO: Per world setting thing :)
-        /*var shouldAutoLoad = Config.ShouldAttemptToLoadWorldColliders();
-        if (!shouldAutoLoad) {
-            ResoniteMario64.Msg($"[GetAllStaticSurfaces] As per configuration we're skipping auto generating this world's colliders.");
-        }*/
-        var shouldAutoLoad = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_ATTEMPT_LOADING_WORLD_COLLIDERS);
-
         foreach (var obj in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
 
-            var cvrSM64ColliderStatic = obj.Slot.GetComponent<SM64ColliderStatic>();
-            var hasDedicatedComponent = cvrSM64ColliderStatic != null;
 
-            // Ignore bad colliders if we don't have a dedicated component, or if auto load world colliders is off
-            if (!hasDedicatedComponent && (!shouldAutoLoad || !IsGoodCollider(obj))) continue;
+            // Ignore bad colliders
+            if (!IsGoodCollider(obj)) continue;
 
-            // Ignore the dynamic colliders, those will be handled separately
-            var dynamicCollider = obj.Slot.GetComponent<SM64ColliderDynamic>();
-            if (dynamicCollider != null) continue;
+            // TODO: Handle dynamic colliders somehow
 
             // Check if we have surface and terrain data
             var surfaceType = SM64SurfaceType.Default;
             var terrainType = SM64TerrainType.Grass;
 
-            // Check if we have surface and terrain data
-            if (hasDedicatedComponent)
-            {
-                surfaceType = cvrSM64ColliderStatic.SurfaceType;
-                terrainType = cvrSM64ColliderStatic.TerrainType;
-            }
-
 #if DEBUG
             //ResoniteMario64.Msg($"[GoodCollider] {obj.name}");
 #endif
 
-            if (obj is MeshCollider meshCollider && !hasDedicatedComponent)
+            if (obj is MeshCollider meshCollider)
             {
                 // Let's do some more processing to the mesh colliders without dedicated components
                 meshColliders.Add(meshCollider);
@@ -89,7 +65,7 @@ internal static class Utils
             else
             {
                 // Everything else, let's just add (probably a bad idea)
-                GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType, hasDedicatedComponent);
+                GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType);
             }
         }
 
@@ -124,7 +100,7 @@ internal static class Utils
             }
             else
             {
-                GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass, false);
+                GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
 #if DEBUG
                 ResoniteMario64.Msg($"[MeshCollider] {meshCollider.Slot.Name} will be added. Tris: {meshTrisCount}, Total " +
                                 $"Tris: {newTotalMeshColliderTris}/{ResoniteMario64.config.GetValue(ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS)}");
@@ -139,34 +115,16 @@ internal static class Utils
 
 
     // Function used for static colliders. Returns correct global positions, rotations and scales.
-    public static List<Interop.SM64Surface> GetTransformedSurfaces(Collider collider, List<Interop.SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, bool bypassPolygonLimit)
+    public static List<Interop.SM64Surface> GetTransformedSurfaces(Collider collider, List<Interop.SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
-        /*
-        var debg = collider.World.RootSlot.AddSlot(collider.Slot.Name + " -debug surfaces");
-        debg.GlobalScale = float3.One / 1000f;
-        var grassMat = debg.AttachComponent<UnlitMaterial>();
-        grassMat.TintColor.Value = colorX.Azure.SetA(0.5f);
-        grassMat.BlendMode.Value = BlendMode.Alpha;
 
-        foreach (var surf in surfaces)
-        {
-            var s = debg.AddSlot("surf");
-            var tri = s.AttachComponent<TriangleMesh>();
-            var rend = s.AttachComponent<MeshRenderer>();
-            rend.Mesh.Target = tri;
-            rend.Materials.Add(grassMat);
-            tri.Vertex0.Position.Value = new float3(surf.v0x, surf.v0y, surf.v0z);
-            tri.Vertex1.Position.Value = new float3(surf.v1x, surf.v1y, surf.v1z);
-            tri.Vertex2.Position.Value = new float3(surf.v2x, surf.v2y, surf.v2z);
-        }
-        */
         return surfaces;
     }
 
 
     // Function used for dynamic colliders. Returns correct scales. (rotation and position is set dynamically)
-    internal static List<Interop.SM64Surface> GetScaledSurfaces(Collider collider, List<Interop.SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, bool bypassPolygonLimit)
+    internal static List<Interop.SM64Surface> GetScaledSurfaces(Collider collider, List<Interop.SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, x => collider.Slot.GlobalScale * (x + collider.Offset));
         

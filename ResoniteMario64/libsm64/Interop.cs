@@ -316,7 +316,7 @@ internal static class Interop {
         // #endif
 
         //TODO: Use mario texture that we read here, instead of a hardcoded resdb link
-        marioTexture = new Bitmap2D(SM64_TEXTURE_WIDTH, SM64_TEXTURE_HEIGHT, TextureFormat.RGBA32, false, ColorProfile.sRGB);
+        marioTexture = new Bitmap2D(SM64_TEXTURE_WIDTH, SM64_TEXTURE_HEIGHT, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
         for (var ix = 0; ix < SM64_TEXTURE_WIDTH; ix++)
         for (var iy = 0; iy < SM64_TEXTURE_HEIGHT; iy++) {
             var color = new color32(
@@ -508,22 +508,6 @@ internal static class Interop {
 
     public static void MarioCapExtend(uint marioId, float durationSeconds) {
         sm64_mario_extend_cap(marioId, (ushort)(durationSeconds * SECONDS_MULTIPLIER));
-    }
-
-    public static void SetLevelModifier(uint marioId, SM64LevelModifier.ModifierType modifierType, float unityLevelY) {
-        var marioYValue = (int)(SCALE_FACTOR * unityLevelY);
-        if (MathX.Approximately(unityLevelY, float.MinValue)) {
-            marioYValue = (int)(-2500*SCALE_FACTOR);
-        }
-        switch (modifierType) {
-            // Unity Y (height) world coord, which will be filled with water/gas
-            case SM64LevelModifier.ModifierType.Water:
-                sm64_set_mario_water_level(marioId, marioYValue);
-                break;
-            case SM64LevelModifier.ModifierType.Gas:
-                sm64_set_mario_gas_level(marioId, marioYValue);
-                break;
-        }
     }
 
     public static void MarioSetPosition(uint marioId, float3 pos) {

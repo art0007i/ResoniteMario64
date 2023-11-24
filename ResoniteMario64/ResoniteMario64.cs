@@ -9,6 +9,7 @@ using FrooxEngine;
 using System.IO;
 using System.Security.Cryptography;
 using FrooxEngine.UIX;
+using BepuPhysics.Constraints;
 
 namespace ResoniteMario64;
 
@@ -18,32 +19,13 @@ public class ResoniteMario64 : ResoniteMod
     public override string Author => "art0007i";
     public override string Version => "1.0.0";
     public override string Link => "https://github.com/art0007i/ResoniteMario64/";
-
-
-    public static bool ShouldAttemptToLoadWorldColliders()
-    {
-        // TODO: make this func load a per world setting n stuff
-        return true;
-    }
-
-
-    // CURRENT WORLD (this setting differs per world... idk how to handle it :/
-    /*
-
-    ONCHANGE -> CVRSM64Context.QueueStaticSurfacesUpdate();
-
-    Whether to attempt to auto generate colliders for this world or not. Some worlds are just too laggy to have their colliders generated... If that's the case disable this and use props to create colliders!
-    
-     */
-    [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KEY_ATTEMPT_LOADING_WORLD_COLLIDERS = new("attempt_loading_world_colliders", "Whether to attempt to auto generate colliders for worlds or not. Some worlds are just too laggy to have their colliders generated... If that's the case disable this and create some colliders manually!", () => true); // // Default option for whether it should attempt to load world colliders or not when joining new worlds.
     // AUDIO
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KEY_DISABLE_AUDIO = new("disable_audio", "Whether to disable all Super Mario 64 Music/Sounds or not.", () => false);
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KEY_PLAY_RANDOM_MUSIC = new("play_random_music", "Whether to play a random music when a mario joins or not.", () => true);
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<float> KEY_AUDIO_VOLUME = new("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider)
+    public static ModConfigurationKey<float> KEY_AUDIO_VOLUME = new("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider) edit: 3 means probably 3 decimal places
     // PERFORMANCE
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KEY_DELETE_AFTER_DEATH = new("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
@@ -72,27 +54,9 @@ public class ResoniteMario64 : ResoniteMod
     public override void OnEngineInit()
     {
         config = GetConfiguration();
-        /*
-         * use rml_libs
-        // Extract the native binary to the plugins folder
-        const string dllName = "sm64.dll";
-        var dstPath = Path.GetFullPath(Path.Combine("Resonite_Data", "Plugins", "x86_64", dllName));
-
-        try
-        {
-            Msg($"Copying the sm64.dll to {dstPath}");
-            // TODO: hopefully works :)
-            using var resourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(dllName);
-            using var fileStream = File.Open(dstPath, FileMode.Create, FileAccess.Write);
-            resourceStream!.CopyTo(fileStream);
-        }
-        catch (IOException ex)
-        {
-            Error("Failed to copy native library.");
-            Error(ex);
-            return;
-        }
-        */
+        
+        // TODO: sm64.dll needs to be either in unity's plugin folder, or game main dir.
+        
         // Load the ROM
         try
         {
@@ -132,14 +96,47 @@ public class ResoniteMario64 : ResoniteMod
         harmony.PatchAll();
     }
 
+    [HarmonyPatch(typeof(World), nameof(World.Destroy))]
+    class WorldCleanupPatch
+    {
+        public static void Prefix(World __instance)
+        {
+            if (SM64Context._instance != null && SM64Context._instance.World == __instance)
+            {
+                SM64Context._instance.DestroyInstance();
+            }
+        }
+    }
 
+    [HarmonyPatch(typeof(UpdateManager), nameof(UpdateManager.RunUpdates))]
+    class WorldUpdatePatch
+    {
+        public static void Prefix(UpdateManager __instance)
+        {
+            if (SM64Context._instance != null && SM64Context._instance.World == __instance.World)
+            {
+                SM64Context._instance.OnCommonUpdate();
+            }
+        }
+    }
+
+    // TODO: figure out a physical synchronizable representation of mario.
     [HarmonyPatch(typeof(Slot), nameof(Slot.BuildInspectorUI))]
     class SlotUIAddon
     {
         public static void Postfix(Slot __instance, UIBuilder ui)
         {
-            ui.Button("Spawn Mario64!").LocalPressed += (b,e)=>{
-                __instance.AttachComponent<SM64Mario>();
+            var btn = ui.Button("Spawn Mario64!");
+            btn.LocalPressed += (b,e)=> {
+                if (SM64Context.EnsureInstanceExists(__instance.World))
+                {
+                    var mar = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario");
+                    SM64Context._instance.AddMario(mar);
+                }
+                else
+                {
+                    btn.LabelText = "Failed to spawn mario!";
+                }
             };
         }
     }
