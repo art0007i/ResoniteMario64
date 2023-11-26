@@ -45,6 +45,9 @@
     <Reference Include="System.Memory">
       <HintPath>$(GamePath)Resonite_Data\Managed\System.Memory.dll</HintPath>
     </Reference>
+    <Reference Include="CSCore">
+      <HintPath>$(GamePath)Resonite_Data\Managed\CSCore.dll</HintPath>
+    </Reference>
   </ItemGroup>
   
   <ItemGroup>

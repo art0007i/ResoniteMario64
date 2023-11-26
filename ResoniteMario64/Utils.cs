@@ -85,11 +85,22 @@ internal static class Utils
         meshColliders.Sort((a, b) => a.Mesh.Asset.Data.TotalTriangleCount.CompareTo(b.Mesh.Asset.Data.TotalTriangleCount));
 
         // Add the mesh colliders until we reach the max mesh collider polygon limit
+        var maxTris = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS);
         var totalMeshColliderTris = 0;
         foreach (var meshCollider in meshColliders)
         {
             var meshTrisCount = meshCollider.Mesh.Asset.Data.TotalTriangleCount;
             var newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
+            if(newTotalMeshColliderTris > maxTris)
+            {
+                ResoniteMario64.Debug("[MeshCollider] Collider has too many triangles. " + meshCollider.ToString());
+                continue;
+            }
+            else
+            {
+                ResoniteMario64.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider.ToString());
+            }
+            
             GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
         }
 

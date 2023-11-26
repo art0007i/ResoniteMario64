@@ -5,6 +5,11 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSCore.DSP;
+using CSCore.Streams.Effects;
+using CSCore.Streams;
+using System.Collections;
+using CSCore.Streams.SampleConverter;
 using System.Reflection.Emit;
 
 namespace ResoniteMario64;
@@ -27,7 +32,9 @@ public class SM64Context {
 
     OpusStream<MonoSample> MarioAudio;
     CircularBufferWriteState<MonoSample> _writeState = default;
-
+    WriteableBufferingSource dsp_buffer;
+    Pcm16BitToSample dsp_sampler;
+    PitchShifter dsp_shifter;
 
     protected SM64Context(World wld) {
         World = wld;
@@ -73,7 +80,8 @@ public class SM64Context {
         if (inp.VR_Active)
         {
             var main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
-            joystick = main.Inputs.Axis.CurrentValue;
+            var off = main.OtherTool;
+            joystick = off.Inputs.Axis.CurrentValue;
             jump = (main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held);
             stomp = main.Inputs.Grab.Held;
             kick = main.Inputs.Interact.Held;
@@ -120,6 +128,18 @@ public class SM64Context {
         return new float2(hori, vert);
     }
 
+    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand)
+    {
+        if (_instance?.World == c.World
+                && _instance._marios.Count > 0
+                && c.InputInterface.VR_Active
+                && c.Side.Value == hand)
+        {
+            return true;
+        }
+        return false;
+    }
+    
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker
     {
@@ -139,59 +159,53 @@ public class SM64Context {
 
         public static bool Injection(bool b, InteractionHandler c)
         {
-            if (_instance?.World == c.World 
-                && _instance._marios.Count > 0 
-                && !c.SharesUserspaceToggleAndMenus
-                && c.InputInterface.VR_Active
-                && c.Side.Value == c.LocalUser.Primaryhand)
-            {
-                return true;
-            }
-            return b;
+            return ShouldblockInputs(c, c.LocalUser.Primaryhand) || b; 
         }
     }
 
-
+    [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
+    public class MarioInputBlocker
+    {
+        public static void Postfix(InteractionHandler __instance)
+        {
+            if (ShouldblockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
+            {
+                __instance.Inputs.Axis.RegisterBlocks = true;
+            }
+            /*if (ShouldblockInputs(__instance, __instance.LocalUser.Primaryhand))
+            {
+                __instance.Inputs.UserspaceToggle.RegisterBlocks = true;
+                __instance.Inputs.Interact.RegisterBlocks = true;
+                __instance.Inputs.Grab.RegisterBlocks = true;
+            }*/
+        }
+    }
     private void ProcessAudio()
     {
         if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_DISABLE_AUDIO)) return;
+        if (MarioAudio == null) return;
+
         Interop.AudioTick(_audioBuffer, BufferSize);
-        if (MarioAudio != null)
-        {
-            MarioAudio.Write(ConvertSamples(_audioBuffer, ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_PITCH)), ref _writeState);
-        }
+        MarioAudio.Write(ConvertSamples(_audioBuffer), ref _writeState);
     }
 
-    public static Span<MonoSample> ConvertSamples(short[] audioBuffer, float pitchShiftFactor)
+    public Span<MonoSample> ConvertSamples(short[] audioBuffer)
     {
-        int newLength = (int)(audioBuffer.Length / pitchShiftFactor);
-        MonoSample[] shiftedAudio = new MonoSample[newLength];
-
-        for (int i = 0; i < newLength; i++)
-        {
-            int index = (int)(i * pitchShiftFactor);
-
-            if (index >= 0 && index < audioBuffer.Length)
-            {
-                // Linear interpolation
-                float fraction = index % 1;
-                int floorIndex = index;
-                int ceilIndex = floorIndex + 1;
-
-                float floorValue = MathX.Min((float)audioBuffer[floorIndex] / short.MaxValue, 1f);
-                float ceilValue = MathX.Min((float)audioBuffer[ceilIndex] / short.MaxValue, 1f);
-
-                float interpolatedValue = MathX.Lerp(floorValue, ceilValue, fraction);
-
-                shiftedAudio[i] = interpolatedValue;
-            }
-        }
-
-        return shiftedAudio.AsSpan();
+        dsp_shifter.PitchShiftFactor = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_PITCH);
+        byte[] bytes = new byte[audioBuffer.Length * sizeof(short)];
+        Buffer.BlockCopy(audioBuffer, 0, bytes, 0, bytes.Length);
+        dsp_buffer.Write(bytes, 0, bytes.Length);
+        float[] result = new float[audioBuffer.Length];
+        dsp_shifter.Read(result, 0, audioBuffer.Length);
+        return result.Select((s) => new MonoSample(s)).ToArray().AsSpan();
     }
 
 
     private void SetAudioSource() {
+        dsp_buffer = new(new(22500, 16, 1, CSCore.AudioEncoding.Pcm));
+        dsp_sampler = new(dsp_buffer);
+        dsp_shifter = new(dsp_sampler);
+
         OpusStream<MonoSample> stream = World.LocalUser.GetStreamOrAdd<OpusStream<MonoSample>>("Mario64Audio", (s) =>
         {
             s.Name = "Mario64Audio";

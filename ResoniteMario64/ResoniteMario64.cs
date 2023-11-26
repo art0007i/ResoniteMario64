@@ -34,8 +34,8 @@ public class ResoniteMario64 : ResoniteMod
     //public static ModConfigurationKey<float> KEY_MARIO_CULL_DISTANCE = new("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
     //[AutoRegisterConfigKey]
     //public static ModConfigurationKey<int> KEY_MAX_MARIOS_PER_PERSON = new("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine.", () => 1); // slider 0, 20, 0 (still dk what the last arg means)
-    //[AutoRegisterConfigKey]
-    //public static ModConfigurationKey<int> KEY_MAX_MESH_COLLIDER_TRIS = new("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
+    [AutoRegisterConfigKey]
+    public static ModConfigurationKey<int> KEY_MAX_MESH_COLLIDER_TRIS = new("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
     // ENGINE
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<float> KEY_AUDIO_PITCH = new("audio_pitch", "The audio pitch of the game sounds. You can use this to fine tune the Engine Sounds.", () => 1.3f); // slider 0f, 1f, 2
@@ -132,11 +132,24 @@ public class ResoniteMario64 : ResoniteMod
                 if (SM64Context.EnsureInstanceExists(__instance.World))
                 {
                     var mar = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario");
+                    mar.GlobalPosition = __instance.GlobalPosition;
                     SM64Context._instance.AddMario(mar);
                 }
                 else
                 {
                     btn.LabelText = "Failed to spawn mario!";
+                }
+            };
+            ui.Button("Rebuild Static Surfaces").LocalPressed += (b,e)=> {
+                if (SM64Context._instance != null)
+                {
+                    SM64Context.QueueStaticSurfacesUpdate();
+                }
+            };
+            ui.Button("Destroy Mario64 Context").LocalPressed += (b,e)=> {
+                if (SM64Context._instance != null)
+                {
+                    SM64Context._instance.DestroyInstance();
                 }
             };
         }
