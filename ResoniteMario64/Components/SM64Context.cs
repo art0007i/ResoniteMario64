@@ -32,9 +32,6 @@ public class SM64Context {
 
     OpusStream<MonoSample> MarioAudio;
     CircularBufferWriteState<MonoSample> _writeState = default;
-    WriteableBufferingSource dsp_buffer;
-    Pcm16BitToSample dsp_sampler;
-    PitchShifter dsp_shifter;
 
     protected SM64Context(World wld) {
         World = wld;
@@ -185,26 +182,19 @@ public class SM64Context {
         if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_DISABLE_AUDIO)) return;
         if (MarioAudio == null) return;
 
-        Interop.AudioTick(_audioBuffer, BufferSize);
-        MarioAudio.Write(ConvertSamples(_audioBuffer), ref _writeState);
+        while (MarioAudio.SamplesAvailableForEncode+MarioAudio.UnreadSamples < MarioAudio.BufferSize/2)
+        {
+            ResoniteModLoader.ResoniteMod.Msg(Interop.AudioTick(_audioBuffer, BufferSize));
+            MarioAudio.Write(ConvertSamples(_audioBuffer), ref _writeState);
+        }
     }
 
     public Span<MonoSample> ConvertSamples(short[] audioBuffer)
     {
-        dsp_shifter.PitchShiftFactor = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_PITCH);
-        byte[] bytes = new byte[audioBuffer.Length * sizeof(short)];
-        Buffer.BlockCopy(audioBuffer, 0, bytes, 0, bytes.Length);
-        dsp_buffer.Write(bytes, 0, bytes.Length);
-        float[] result = new float[audioBuffer.Length];
-        dsp_shifter.Read(result, 0, audioBuffer.Length);
-        return result.Select((s) => new MonoSample(s)).ToArray().AsSpan();
+        return audioBuffer.Select(x => new MonoSample((float)x / short.MaxValue)).ToArray().AsSpan();
     }
 
-
     private void SetAudioSource() {
-        dsp_buffer = new(new(22500, 16, 1, CSCore.AudioEncoding.Pcm));
-        dsp_sampler = new(dsp_buffer);
-        dsp_shifter = new(dsp_sampler);
 
         OpusStream<MonoSample> stream = World.LocalUser.GetStreamOrAdd<OpusStream<MonoSample>>("Mario64Audio", (s) =>
         {
@@ -219,32 +209,6 @@ public class SM64Context {
         output.Spatialize.Value = false;
         output.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
         output.Volume.Value = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_VOLUME);
-    }
-
-    private void ProcessMoreSamples() {
-        Interop.AudioTick(_audioBuffer, BufferSize);
-        for (var i = 0; i < BufferSize; i++) {
-            _processedAudioBuffer[i] = MathX.Min((float)_audioBuffer[i] / short.MaxValue, 1f);
-        }
-        _bufferPosition = 0;
-    }
-
-    // TODO: apparently this is just some unity function that allows you to insert audio somehow
-    private void OnAudioFilterRead(float[] data, int channels) {
-
-        // Disable audio, it can get annoying
-        if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_DISABLE_AUDIO)) return;
-
-        var samplesRemaining = data.Length;
-        while (samplesRemaining > 0) {
-            var samplesToCopy = MathX.Min(samplesRemaining, BufferSize - _bufferPosition);
-            Array.Copy(_processedAudioBuffer, _bufferPosition, data, data.Length - samplesRemaining, samplesToCopy);
-            _bufferPosition += samplesToCopy;
-            samplesRemaining -= samplesToCopy;
-            if (_bufferPosition >= BufferSize) {
-                ProcessMoreSamples();
-            }
-        }
     }
 
     internal double LastTick;
