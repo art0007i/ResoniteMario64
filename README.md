@@ -1,3 +1,5 @@
+# mod is not finished. development has basically halted due to lack of interest but if somoene wants to fix it go ahead.
+
 # ResoniteMario64
 
 A [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader) mod for [Resonite](https://resonite.com/) that allows you to spawn in and control mario from super mario 64.
