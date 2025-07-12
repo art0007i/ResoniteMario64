@@ -74,17 +74,20 @@ public partial class SM64Context : IDisposable
         }
     }
 
-    public static bool TryAddMario(Slot root, bool isButton = false) => AddMario(root, isButton) != null;
+    public static bool TryAddMario(Slot root) => AddMario(root) != null;
 
-    public static SM64Mario AddMario(Slot root, bool isButton = false)
+    public static SM64Mario AddMario(Slot root)
     {
         SM64Mario mario = null;
 
         if (EnsureInstanceExists(root.World))
         {
-            mario = new SM64Mario(root, isButton);
-            Instance.Marios.Add(root, mario);
-            if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
+            if (!Instance.Marios.ContainsKey(root))
+            {
+                mario = new SM64Mario(root);
+                Instance.Marios.Add(root, mario);
+                if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
+            }
         }
 
         return mario;

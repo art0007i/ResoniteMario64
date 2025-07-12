@@ -140,11 +140,28 @@ public class ResoniteMario64 : ResoniteMod
         {
             __instance.RootSlot.ChildAdded += (slot, child) =>
             {
-                if (child.Tag == "Mario" && SM64Context.Instance?.Marios.ContainsKey(child) is not true)
+                if (child.Tag == "Mario")
                 {
                     SM64Context.AddMario(child);
                 }
             };
+        }
+    }
+
+    [HarmonyPatch(typeof(Button), "RunPressed")]
+    private class RunButtonPressed
+    {
+        public static bool Prefix(Button __instance)
+        {
+            if (__instance.Slot.Tag == "SpawnMario")
+            {
+                Slot mario = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
+                mario.GlobalPosition = __instance.Slot.GlobalPosition;
+                
+                return !SM64Context.TryAddMario(mario);
+            }
+
+            return true;
         }
     }
 
@@ -161,7 +178,7 @@ public class ResoniteMario64 : ResoniteMod
                     Slot mario = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
                     mario.GlobalPosition = __instance.GlobalPosition;
 
-                    b.LabelText = SM64Context.TryAddMario(mario, true) ? "Mario Spawned!" : "Mario Spawn Failed!";
+                    b.LabelText = SM64Context.TryAddMario(mario) ? "Mario Spawned!" : "Mario Spawn Failed!";
 
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
@@ -219,6 +236,7 @@ public class ResoniteMario64 : ResoniteMod
                     else if (inspector?.ComponentView?.Target?.Tag == $"SM64 {AudioTag}")
                     {
                         ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
+                        ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
                     }
                 }
                 catch (Exception e)

@@ -24,76 +24,100 @@ public static class Utils
         }
     }
 
-    public static bool IsGoodCollider(Collider col) =>
+    private static bool IsGoodCollider(Collider col) =>
             // Ignore disabled
             col.Enabled
             && col.Slot.IsActive
             // Ignore non character colliders and non Tagged Colliders
-            && (col.CharacterCollider.Value || col.Slot.Tag == "SM64 Collider")
+            && (col.CharacterCollider.Value || col.Slot.Tag?.Contains("SM64 Collider") is true)
             // Ignore triggers
             && col.Type.Value != ColliderType.Trigger;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
         List<SM64Surface> surfaces = new List<SM64Surface>();
-        List<MeshCollider> meshColliders = new List<MeshCollider>();
+        List<(MeshCollider collider, SM64SurfaceType surfaceType, SM64TerrainType terrainType)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType)>();
 
         foreach (Collider obj in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
-            // Ignore bad colliders
             if (!IsGoodCollider(obj)) continue;
 
-            // TODO: Handle dynamic colliders somehow
-
-            // Check if we have surface and terrain data
             SM64SurfaceType surfaceType = SM64SurfaceType.Default;
             SM64TerrainType terrainType = SM64TerrainType.Grass;
-            
-            // ResoniteMod.Debug($"[GoodCollider] {obj.name}");
+
+            string[] tagParts = obj.Slot.Tag?.Split(',');
+            if (tagParts != null)
+            {
+                foreach (string part in tagParts)
+                {
+                    string trimmed = part.Trim();
+
+                    if (trimmed.StartsWith("SurfaceType_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string enumName = trimmed.Substring("SurfaceType_".Length);
+                        if (Enum.TryParse(enumName, true, out SM64SurfaceType parsedSurface))
+                        {
+                            surfaceType = parsedSurface;
+                        }
+                    }
+                    else if (trimmed.StartsWith("TerrainType_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string enumName = trimmed.Substring("TerrainType_".Length);
+                        if (Enum.TryParse(enumName, true, out SM64TerrainType parsedTerrain))
+                        {
+                            terrainType = parsedTerrain;
+                        }
+                    }
+                }
+            }
 
             if (obj is MeshCollider meshCollider)
             {
-                // Let's do some more processing to the mesh colliders without dedicated components
-                meshColliders.Add(meshCollider);
+                meshColliders.Add((meshCollider, surfaceType, terrainType));
             }
             else
             {
-                // Everything else, let's just add (probably a bad idea)
                 GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType);
             }
         }
 
         // Ignore all meshes colliders with a null shared mesh, or non-readable
-        List<MeshCollider> nonReadableMeshColliders = meshColliders.Where(meshCollider => meshCollider.Mesh.Target == null || !meshCollider.Mesh.IsAssetAvailable).ToList();
+        List<(MeshCollider collider, SM64SurfaceType surfaceType, SM64TerrainType terrainType)> nonReadableMeshColliders = meshColliders.Where(mc => mc.collider.Mesh.Target == null || !mc.collider.Mesh.IsAssetAvailable).ToList();
 #if DEBUG
-        foreach (MeshCollider invalidMeshCollider in nonReadableMeshColliders)
+        foreach (var invalid in nonReadableMeshColliders)
         {
-            ResoniteMod.Warn($"[MeshCollider] {invalidMeshCollider.Slot.Name} Mesh is " +
-                                 $"{(invalidMeshCollider.Mesh.Target == null ? "null" : "non-readable")}, " +
-                                 "so we won't be able to use this as a collider for Mario :(");
+            ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is " +
+                             $"{(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, " +
+                             "so we won't be able to use this as a collider for Mario :(");
         }
 #endif
-        meshColliders.RemoveAll(meshCollider => meshCollider.Mesh.Target == null || !meshCollider.Mesh.IsAssetAvailable);
+        meshColliders.RemoveAll(mc => mc.collider.Mesh.Target == null || !mc.collider.Mesh.IsAssetAvailable);
 
         // Sort the meshColliders list by the length of their triangles array in ascending order
-        meshColliders.Sort((a, b) => a.Mesh.Asset.Data.TotalTriangleCount.CompareTo(b.Mesh.Asset.Data.TotalTriangleCount));
+        meshColliders.Sort((a, b) => a.collider.Mesh.Asset.Data.TotalTriangleCount.CompareTo(b.collider.Mesh.Asset.Data.TotalTriangleCount));
 
         // Add the mesh colliders until we reach the max mesh collider polygon limit
         int maxTris = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMeshColliderTris);
         int totalMeshColliderTris = 0;
-        foreach (MeshCollider meshCollider in meshColliders)
+        
+        foreach ((MeshCollider meshCollider, SM64SurfaceType surfaceType, SM64TerrainType terrainType) in meshColliders)
         {
             int meshTrisCount = meshCollider.Mesh.Asset.Data.TotalTriangleCount;
             int newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
             if (newTotalMeshColliderTris > maxTris)
             {
+#if DEBUG
                 ResoniteMod.Debug("[MeshCollider] Collider has too many triangles. " + meshCollider);
+#endif
                 continue;
             }
 
-            ResoniteMod.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider);
+#if DEBUG
+            ResoniteMod.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider);   
+#endif
 
-            GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
+            GetTransformedSurfaces(meshCollider, surfaces, surfaceType, terrainType);
+            totalMeshColliderTris = newTotalMeshColliderTris;
         }
 
         return surfaces.ToArray();
@@ -115,4 +139,3 @@ public static class Utils
         return surfaces;
     }
 }
-
