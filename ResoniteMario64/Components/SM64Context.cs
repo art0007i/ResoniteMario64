@@ -1,39 +1,61 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using CSCore.DSP;
-using CSCore.Streams.Effects;
-using CSCore.Streams;
-using System.Collections;
-using CSCore.Streams.SampleConverter;
-using System.Reflection.Emit;
+using ResoniteMario64.libsm64;
+using static ResoniteMario64.Consts;
 
-namespace ResoniteMario64;
+namespace ResoniteMario64.Components;
 
-[Category("SM64")]
-public class SM64Context {
+public class SM64Context : IDisposable
+{
+    // private readonly List<SM64ColliderDynamic> _surfaceObjects = new();
+    public static SM64Context Instance;
+    
+#region Audio
 
-    internal static SM64Context _instance = null;
+    private Slot _marioAudioSlot;
+    private OpusStream<StereoSample> _marioAudioStream;
+    private AudioOutput _marioAudioOutput;
+    
+    private const int NativeSampleRate = 32000;
+    private const int TargetSampleRate = 48000;
 
+    private const int NativeBufferCount = 544 * 2;             // Random ahh numbers
+    private const int NativeBufferSize = NativeBufferCount * 2;// Pt.2
+
+    private readonly short[] _audioBuffer = new short[NativeBufferSize];
+    private readonly StereoSample[] _convertedBuffer = new StereoSample[(int)(NativeBufferSize * (TargetSampleRate / (float)NativeSampleRate))];
+
+    private CircularBufferWriteState<StereoSample> _writeState;
+    
+    private readonly Stopwatch _audioStopwatch = Stopwatch.StartNew();
+    private const double AudioTickInterval = 1000.0 / 30.0;
+    private double _audioAccumulator = 0.0;
+
+#endregion
+    
+    public readonly Dictionary<Slot, SM64Mario> Marios = new Dictionary<Slot, SM64Mario>();
+    
+    public Comment InputBlock;
+
+    public float2 Joystick;
+    public bool Jump;
+    public bool Kick;
+    public bool Stomp;
+
+    internal double LastTick;
+    
     public World World;
 
-    private readonly List<SM64Mario> _marios = new();
-    //private readonly List<SM64ColliderDynamic> _surfaceObjects = new();
-
-    // Audio
-    private const int BufferSize = 544 * 2 * 2;
-    private int _bufferPosition = BufferSize;
-    private readonly short[] _audioBuffer = new short[BufferSize];
-    private readonly float[] _processedAudioBuffer = new float[BufferSize];
-
-    OpusStream<MonoSample> MarioAudio;
-    CircularBufferWriteState<MonoSample> _writeState = default;
-
-    protected SM64Context(World wld) {
+    private SM64Context(World wld)
+    {
         World = wld;
 
         Interop.GlobalInit(ResoniteMario64.SuperMario64UsZ64RomBytes);
@@ -49,115 +71,323 @@ public class SM64Context {
         QueueStaticSurfacesUpdate();
     }
 
-    public SM64Mario AddMario(Slot root)
+    public static SM64Mario AddMario(Slot root, bool isButton = false)
     {
-        var mario = new SM64Mario(root);
-        _instance._marios.Add(mario);
-        if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_PLAY_RANDOM_MUSIC)) Interop.PlayRandomMusic();
+        SM64Mario mario = null;
+        
+        if (EnsureInstanceExists(root.World))
+        {
+            mario = new SM64Mario(root, isButton);
+            Instance.Marios.Add(root, mario);
+            if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
+        }
 
         return mario;
     }
 
-    public float2 joystick;
-    public bool jump;
-    public bool kick;
-    public bool stomp;
-
-    public Comment inputBlock;
+    public static bool TryAddMario(Slot root, bool isButton = false) => AddMario(root, isButton) != null;
 
     private void HandleInputs()
     {
-        var root = World.LocalUser.Root;
-        if (root == null) return;
-        var loco = root.GetRegisteredComponent<LocomotionController>();
+        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco == null) return;
 
-        var inp = World.InputInterface;
-
+        InputInterface inp = World.InputInterface;
         if (inp.VR_Active)
         {
-            var main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
-            var off = main.OtherTool;
-            joystick = off.Inputs.Axis.CurrentValue;
-            jump = (main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held);
-            stomp = main.Inputs.Grab.Held;
-            kick = main.Inputs.Interact.Held;
+            InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
+            InteractionHandler off = main.OtherTool;
+
+            Joystick = off.Inputs.Axis.CurrentValue;
+            Jump = main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held;
+            Stomp = main.Inputs.Grab.Held;
+            Kick = main.Inputs.Interact.Held;
         }
         else
         {
-            var w = inp.GetKey(Key.W);
-            var s = inp.GetKey(Key.S);
-            var d = inp.GetKey(Key.D);
-            var a = inp.GetKey(Key.A);
-            joystick = GetDekstopJoystick(w, s, d, a);
+            bool w = inp.GetKey(Key.W);
+            bool s = inp.GetKey(Key.S);
+            bool d = inp.GetKey(Key.D);
+            bool a = inp.GetKey(Key.A);
 
-            jump = inp.GetKey(Key.Space);
-            stomp = inp.GetKey(Key.Shift);
-            kick = inp.Mouse.LeftButton.Held;
+            Joystick = GetDesktopJoystick(w, s, d, a);
+            Jump = inp.GetKey(Key.Space);
+            Stomp = inp.GetKey(Key.Shift);
+            Kick = inp.Mouse.LeftButton.Held;
+        }
+        
+        if (InputBlock == null || InputBlock.IsRemoved)
+        {
+            Comment block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == $"SM64 {InputBlockTag}");
+            block.Text.Value = $"SM64 {InputBlockTag}";
+            InputBlock = block;
         }
 
-
-        if (inputBlock == null || inputBlock.IsRemoved)
+        if (Marios.Count > 0 && !(inp.GetKey(Key.Control) || inp.VR_Active))
         {
-            var block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == "Mario64InputBlock");
-            block.Text.Value = "Mario64InputBlock";
-            inputBlock = block;
-        }
-        if (_marios.Count > 0 && !(inp.GetKey(Key.Control) || inp.VR_Active))
-        {
-            var currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == "Mario64InputBlock");
+            Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == $"SM64 {InputBlockTag}");
             if (currentBlock == null)
             {
-                loco.SupressSources.Add(inputBlock);
+                loco.SupressSources.Add(InputBlock);
             }
         }
         else
         {
-            loco.SupressSources.RemoveAll(inputBlock);
+            loco.SupressSources.RemoveAll(InputBlock);
         }
-    }
-    private float2 GetDekstopJoystick(bool up, bool down, bool left, bool right)
-    {
-        // prioritize Top Right when all inputs are held
-        float vert = (up ? 1 : (down ? -1 : 0));
-        float hori = (left ? 1 : (right ? -1 : 0));
-        // could normalize but I think mario engine does it at some point down the line anyway
-        return new float2(hori, vert);
     }
 
-    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand)
+    private float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
-        if (_instance?.World == c.World
-                && _instance._marios.Count > 0
-                && c.InputInterface.VR_Active
-                && c.Side.Value == hand)
+        float vert = up ? 1 : down ? -1 : 0;
+        float hori = left ? 1 : right ? -1 : 0;
+
+        float2 input = new float2(hori, vert);
+
+        float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
+        return length > 1.0f
+                ? new float2(input.x / length, input.y / length)
+                : input;
+    }
+
+    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World && Instance.Marios.Count > 0 && c.InputInterface.VR_Active && c.Side.Value == hand;
+
+    private void ProcessAudio()
+    {
+        if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDisableAudio)) return;
+        if (_marioAudioStream == null) return;
+
+        double elapsed = _audioStopwatch.Elapsed.TotalMilliseconds;
+        _audioStopwatch.Restart();
+        _audioAccumulator += elapsed;
+
+        // Clamp accumulator to avoid runaway overflow
+        if (_audioAccumulator > AudioTickInterval * 4)
         {
-            return true;
+            _audioAccumulator = AudioTickInterval * 4;
         }
-        return false;
+
+        // Run at 30Hz max
+        if (_audioAccumulator >= AudioTickInterval)
+        {
+            _audioAccumulator -= AudioTickInterval;
+
+            Interop.AudioTick(_audioBuffer, (uint)(NativeBufferCount / _marioAudioStream.FrameSize * _marioAudioStream.FrameSize));
+
+            int written = DownmixAndResampleStereo(
+                _audioBuffer,
+                NativeSampleRate,
+                TargetSampleRate,
+                _convertedBuffer
+            );
+
+            if (written <= 0) return;
+            if (_marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode < written)
+            {
+                return;
+            }
+
+            _marioAudioStream.Write(_convertedBuffer.AsSpan(0, written), ref _writeState);
+        }
+    }
+
+    private static int DownmixAndResampleMono(short[] input, float inputRate, float outputRate, MonoSample[] output)
+    {
+        float ratio = inputRate / outputRate;
+        float pos = 0.0f;
+        int outputIndex = 0;
+
+        while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
+        {
+            int i = (int)pos * 2;
+
+            float l1 = input[i] / 32768.0f;
+            float r1 = input[i + 1] / 32768.0f;
+            float l2 = input[i + 2] / 32768.0f;
+            float r2 = input[i + 3] / 32768.0f;
+
+            float t = pos - (int)pos;
+
+            float s1 = (l1 + r1) * 0.5f;
+            float s2 = (l2 + r2) * 0.5f;
+
+            float sample = s1 * (1 - t) + s2 * t;
+
+            output[outputIndex++] = new MonoSample(sample);
+            pos += ratio;
+        }
+
+        return outputIndex;
     }
     
+    private static int DownmixAndResampleStereo(short[] input, float inputRate, float outputRate, StereoSample[] output)
+    {
+        float ratio = inputRate / outputRate;
+        float pos = 0.0f;
+        int outputIndex = 0;
+
+        while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
+        {
+            int i = (int)pos * 2;
+
+            float l1 = input[i] / 32768.0f;
+            float r1 = input[i + 1] / 32768.0f;
+            float l2 = input[i + 2] / 32768.0f;
+            float r2 = input[i + 3] / 32768.0f;
+
+            float t = pos - (int)pos;
+
+            float left = l1 * (1 - t) + l2 * t;
+            float right = r1 * (1 - t) + r2 * t;
+
+            output[outputIndex++] = new StereoSample(left, right);
+            pos += ratio;
+        }
+
+        return outputIndex;
+    }
+
+    private void SetAudioSource()
+    {
+        _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(World.LocalUser, $"SM64 {AudioTag}", out bool created);
+        if (created)
+        {
+            _marioAudioStream.Group = "SM64";
+        }
+        Slot userSlot = World.LocalUser.Root.Slot;
+        userSlot.RunSynchronously(() =>
+        {
+            _marioAudioSlot = World.RootSlot.FindChildOrAdd($"SM64 {AudioTag}", false);
+            _marioAudioSlot.Tag = $"SM64 {AudioTag}";
+            _marioAudioSlot.OnPrepareDestroy += slot =>
+            {
+                if (Interop.IsGlobalInit)
+                {
+                    slot.RunInUpdates(slot.LocalUser.AllocationID * 3, SetAudioSource);
+                }
+            };
+            
+            _marioAudioOutput = _marioAudioSlot.GetComponentOrAttach<AudioOutput>(out bool attached);
+            if (attached || _marioAudioOutput.Source.Target == null)
+            {
+                _marioAudioOutput.Source.Target = _marioAudioStream;
+                _marioAudioOutput.SpatialBlend.Value = 0;
+                _marioAudioOutput.Spatialize.Value = false;
+                _marioAudioOutput.DopplerLevel.Value = 0;
+                _marioAudioOutput.IgnoreAudioEffects.Value = true;
+                _marioAudioOutput.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+                _marioAudioOutput.Volume.Value = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
+            }
+        });
+    }
+
+    public void OnCommonUpdate()
+    {
+        HandleInputs();
+
+        if (World.InputInterface.GetKeyDown(Key.Semicolon))
+        {
+            QueueStaticSurfacesUpdate();
+        }
+
+        if (World.Time.WorldTime - LastTick >= ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f)
+        {
+            SM64GameTick();
+            LastTick = World.Time.WorldTime;
+        }
+
+        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        foreach (SM64Mario o in marios.Values)
+        {
+            o.ContextUpdateSynced();
+        }
+    }
+
+    private void SM64GameTick()
+    {
+        ProcessAudio();
+
+        /*lock (_surfaceObjects) {
+            foreach (var o in _surfaceObjects) {
+                o.ContextFixedUpdateSynced();
+            }
+        }
+        */
+
+        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        foreach (SM64Mario o in marios.Values)
+        {
+            o.ContextFixedUpdateSynced();
+        }
+    }
+
+    private static bool EnsureInstanceExists(World wld)
+    {
+        if (Instance != null && wld != Instance.World)
+        {
+            bool destroy = wld.Focus == World.WorldFocus.Focused;
+            ResoniteMario64.Error("Tried to create instance while one already exists." + (destroy ? " It will be replaced by a new one." : ""));
+            if (destroy)
+            {
+                Instance.Dispose();
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if (Instance != null) return true;
+
+        Instance = new SM64Context(wld);
+        return true;
+    }
+
+    public static void QueueStaticSurfacesUpdate()
+    {
+        // TODO: implement buffer (so it will execute the update after 1.5s, and you can call it multiple times within that time)
+        if (Instance == null) return;
+        Instance.StaticTerrainUpdate();
+    }
+
+    private void StaticTerrainUpdate()
+    {
+        if (Instance == null) return;
+        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
+    }
+
+    public static void UnregisterMario(SM64Mario mario)
+    {
+        if (Instance == null) return;
+
+        Interop.MarioDelete(mario.MarioId);
+        
+        Instance.Marios.Remove(mario.MarioSlot);
+
+        if (Instance.Marios.Count == 0)
+        {
+            Interop.StopMusic();
+        }
+    }
+
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker
     {
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
-            var lookFor = AccessTools.Field(typeof(InteractionHandler), "_blockUserspaceOpen");
-            foreach (var code in codes)
+            FieldInfo lookFor = AccessTools.Field(typeof(InteractionHandler), "_blockUserspaceOpen");
+            foreach (CodeInstruction code in codes)
             {
                 yield return code;
                 if (code.LoadsField(lookFor))
                 {
-                    yield return new(OpCodes.Ldarg_0);
-                    yield return new(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
                 }
             }
         }
 
-        public static bool Injection(bool b, InteractionHandler c)
-        {
-            return ShouldblockInputs(c, c.LocalUser.Primaryhand) || b; 
-        }
+        public static bool Injection(bool b, InteractionHandler c) => ShouldblockInputs(c, c.LocalUser.Primaryhand) || b;
     }
 
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
@@ -175,134 +405,6 @@ public class SM64Context {
                 __instance.Inputs.Interact.RegisterBlocks = true;
                 __instance.Inputs.Grab.RegisterBlocks = true;
             }*/
-        }
-    }
-    private void ProcessAudio()
-    {
-        if (ResoniteMario64.config.GetValue(ResoniteMario64.KEY_DISABLE_AUDIO)) return;
-        if (MarioAudio == null) return;
-
-        while (MarioAudio.SamplesAvailableForEncode+MarioAudio.UnreadSamples < MarioAudio.BufferSize/2)
-        {
-            ResoniteModLoader.ResoniteMod.Msg(Interop.AudioTick(_audioBuffer, BufferSize));
-            MarioAudio.Write(ConvertSamples(_audioBuffer), ref _writeState);
-        }
-    }
-
-    public Span<MonoSample> ConvertSamples(short[] audioBuffer)
-    {
-        return audioBuffer.Select(x => new MonoSample((float)x / short.MaxValue)).ToArray().AsSpan();
-    }
-
-    private void SetAudioSource() {
-
-        OpusStream<MonoSample> stream = World.LocalUser.GetStreamOrAdd<OpusStream<MonoSample>>("Mario64Audio", (s) =>
-        {
-            s.Name = "Mario64Audio";
-        });
-        MarioAudio = stream;
-        var userSlot = World.LocalUser.Root.Slot;
-        var audio = World.AddSlot("mario audio");
-        var output = audio.AttachComponent<AudioOutput>();
-        output.Source.Target = stream;
-        output.SpatialBlend.Value = 0;
-        output.Spatialize.Value = false;
-        output.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
-        output.Volume.Value = ResoniteMario64.config.GetValue(ResoniteMario64.KEY_AUDIO_VOLUME);
-    }
-
-    internal double LastTick;
-
-    public void OnCommonUpdate()
-    {
-        HandleInputs();
-
-
-        if (World.InputInterface.GetKeyDown(Key.Semicolon))
-        {
-            QueueStaticSurfacesUpdate();
-        }
-
-        if (World.Time.WorldTime - LastTick >= ResoniteMario64.config.GetValue(ResoniteMario64.KEY_GAME_TICK_MS) / 1000f)
-        {
-            SM64GameTick();
-            LastTick = World.Time.WorldTime;
-        }
-        lock (_marios)
-        {
-            foreach (var o in _marios)
-            {
-                o.ContextUpdateSynced();
-            }
-        }
-    }
-
-    private void SM64GameTick() {
-        ProcessAudio();
-
-        /*lock (_surfaceObjects) {
-            foreach (var o in _surfaceObjects) {
-                o.ContextFixedUpdateSynced();
-            }
-        }
-        */
-        lock (_marios) {
-            foreach (var o in _marios) {
-                o.ContextFixedUpdateSynced(_marios);
-            }
-        }
-    }
-
-    public void DestroyInstance() {
-        lock (_marios)
-        {
-            foreach (var o in _marios)
-            {
-                o.DestroyMario();
-            }
-        }
-
-        Interop.GlobalTerminate();
-        _instance = null;
-    }
-
-    public static bool EnsureInstanceExists(World wld) {
-        if(_instance != null && wld != _instance.World)
-        {
-            var destroy = wld.Focus == World.WorldFocus.Focused;
-            ResoniteMario64.Error("Tried to create instance while one already exists." + (destroy ? " It will be replaced by a new one." : ""));
-            if (destroy) _instance.DestroyInstance();
-            else return false;
-        }
-        if (_instance != null) return true;
-
-        _instance = new SM64Context(wld);
-        return true;
-    }
-
-    public static void QueueStaticSurfacesUpdate() {
-        // TODO: implement buffer (so it will execute the update after 1.5s, and you can call it multiple times within that time)
-        if (_instance == null) return;
-        _instance.StaticTerrainUpdate();
-    }
-
-    private void StaticTerrainUpdate() {
-        if (_instance == null) return;
-        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
-    }
-
-    public static void UnregisterMario(SM64Mario mario) {
-        if (_instance == null) return;
-
-        Interop.MarioDelete(mario.MarioId);
-
-        lock (_instance._marios) {
-
-            _instance._marios.Remove(mario);
-
-            if (_instance._marios.Count == 0) {
-                Interop.StopMusic();
-            }
         }
     }
 
@@ -326,4 +428,21 @@ public class SM64Context {
             }
         }
     }*/
+    public void Dispose()
+    {
+        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        foreach (SM64Mario o in marios.Values)
+        {
+            o.Dispose();
+        }
+        
+        Interop.GlobalTerminate();
+        
+        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
+        loco?.SupressSources?.RemoveAll(InputBlock);
+        
+        _marioAudioSlot?.Destroy();
+
+        Instance = null;
+    }
 }
