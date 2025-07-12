@@ -296,7 +296,7 @@ public class SM64Context : IDisposable
             LastTick = World.Time.WorldTime;
         }
 
-        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario o in marios.Values)
         {
             o.ContextUpdateSynced();
@@ -314,7 +314,7 @@ public class SM64Context : IDisposable
         }
         */
 
-        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario o in marios.Values)
         {
             o.ContextFixedUpdateSynced();
@@ -430,7 +430,7 @@ public class SM64Context : IDisposable
     }*/
     public void Dispose()
     {
-        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(Marios);
+        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario o in marios.Values)
         {
             o.Dispose();

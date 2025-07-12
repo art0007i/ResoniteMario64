@@ -23,6 +23,8 @@ public static class Utils
         { SoundBitsKeys.SOUND_MENU_COLLECT_RED_COIN, SoundArgLoad(7, 8, 0x28, 0x90, 8) }
     };
 
+    public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
+
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
