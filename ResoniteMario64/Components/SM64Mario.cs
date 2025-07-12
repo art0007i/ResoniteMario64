@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -364,15 +366,7 @@ public class SM64Mario : IDisposable
         {
             MarioSpace.TryWriteValue(ActionFlagsTag, CurrentState.ActionFlags);
             MarioSpace.TryWriteValue(StateFlagsTag, CurrentState.StateFlags);
-        }
-        else
-        {
-            SetAction(ActionFlags);
-            SetState(StateFlags);
-        }
-
-        if (IsLocal)
-        {
+            
             if (_marioGrabbable != null)
             {
                 bool pickup = IsBeingGrabbed;
@@ -391,27 +385,26 @@ public class SM64Mario : IDisposable
 
                 _wasPickedUp = pickup;
             }
-        }
-
-        // Check for deaths, so we delete the prop
-        if (!_isDying && CurrentState.IsDead)
-        {
-            _isDying = true;
-            MarioSlot.RunInSeconds(15f, () => SetMarioAsNuked(true));
-        }
-
-        for (int i = 0; i < _colorBuffer.Length; ++i)
-        {
-            _colorBufferColors[i] = new color(_colorBuffer[i].x, _colorBuffer[i].y, _colorBuffer[i].z);
-        }
-
-        if (_marioMesh != null)
-        {
-            for (int i = 0; i < _marioMesh.VertexCount; i++)
+            
+            // Check for deaths, so we delete the prop
+            if (!_isDying && CurrentState.IsDead)
             {
-                _marioMesh.SetColor(i, _colorBufferColors[i]);
-                _marioMesh.SetUV(i, 0, _uvBuffer[i]);
+                _isDying = true;
+                MarioSlot.RunInSeconds(15f, () => SetMarioAsNuked(true));
             }
+        }
+        else
+        {
+            SetAction(ActionFlags);
+            SetState(StateFlags);
+        }
+
+        // Just for now until Collider Shenanigans is implemented
+        Dictionary<Slot, SM64Mario> marios = new Dictionary<Slot, SM64Mario>(SM64Context.Instance.Marios);
+        SM64Mario attackingMario = marios.Values.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f);
+        if (attackingMario != null)
+        {
+            TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
         }
 
         if (CurrentState.HasCap(MarioCapType.MetalCap))
@@ -426,6 +419,20 @@ public class SM64Mario : IDisposable
             if (CurrentMaterial != _marioMaterialClipped)
             {
                 CurrentMaterial = _marioMaterialClipped;
+            }
+        }
+        
+        for (int i = 0; i < _colorBuffer.Length; ++i)
+        {
+            _colorBufferColors[i] = new color(_colorBuffer[i].x, _colorBuffer[i].y, _colorBuffer[i].z);
+        }
+
+        if (_marioMesh != null)
+        {
+            for (int i = 0; i < _marioMesh.VertexCount; i++)
+            {
+                _marioMesh.SetColor(i, _colorBufferColors[i]);
+                _marioMesh.SetUV(i, 0, _uvBuffer[i]);
             }
         }
     }
