@@ -2,6 +2,7 @@
 
 using Elements.Assets;
 using FrooxEngine;
+using ResoniteModLoader;
 
 #endregion
 
@@ -57,7 +58,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 #if DEBUG
-                ResoniteMario64.Warn($"[MeshCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
+                ResoniteMod.Warn($"[MeshCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
 #endif
 
                 break;
@@ -67,7 +68,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 #if DEBUG
-                ResoniteMario64.Warn($"[ConvexHullCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
+                ResoniteMod.Warn($"[ConvexHullCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
 #endif
 
                 break;

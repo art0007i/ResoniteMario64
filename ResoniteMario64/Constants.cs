@@ -1,6 +1,6 @@
 ﻿namespace ResoniteMario64;
 
-public static class Consts
+public static class Constants
 {
     public const string MarioTag = "Mario";
     public const string JoystickTag = "Joystick";

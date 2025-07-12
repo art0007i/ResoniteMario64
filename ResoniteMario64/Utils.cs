@@ -5,24 +5,13 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.libsm64;
+using ResoniteModLoader;
+using static ResoniteMario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64;
 
 public static class Utils
 {
-    public static readonly Dictionary<SoundBitsKeys, uint> SoundBits = new Dictionary<SoundBitsKeys, uint>
-    {
-        { SoundBitsKeys.SOUND_GENERAL_COIN, SoundArgLoad(3, 8, 0x11, 0x80, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_COIN_WATER, SoundArgLoad(3, 8, 0x12, 0x80, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_COIN_SPURT, SoundArgLoad(3, 0, 0x30, 0x00, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_COIN_SPURT_2, SoundArgLoad(3, 8, 0x30, 0x00, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_COIN_SPURT_EU, SoundArgLoad(3, 8, 0x30, 0x20, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_COIN_DROP, SoundArgLoad(3, 0, 0x36, 0x40, 8) },
-        { SoundBitsKeys.SOUND_GENERAL_RED_COIN, SoundArgLoad(3, 0, 0x68, 0x90, 8) },
-        { SoundBitsKeys.SOUND_MENU_COIN_ITS_A_ME_MARIO, SoundArgLoad(7, 0, 0x14, 0x00, 8) },
-        { SoundBitsKeys.SOUND_MENU_COLLECT_RED_COIN, SoundArgLoad(7, 8, 0x28, 0x90, 8) }
-    };
-
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
 
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
@@ -39,7 +28,7 @@ public static class Utils
             // Ignore disabled
             col.Enabled
             && col.Slot.IsActive
-            // Ignore non character colliders
+            // Ignore non character colliders and non Tagged Colliders
             && (col.CharacterCollider.Value || col.Slot.Tag == "SM64 Collider")
             // Ignore triggers
             && col.Type.Value != ColliderType.Trigger;
@@ -59,10 +48,8 @@ public static class Utils
             // Check if we have surface and terrain data
             SM64SurfaceType surfaceType = SM64SurfaceType.Default;
             SM64TerrainType terrainType = SM64TerrainType.Grass;
-
-#if DEBUG
-            // ResoniteMario64.Msg($"[GoodCollider] {obj.name}");
-#endif
+            
+            // ResoniteMod.Debug($"[GoodCollider] {obj.name}");
 
             if (obj is MeshCollider meshCollider)
             {
@@ -81,7 +68,7 @@ public static class Utils
 #if DEBUG
         foreach (MeshCollider invalidMeshCollider in nonReadableMeshColliders)
         {
-            ResoniteMario64.Warn($"[MeshCollider] {invalidMeshCollider.Slot.Name} Mesh is " +
+            ResoniteMod.Warn($"[MeshCollider] {invalidMeshCollider.Slot.Name} Mesh is " +
                                  $"{(invalidMeshCollider.Mesh.Target == null ? "null" : "non-readable")}, " +
                                  "so we won't be able to use this as a collider for Mario :(");
         }
@@ -100,11 +87,11 @@ public static class Utils
             int newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
             if (newTotalMeshColliderTris > maxTris)
             {
-                ResoniteMario64.Debug("[MeshCollider] Collider has too many triangles. " + meshCollider);
+                ResoniteMod.Debug("[MeshCollider] Collider has too many triangles. " + meshCollider);
                 continue;
             }
 
-            ResoniteMario64.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider);
+            ResoniteMod.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider);
 
             GetTransformedSurfaces(meshCollider, surfaces, SM64SurfaceType.Default, SM64TerrainType.Grass);
         }
@@ -127,22 +114,5 @@ public static class Utils
 
         return surfaces;
     }
-    
-    public static uint SoundArgLoad(uint bank, uint playFlags, uint soundId, uint priority, uint flags2) =>
-            // Sound Magic Definition:
-            // First Byte (Upper Nibble): Sound Bank (not the same as audio bank!)
-            // First Byte (Lower Nibble): Bitflags for audio playback?
-            // Second Byte: Sound ID
-            // Third Byte: Priority
-            // Fourth Byte (Upper Nibble): More bitflags
-            // Fourth Byte (Lower Nibble): Sound Status (this is set to SOUND_STATUS_PLAYING when passed to the audio driver.)
-            bank << 28 | playFlags << 24 | soundId << 16 | priority << 8 | flags2 << 4 | 1;
 }
 
-public enum MarioCapType
-{
-    None,
-    VanishCap,
-    MetalCap,
-    WingCap
-}

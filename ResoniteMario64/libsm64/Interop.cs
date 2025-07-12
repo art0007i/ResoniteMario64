@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Elements.Assets;
 using Elements.Core;
 using ResoniteModLoader;
+using static ResoniteMario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.libsm64;
 
@@ -11,17 +12,10 @@ public static class MarioExtensions
 {
     public static float3 ToMarioRotation(this float3 rot)
     {
-        float Fmod(float a, float b)
-        {
-            return a - b * MathX.Floor(a / b);
-        }
-
-        float FixAngle(float a)
-        {
-            return Fmod(a + 180.0f, 360.0f) - 180.0f;
-        }
-
         return new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
+
+        float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
+        float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
     }
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
@@ -29,7 +23,7 @@ public static class MarioExtensions
 
 internal static class Interop
 {
-    public const float ScaleFactor = 150.0f;
+    public static float ScaleFactor => ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
 
     public const int SM64TextureWidth = 64 * 11;
     public const int SM64TextureHeight = 64;
@@ -43,44 +37,9 @@ internal static class Interop
 
     // It seems a collider can't be too big, otherwise it will be ignored
     // This seems like too much of a pain to fix rn, let the future me worry about it
-    public const int SM64MaxVertexDistance = 250000 * (int)ScaleFactor;
+    public static int SM64MaxVertexDistance = 250000 * (int)ScaleFactor;
 
     public const float SM64Deg2Angle = 182.04459f;
-
-    private static readonly ushort[] Musics =
-    {
-        (ushort)MusicId.SEQ_MENU_TITLE_SCREEN,
-        (ushort)(MusicId.SEQ_MENU_TITLE_SCREEN | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_GRASS,
-        (ushort)(MusicId.SEQ_LEVEL_GRASS | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_INSIDE_CASTLE,
-        (ushort)(MusicId.SEQ_LEVEL_INSIDE_CASTLE | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_WATER,
-        (ushort)(MusicId.SEQ_LEVEL_WATER | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_HOT,
-        (ushort)(MusicId.SEQ_LEVEL_HOT | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_BOSS_KOOPA,
-        (ushort)(MusicId.SEQ_LEVEL_BOSS_KOOPA | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_SNOW,
-        (ushort)(MusicId.SEQ_LEVEL_SNOW | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_SLIDE,
-        (ushort)(MusicId.SEQ_LEVEL_SLIDE | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_SPOOKY,
-        (ushort)(MusicId.SEQ_LEVEL_SPOOKY | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_EVENT_POWERUP,
-        (ushort)(MusicId.SEQ_EVENT_POWERUP | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_EVENT_METAL_CAP,
-        (ushort)(MusicId.SEQ_EVENT_METAL_CAP | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_LEVEL_KOOPA_ROAD,
-        (ushort)(MusicId.SEQ_LEVEL_KOOPA_ROAD | MusicId.SEQ_VARIATION),
-
-        (ushort)MusicId.SEQ_LEVEL_BOSS_KOOPA_FINAL,
-        (ushort)(MusicId.SEQ_LEVEL_BOSS_KOOPA_FINAL | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_MENU_FILE_SELECT,
-        (ushort)(MusicId.SEQ_MENU_FILE_SELECT | MusicId.SEQ_VARIATION),
-        (ushort)MusicId.SEQ_EVENT_CUTSCENE_CREDITS,
-        (ushort)(MusicId.SEQ_EVENT_CUTSCENE_CREDITS | MusicId.SEQ_VARIATION)
-    };
 
     public static Bitmap2D MarioTexture { get; private set; }
 
@@ -198,8 +157,8 @@ internal static class Interop
 
     public static void GlobalInit(byte[] rom)
     {
-        GCHandle romHandle = GCHandle.Alloc(rom, GCHandleType.Pinned);
-        byte[] textureData = new byte[4 * SM64TextureWidth * SM64TextureHeight];
+        GCHandle romHandle         = GCHandle.Alloc(rom, GCHandleType.Pinned);
+        byte[]   textureData       = new byte[4 * SM64TextureWidth * SM64TextureHeight];
         GCHandle textureDataHandle = GCHandle.Alloc(textureData, GCHandleType.Pinned);
 
         sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
@@ -256,7 +215,7 @@ internal static class Interop
     public static void StopMusic()
     {
         // Stop all music that was queued
-        while (sm64_get_current_background_music() is var currentMusic && currentMusic != (ushort)MusicId.SEQ_NONE)
+        while (sm64_get_current_background_music() is var currentMusic && currentMusic != (ushort)MusicSequence.None)
         {
             sm64_stop_background_music(currentMusic);
         }
@@ -265,8 +224,8 @@ internal static class Interop
     public static void StaticSurfacesLoad(SM64Surface[] surfaces)
     {
         ResoniteMod.Msg("Reloading all static collider surfaces, this can be caused by the Game Engine " +
-                            "Initialized/Destroyed or some component with static colliders was loaded/deleted. " +
-                            $"You might notice some lag spike... Total Polygons: {surfaces.Length}");
+                        "Initialized/Destroyed or some component with static colliders was loaded/deleted. " +
+                        $"You might notice some lag spike... Total Polygons: {surfaces.Length}");
         sm64_static_surfaces_load(surfaces, (ulong)surfaces.Length);
     }
 
@@ -276,17 +235,17 @@ internal static class Interop
     {
         SM64MarioState outState = new SM64MarioState();
 
-        GCHandle posHandle = GCHandle.Alloc(positionBuffer, GCHandleType.Pinned);
-        GCHandle normHandle = GCHandle.Alloc(normalBuffer, GCHandleType.Pinned);
+        GCHandle posHandle   = GCHandle.Alloc(positionBuffer, GCHandleType.Pinned);
+        GCHandle normHandle  = GCHandle.Alloc(normalBuffer, GCHandleType.Pinned);
         GCHandle colorHandle = GCHandle.Alloc(colorBuffer, GCHandleType.Pinned);
-        GCHandle uvHandle = GCHandle.Alloc(uvBuffer, GCHandleType.Pinned);
+        GCHandle uvHandle    = GCHandle.Alloc(uvBuffer, GCHandleType.Pinned);
 
         SM64MarioGeometryBuffers buff = new SM64MarioGeometryBuffers
         {
             position = posHandle.AddrOfPinnedObject(),
-            normal = normHandle.AddrOfPinnedObject(),
-            color = colorHandle.AddrOfPinnedObject(),
-            uv = uvHandle.AddrOfPinnedObject()
+            normal   = normHandle.AddrOfPinnedObject(),
+            color    = colorHandle.AddrOfPinnedObject(),
+            uv       = uvHandle.AddrOfPinnedObject()
         };
 
 
@@ -306,24 +265,24 @@ internal static class Interop
     public static uint AudioTick(short[] audioBuffer, uint numDesiredSamples, uint numQueuedSamples = 0)
     {
         GCHandle audioBufferPointer = GCHandle.Alloc(audioBuffer, GCHandleType.Pinned);
-        uint numSamples = sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
+        uint     numSamples         = sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
         audioBufferPointer.Free();
         return numSamples;
     }
 
-    public static void PlaySoundGlobal(SoundBitsKeys soundBitsKey)
+    public static void PlaySoundGlobal(Sounds soundKey)
     {
-        sm64_play_sound_global((int)Utils.SoundBits[soundBitsKey]);
+        sm64_play_sound_global((int)SoundBank[soundKey]);
     }
 
-    public static void PlaySound(SoundBitsKeys soundBitsKey, float3 unityPosition)
+    public static void PlaySound(Sounds soundKey, float3 unityPosition)
     {
-        float3 marioPos = unityPosition.ToMarioPosition();
-        float[] position = { marioPos.x, marioPos.y, marioPos.z };
+        float3   marioPos   = unityPosition.ToMarioPosition();
+        float[]  position   = { marioPos.x, marioPos.y, marioPos.z };
         GCHandle posPointer = GCHandle.Alloc(position, GCHandleType.Pinned);
 
-        sm64_play_sound((int)Utils.SoundBits[soundBitsKey], posPointer.AddrOfPinnedObject());
-        
+        sm64_play_sound((int)SoundBank[soundKey], posPointer.AddrOfPinnedObject());
+
         posPointer.Free();
     }
 
@@ -363,32 +322,32 @@ internal static class Interop
         {
             outSurfaces.Add(new SM64Surface
             {
-                Force = 0,
-                Type = (short)surfaceType,
+                Force   = 0,
+                Type    = (short)surfaceType,
                 Terrain = (ushort)terrainType,
-                v0x = (int)(ScaleFactor * -vertices[triangles[i]].x),
-                v0y = (int)(ScaleFactor * vertices[triangles[i]].y),
-                v0z = (int)(ScaleFactor * vertices[triangles[i]].z),
-                v1x = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
-                v1y = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
-                v1z = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
-                v2x = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
-                v2y = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
-                v2z = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
+                v0x     = (int)(ScaleFactor * -vertices[triangles[i]].x),
+                v0y     = (int)(ScaleFactor * vertices[triangles[i]].y),
+                v0z     = (int)(ScaleFactor * vertices[triangles[i]].z),
+                v1x     = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
+                v1y     = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
+                v1z     = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
+                v2x     = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
+                v2y     = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
+                v2z     = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
             });
         }
     }
 
     public static uint SurfaceObjectCreate(float3 position, floatQ rotation, SM64Surface[] surfaces)
     {
-        GCHandle surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
-        SM64ObjectTransform t = SM64ObjectTransform.FromUnityWorld(position, rotation);
+        GCHandle            surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
+        SM64ObjectTransform t              = SM64ObjectTransform.FromUnityWorld(position, rotation);
 
         SM64SurfaceObject surfObj = new SM64SurfaceObject
         {
-            transform = t,
+            transform    = t,
             surfaceCount = (uint)surfaces.Length,
-            surfaces = surfListHandle.AddrOfPinnedObject()
+            surfaces     = surfListHandle.AddrOfPinnedObject()
         };
 
         uint result = sm64_surface_object_create(ref surfObj);
@@ -515,10 +474,10 @@ public struct SM64MarioState
     {
         get
         {
-            if ((StateFlags & (uint)StateFlag.MARIO_VANISH_CAP) != 0) return MarioCapType.VanishCap;
-            if ((StateFlags & (uint)StateFlag.MARIO_METAL_CAP)  != 0) return MarioCapType.MetalCap;
-            if ((StateFlags & (uint)StateFlag.MARIO_WING_CAP)   != 0) return MarioCapType.WingCap;
-            return MarioCapType.None;
+            if ((StateFlags & (uint)StateFlag.VanishCap) != 0) return MarioCapType.VanishCap;
+            if ((StateFlags & (uint)StateFlag.MetalCap) != 0) return MarioCapType.MetalCap;
+            if ((StateFlags & (uint)StateFlag.WingCap) != 0) return MarioCapType.WingCap;
+            return MarioCapType.NormalCap;
         }
     }
 
@@ -528,34 +487,33 @@ public struct SM64MarioState
         {
             List<MarioCapType> activeCaps = new List<MarioCapType>();
 
-            if ((StateFlags & (uint)StateFlag.MARIO_VANISH_CAP) != 0) activeCaps.Add(MarioCapType.VanishCap);
-            if ((StateFlags & (uint)StateFlag.MARIO_METAL_CAP)  != 0) activeCaps.Add(MarioCapType.MetalCap);
-            if ((StateFlags & (uint)StateFlag.MARIO_WING_CAP)   != 0) activeCaps.Add(MarioCapType.WingCap);
+            if ((StateFlags & (uint)StateFlag.VanishCap) != 0) activeCaps.Add(MarioCapType.VanishCap);
+            if ((StateFlags & (uint)StateFlag.MetalCap) != 0) activeCaps.Add(MarioCapType.MetalCap);
+            if ((StateFlags & (uint)StateFlag.WingCap) != 0) activeCaps.Add(MarioCapType.WingCap);
 
-            if (activeCaps.Count == 0) activeCaps.Add(MarioCapType.None);
+            if (activeCaps.Count == 0) activeCaps.Add(MarioCapType.NormalCap);
             return activeCaps;
         }
     }
-    
-    public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
-    
-    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint;
-    public bool IsAttacking => (ActionFlags & (uint)ActionFlag.ACT_FLAG_ATTACKING) != 0;
-    public bool IsFirstPerson => IsFlyingOrSwimming;
-    public bool IsFlyingOrSwimming => (ActionFlags & (uint)ActionFlag.ACT_FLAG_SWIMMING_OR_FLYING) != 0;
-    public bool IsSwimming => (ActionFlags & (uint)ActionFlag.ACT_FLAG_SWIMMING) != 0;
-    public bool IsFlying => (ActionFlags & (uint)ActionFlag.ACT_FLYING) != 0;
-    public bool IsTeleporting => (ActionFlags & (uint)StateFlag.MARIO_TELEPORTING) != 0;
 
-    public bool IsWearingCap(MarioCapType capType) => HasCap(capType);
-    public bool HasCap(MarioCapType capType)
+    public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
+
+    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint;
+    public bool IsAttacking => (ActionFlags & (uint)ActionFlag.Attacking) != 0;
+    public bool IsFirstPerson => IsFlyingOrSwimming;
+    public bool IsFlyingOrSwimming => (ActionFlags & (uint)ActionFlag.SwimmingOrFlying) != 0;
+    public bool IsSwimming => (ActionFlags & (uint)ActionFlag.Swimming) != 0;
+    public bool IsFlying => (ActionFlags & (uint)ActionFlag.Flying) != 0;
+    public bool IsTeleporting => (ActionFlags & (uint)StateFlag.Teleporting) != 0;
+
+    public bool IsWearingCap(MarioCapType capType)
     {
         return capType switch
         {
-            MarioCapType.VanishCap => (StateFlags & (uint)StateFlag.MARIO_VANISH_CAP) != 0,
-            MarioCapType.MetalCap  => (StateFlags & (uint)StateFlag.MARIO_METAL_CAP) != 0,
-            MarioCapType.WingCap   => (StateFlags & (uint)StateFlag.MARIO_WING_CAP) != 0,
-            _                      => capType == MarioCapType.None
+            MarioCapType.VanishCap => (StateFlags & (uint)StateFlag.VanishCap) != 0,
+            MarioCapType.MetalCap  => (StateFlags & (uint)StateFlag.MetalCap) != 0,
+            MarioCapType.WingCap   => (StateFlags & (uint)StateFlag.WingCap) != 0,
+            _                      => capType == MarioCapType.NormalCap
         };
     }
 }
@@ -583,7 +541,7 @@ internal struct SM64ObjectTransform
     {
         return new SM64ObjectTransform
         {
-            Position = VecToArr(position.ToMarioPosition()),
+            Position      = VecToArr(position.ToMarioPosition()),
             EulerRotation = VecToArr(rotation.EulerAngles.ToMarioRotation())
         };
 

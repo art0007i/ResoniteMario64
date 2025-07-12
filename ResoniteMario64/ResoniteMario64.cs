@@ -5,9 +5,11 @@ using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
 using ResoniteMario64.Components;
+using ResoniteMario64.Components.Context;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
-using static ResoniteMario64.Consts;
+using static ResoniteMario64.Constants;
+using static ResoniteMario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64;
 
@@ -42,11 +44,14 @@ public class ResoniteMario64 : ResoniteMod
     // ENGINE
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<int> KeyGameTickMs = new ModConfigurationKey<int>("game_tick_ms", "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", () => 25); // slider 1, 100, 0
-    
+
     // Local
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true);
-
+    
+    [AutoRegisterConfigKey]
+    public static ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
+    
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
 
@@ -192,7 +197,7 @@ public class ResoniteMario64 : ResoniteMod
                         if (mario.IsLocal)
                         {
                             ui.Spacer(8);
-                            
+
                             foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
                             {
                                 ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, true); };
@@ -201,13 +206,13 @@ public class ResoniteMario64 : ResoniteMod
                             ui.Spacer(8);
 
                             ui.Button("Heal Mario").LocalPressed += (b, e) => { mario.Heal(1); };
-                            
+
                             ui.Spacer(8);
 
-                            ui.Button("Do Damage to Mario").LocalPressed += (b, e) => { mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1); };
+                            ui.Button("Damage Mario").LocalPressed += (b, e) => { mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1); };
                             ui.Button("Kill Mario").LocalPressed += (b, e) => { mario.SetHealthPoints(0); };
                             ui.Button("Nuke Mario").LocalPressed += (b, e) => { mario.SetMarioAsNuked(true); };
-                            
+
                             ui.Spacer(8);
                         }
                     }
