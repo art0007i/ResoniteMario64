@@ -575,32 +575,6 @@ public struct SM64MarioState
     public float3 ScaledPosition => Position != null ? new float3(-Position[0], Position[1], Position[2]) / Interop.ScaleFactor : float3.Zero;
     public floatQ ScaledRotation => floatQ.Euler(0f, MathX.Repeat(-MathX.Rad2Deg * FacingAngle + 180f, 360f) - 180f, 0f);
 
-    public MarioCapType FirstActiveCap
-    {
-        get
-        {
-            if ((StateFlags & (uint)StateFlag.VanishCap) != 0) return MarioCapType.VanishCap;
-            if ((StateFlags & (uint)StateFlag.MetalCap) != 0) return MarioCapType.MetalCap;
-            if ((StateFlags & (uint)StateFlag.WingCap) != 0) return MarioCapType.WingCap;
-            return MarioCapType.NormalCap;
-        }
-    }
-
-    public List<MarioCapType> AllActiveCaps
-    {
-        get
-        {
-            List<MarioCapType> activeCaps = new List<MarioCapType>();
-
-            if ((StateFlags & (uint)StateFlag.VanishCap) != 0) activeCaps.Add(MarioCapType.VanishCap);
-            if ((StateFlags & (uint)StateFlag.MetalCap) != 0) activeCaps.Add(MarioCapType.MetalCap);
-            if ((StateFlags & (uint)StateFlag.WingCap) != 0) activeCaps.Add(MarioCapType.WingCap);
-
-            if (activeCaps.Count == 0) activeCaps.Add(MarioCapType.NormalCap);
-            return activeCaps;
-        }
-    }
-
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
 
     public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint || (ActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;

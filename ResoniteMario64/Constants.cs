@@ -7,6 +7,7 @@ public static class Constants
     public const string JumpTag = "Jump";
     public const string PunchTag = "Punch";
     public const string CrouchTag = "Crouch";
+    public const string HealthPointsTag = "HealthPoints";
     public const string ActionFlagsTag = "ActionFlags";
     public const string StateFlagsTag = "StateFlags";
     

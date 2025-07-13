@@ -13,6 +13,17 @@ namespace ResoniteMario64;
 public static class Utils
 {
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
+    
+    public static bool HasCapType(uint flags, MarioCapType capType)
+    {
+        return capType switch
+        {
+            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0,
+            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0,
+            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0,
+            _                      => capType == MarioCapType.NormalCap
+        };
+    }
 
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
     {

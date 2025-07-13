@@ -132,6 +132,9 @@ public class SM64Mario : IDisposable
         stomp1.VariableName.Value = CrouchTag;
         stomp1.Reference.Target = CrouchStream;
 
+        DynamicValueVariable<float> healthPoints = vars.AttachComponent<DynamicValueVariable<float>>();
+        healthPoints.VariableName.Value = HealthPointsTag;
+
         DynamicValueVariable<uint> actionFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
         actionFlags.VariableName.Value = ActionFlagsTag;
 
@@ -142,7 +145,6 @@ public class SM64Mario : IDisposable
     // Inputs
     private float2 Joystick => MarioSpace.TryReadValue(JoystickTag, out IValue<float2> joystick) ? joystick?.Value ?? float2.Zero : float2.Zero;
     private ValueStream<float2> _joystickStream;
-
     private ValueStream<float2> JoystickStream
     {
         get
@@ -166,7 +168,6 @@ public class SM64Mario : IDisposable
 
     private bool Jump => MarioSpace.TryReadValue(JumpTag, out IValue<bool> jump) && jump?.Value is true;
     private ValueStream<bool> _jumpStream;
-
     private ValueStream<bool> JumpStream
     {
         get
@@ -190,7 +191,6 @@ public class SM64Mario : IDisposable
 
     private bool Punch => MarioSpace.TryReadValue(PunchTag, out IValue<bool> kick) && kick?.Value is true;
     private ValueStream<bool> _punchStream;
-
     private ValueStream<bool> PunchStream
     {
         get
@@ -214,7 +214,6 @@ public class SM64Mario : IDisposable
 
     private bool Crouch => MarioSpace.TryReadValue(CrouchTag, out IValue<bool> stomp) && stomp?.Value is true;
     private ValueStream<bool> _crouchStream;
-
     private ValueStream<bool> CrouchStream
     {
         get
@@ -236,8 +235,12 @@ public class SM64Mario : IDisposable
         set => _crouchStream = value;
     }
 
-    public uint ActionFlags => MarioSpace.TryReadValue(ActionFlagsTag, out uint actionFlags) ? actionFlags : 0;
-    public uint StateFlags => MarioSpace.TryReadValue(StateFlagsTag, out uint stateFlags) ? stateFlags : 0;
+    public float SyncedHealthPoints => MarioSpace.TryReadValue(HealthPointsTag, out float healthPoints) ? healthPoints : 255;
+    public uint SyncedActionFlags => MarioSpace.TryReadValue(ActionFlagsTag, out uint actionFlags) ? actionFlags : 0;
+    public uint SyncedStateFlags => MarioSpace.TryReadValue(StateFlagsTag, out uint stateFlags) ? stateFlags : 0;
+
+    public uint CurrentActionFlags => CurrentState.ActionFlags;
+    public uint CurrentStateFlags => CurrentState.StateFlags;
 
     public bool IsBeingGrabbed => _marioGrabbable.IsGrabbed;
 
@@ -374,8 +377,8 @@ public class SM64Mario : IDisposable
 
         if (IsLocal)
         {
-            MarioSpace.TryWriteValue(ActionFlagsTag, CurrentState.ActionFlags);
-            MarioSpace.TryWriteValue(StateFlagsTag, CurrentState.StateFlags);
+            MarioSpace.TryWriteValue(ActionFlagsTag, CurrentActionFlags);
+            MarioSpace.TryWriteValue(StateFlagsTag, CurrentStateFlags);
 
             if (_marioGrabbable != null)
             {
@@ -402,15 +405,38 @@ public class SM64Mario : IDisposable
             if (!_isDying && CurrentState.IsDead || !_isDying && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 50 && isDeathPlane) /* Find a better value for the distance check */
             {
                 _isDying = true;
-                bool isQuickSand = (ActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
+                bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
                 MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySound(Sounds.Menu_BowserLaugh, MarioSlot.GlobalPosition));
                 MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 3f : 15f, () => SetMarioAsNuked(true));
             }
         }
         else
         {
-            SetAction(ActionFlags);
-            SetState(StateFlags);
+            // This seems to be kinda broken, maybe revisit syncing the WHOLE state instead
+            // if (currentStateFlags != syncedFlags) SetState(syncedAction);
+            // if (currentStateAction != syncedAction) SetAction(syncedAction);
+
+            // Trigger the cap if the synced values have cap (if we already have the cape it will ignore)
+            if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+            {
+                WearCap(MarioCapType.VanishCap);
+            }
+
+            if (Utils.HasCapType(SyncedStateFlags, MarioCapType.MetalCap))
+            {
+                WearCap(MarioCapType.MetalCap);
+            }
+
+            if (Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap))
+            {
+                WearCap(MarioCapType.WingCap, 40f);
+            }
+
+            // Trigger teleport for remotes
+            // if (Utils.IsTeleporting(SyncedStateFlags) && Time.time > _startedTeleporting + 5 * CVRSM64Teleporter.TeleportDuration)
+            // {
+            //     _startedTeleporting = Time.time;
+            // }
         }
 
         // Just for now until Collider Shenanigans is implemented
@@ -477,6 +503,15 @@ public class SM64Mario : IDisposable
         {
             SetPosition(MarioSlot.GlobalPosition);
             SetFaceAngle(MarioSlot.GlobalRotation);
+        }
+
+        if (IsLocal)
+        {
+            MarioSlot.WriteDynamicVariable(HealthPointsTag, CurrentState.HealthPoints);
+        }
+        else
+        {
+            SetHealthPoints(SyncedHealthPoints);
         }
 
         if (_marioMesh != null)
