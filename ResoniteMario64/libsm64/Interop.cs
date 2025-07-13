@@ -17,8 +17,17 @@ public static class MarioExtensions
         float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
         float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
     }
+    
+    public static float3 FromMarioRotation(this float3 rot)
+    {
+        return new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
+
+        float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
+        float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
+    }
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
+    public static float3 FromMarioPosition(this float3 pos) => pos / Interop.ScaleFactor * new float3(-1, 1, 1);
 }
 
 internal static class Interop
@@ -45,8 +54,17 @@ internal static class Interop
 
     public static bool IsGlobalInit { get; private set; }
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void SM64DebugPrintFunctionPtr(string message);
+
+    private delegate void SM64PlaySoundFunctionPtr(uint soundBits, float[] pos);
+
+    // Initialization & Setup
     [DllImport("sm64")]
     private static extern void sm64_register_debug_print_function(IntPtr debugPrintFunctionPtr);
+
+    [DllImport("sm64")]
+    private static extern void sm64_register_play_sound_function(IntPtr playSoundFunction);
 
     [DllImport("sm64")]
     private static extern void sm64_global_init(IntPtr rom, IntPtr outTexture);
@@ -54,6 +72,89 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_global_terminate();
 
+    [DllImport("sm64")]
+    private static extern void sm64_audio_init(IntPtr rom);
+
+    // Audio & Music
+    [DllImport("sm64")]
+    private static extern uint sm64_audio_tick(uint numQueuedSamples, uint numDesiredSamples, IntPtr audioBuffer);
+
+    [DllImport("sm64")]
+    private static extern void sm64_seq_player_play_sequence(byte player, byte seqId, ushort arg2);
+
+    [DllImport("sm64")]
+    private static extern void sm64_play_music(byte player, ushort seqArgs, ushort fadeTimer);
+
+    [DllImport("sm64")]
+    private static extern void sm64_stop_background_music(ushort seqId);
+
+    [DllImport("sm64")]
+    private static extern void sm64_fadeout_background_music(ushort arg0, ushort fadeOut);
+
+    [DllImport("sm64")]
+    private static extern ushort sm64_get_current_background_music();
+
+    [DllImport("sm64")]
+    private static extern void sm64_play_sound(int soundBits, IntPtr pos);
+
+    [DllImport("sm64")]
+    private static extern void sm64_play_sound_global(int soundBits);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_sound_volume(float vol);
+
+    /* Mario Lifecycle */
+    [DllImport("sm64")]
+    private static extern uint sm64_mario_create(float x, float y, float z);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_tick(uint marioId, ref SM64MarioInputs inputs, ref SM64MarioState outState, ref SM64MarioGeometryBuffers outBuffers);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_delete(uint marioId);
+
+    /* Mario Actions & Status */
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_action(uint marioId, uint action);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_action(uint marioId, uint action, uint actionArg);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_state(uint marioId, uint flags);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_health(uint marioId, ushort health);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_invincibility(uint marioId, short timer);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_take_damage(uint marioId, uint damage, uint subtype, float x, float y, float z);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_heal(uint marioId, byte healCounter);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_kill(uint marioId);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_interact_cap(uint marioId, uint capFlag, ushort capTime, byte playMusic);
+
+    [DllImport("sm64")]
+    private static extern void sm64_mario_extend_cap(uint marioId, ushort capTime);
+    
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_animation(uint marioId, ushort animId);
+
+    [DllImport("sm64")]
+    private static extern void sm64_set_mario_anim_frame(uint marioId, short frame);
+
+    [DllImport("sm64")]
+    [return: MarshalAs(UnmanagedType.I1)]
+    private static extern bool sm64_mario_attack(uint marioId, float x, float y, float z, float hitboxHeight);
+
+    /* Mario Transform */
     [DllImport("sm64")]
     private static extern void sm64_set_mario_position(uint marioId, float x, float y, float z);
 
@@ -64,82 +165,21 @@ internal static class Interop
     private static extern void sm64_set_mario_faceangle(uint marioId, float y);
 
     [DllImport("sm64")]
-    private static extern void sm64_audio_init(IntPtr rom);
+    private static extern void sm64_set_mario_velocity(uint marioId, float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern uint sm64_audio_tick(uint numQueuedSamples, uint numDesiredSamples, IntPtr audioBuffer);
+    private static extern void sm64_set_mario_forward_velocity(uint marioId, float vel);
 
-    [DllImport("sm64")]
-    private static extern void sm64_play_music(byte player, ushort seqArgs, ushort fadeTimer);
-
-    [DllImport("sm64")]
-    private static extern ushort sm64_get_current_background_music();
-
-    [DllImport("sm64")]
-    private static extern void sm64_stop_background_music(ushort seqId);
-
-    [DllImport("sm64")]
-    private static extern void sm64_play_sound_global(int soundBits);
-
-    [DllImport("sm64")]
-    private static extern void sm64_play_sound(int soundBits, IntPtr pos);
-
+    /* Mario Environmental Effects */
     [DllImport("sm64")]
     private static extern void sm64_set_mario_water_level(uint marioId, int level);
 
     [DllImport("sm64")]
     private static extern void sm64_set_mario_gas_level(uint marioId, int level);
 
-    [DllImport("sm64")]
-    private static extern void sm64_mario_interact_cap(uint marioId, uint capFlag, ushort capTime, byte playMusic);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_extend_cap(uint marioId, ushort capTime);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_state(uint marioId, uint flags);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_action(uint marioId, uint action);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_action(uint marioId, uint action, uint actionArg);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_invincibility(uint marioId, short timer);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_velocity(uint marioId, float x, float y, float z);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_forward_velocity(uint marioId, float vel);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_take_damage(uint marioId, uint damage, uint subtype, float x, float y, float z);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_attack(uint marioId, float x, float y, float z, float hitboxHeight);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_heal(uint marioId, byte healCounter);
-
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_health(uint marioId, ushort health);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_kill(uint marioId);
-
+    /* Static & Dynamic Surfaces */
     [DllImport("sm64")]
     private static extern void sm64_static_surfaces_load(SM64Surface[] surfaces, ulong numSurfaces);
-
-    [DllImport("sm64")]
-    private static extern uint sm64_mario_create(float marioX, float marioY, float marioZ);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_tick(uint marioId, ref SM64MarioInputs inputs, ref SM64MarioState outState, ref SM64MarioGeometryBuffers outBuffers);
-
-    [DllImport("sm64")]
-    private static extern void sm64_mario_delete(uint marioId);
 
     [DllImport("sm64")]
     private static extern uint sm64_surface_object_create(ref SM64SurfaceObject surfaceObject);
@@ -150,6 +190,31 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_surface_object_delete(uint objectId);
 
+    /* Collision & Geometry Queries */
+    [DllImport("sm64")]
+    private static extern int sm64_surface_find_wall_collision(ref float x, ref float y, ref float z, float offsetY, float radius);
+
+    [DllImport("sm64")]
+    private static extern int sm64_surface_find_wall_collisions(ref IntPtr colData);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_ceil(float x, float y, float z, out IntPtr ceil);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_floor(float x, float y, float z, out IntPtr floor);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_floor_height(float x, float y, float z);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_floor_height_and_data(float x, float y, float z, out IntPtr floorGeo);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_water_level(float x, float z);
+
+    [DllImport("sm64")]
+    private static extern float sm64_surface_find_poison_gas_level(float x, float z);
+
     private static void DebugPrintCallback(string str)
     {
         ResoniteMod.Msg($"[libsm64] {str}");
@@ -157,8 +222,8 @@ internal static class Interop
 
     public static void GlobalInit(byte[] rom)
     {
-        GCHandle romHandle         = GCHandle.Alloc(rom, GCHandleType.Pinned);
-        byte[]   textureData       = new byte[4 * SM64TextureWidth * SM64TextureHeight];
+        GCHandle romHandle = GCHandle.Alloc(rom, GCHandleType.Pinned);
+        byte[] textureData = new byte[4 * SM64TextureWidth * SM64TextureHeight];
         GCHandle textureDataHandle = GCHandle.Alloc(textureData, GCHandleType.Pinned);
 
         sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
@@ -235,17 +300,17 @@ internal static class Interop
     {
         SM64MarioState outState = new SM64MarioState();
 
-        GCHandle posHandle   = GCHandle.Alloc(positionBuffer, GCHandleType.Pinned);
-        GCHandle normHandle  = GCHandle.Alloc(normalBuffer, GCHandleType.Pinned);
+        GCHandle posHandle = GCHandle.Alloc(positionBuffer, GCHandleType.Pinned);
+        GCHandle normHandle = GCHandle.Alloc(normalBuffer, GCHandleType.Pinned);
         GCHandle colorHandle = GCHandle.Alloc(colorBuffer, GCHandleType.Pinned);
-        GCHandle uvHandle    = GCHandle.Alloc(uvBuffer, GCHandleType.Pinned);
+        GCHandle uvHandle = GCHandle.Alloc(uvBuffer, GCHandleType.Pinned);
 
         SM64MarioGeometryBuffers buff = new SM64MarioGeometryBuffers
         {
             position = posHandle.AddrOfPinnedObject(),
-            normal   = normHandle.AddrOfPinnedObject(),
-            color    = colorHandle.AddrOfPinnedObject(),
-            uv       = uvHandle.AddrOfPinnedObject()
+            normal = normHandle.AddrOfPinnedObject(),
+            color = colorHandle.AddrOfPinnedObject(),
+            uv = uvHandle.AddrOfPinnedObject()
         };
 
 
@@ -265,7 +330,7 @@ internal static class Interop
     public static uint AudioTick(short[] audioBuffer, uint numDesiredSamples, uint numQueuedSamples = 0)
     {
         GCHandle audioBufferPointer = GCHandle.Alloc(audioBuffer, GCHandleType.Pinned);
-        uint     numSamples         = sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
+        uint numSamples = sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
         audioBufferPointer.Free();
         return numSamples;
     }
@@ -277,8 +342,8 @@ internal static class Interop
 
     public static void PlaySound(Sounds soundKey, float3 unityPosition)
     {
-        float3   marioPos   = unityPosition.ToMarioPosition();
-        float[]  position   = { marioPos.x, marioPos.y, marioPos.z };
+        float3 marioPos = unityPosition.ToMarioPosition();
+        float[] position = { marioPos.x, marioPos.y, marioPos.z };
         GCHandle posPointer = GCHandle.Alloc(position, GCHandleType.Pinned);
 
         sm64_play_sound((int)SoundBank[soundKey], posPointer.AddrOfPinnedObject());
@@ -322,32 +387,74 @@ internal static class Interop
         {
             outSurfaces.Add(new SM64Surface
             {
-                Force   = 0,
-                Type    = (short)surfaceType,
+                Force = 0,
+                Type = (short)surfaceType,
                 Terrain = (ushort)terrainType,
-                v0x     = (int)(ScaleFactor * -vertices[triangles[i]].x),
-                v0y     = (int)(ScaleFactor * vertices[triangles[i]].y),
-                v0z     = (int)(ScaleFactor * vertices[triangles[i]].z),
-                v1x     = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
-                v1y     = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
-                v1z     = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
-                v2x     = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
-                v2y     = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
-                v2z     = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
+
+                v0x = (int)(ScaleFactor * -vertices[triangles[i]].x),
+                v0y = (int)(ScaleFactor * vertices[triangles[i]].y),
+                v0z = (int)(ScaleFactor * vertices[triangles[i]].z),
+
+                v1x = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
+                v1y = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
+                v1z = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
+
+                v2x = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
+                v2y = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
+                v2z = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
             });
         }
     }
 
+    public static float FindFloor(float3 pos, out SM64SurfaceCollisionData data)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        IntPtr floorPtr;
+        float floorHeightMario = sm64_surface_find_floor(marioPos.x, marioPos.y, marioPos.z, out floorPtr);
+        if (floorPtr == IntPtr.Zero)
+        {
+            data = new SM64SurfaceCollisionData();
+        }
+        else
+        {
+            data = Marshal.PtrToStructure<SM64SurfaceCollisionData>(floorPtr);
+        }
+        return floorHeightMario / Interop.ScaleFactor;
+    }
+    
+    public static float FindFloorHeight(float3 pos)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        float floorHeightMario = sm64_surface_find_floor_height(marioPos.x, marioPos.y, marioPos.z);
+        return floorHeightMario / Interop.ScaleFactor;
+    }
+
+    public static float FindFloorHeightAndData(float3 pos, out SM64FloorCollisionData data)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        IntPtr floorGeo;
+        float floorHeightMario = sm64_surface_find_floor_height_and_data(marioPos.x, marioPos.y, marioPos.z, out floorGeo);
+        if (floorGeo == IntPtr.Zero)
+        {
+            data = new SM64FloorCollisionData();
+        }
+        else
+        {
+            data = Marshal.PtrToStructure<SM64FloorCollisionData>(floorGeo);
+        }
+        return floorHeightMario / Interop.ScaleFactor;
+    }
+
     public static uint SurfaceObjectCreate(float3 position, floatQ rotation, SM64Surface[] surfaces)
     {
-        GCHandle            surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
-        SM64ObjectTransform t              = SM64ObjectTransform.FromUnityWorld(position, rotation);
+        GCHandle surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
+        SM64ObjectTransform t = SM64ObjectTransform.FromUnityWorld(position, rotation);
 
         SM64SurfaceObject surfObj = new SM64SurfaceObject
         {
-            transform    = t,
+            transform = t,
             surfaceCount = (uint)surfaces.Length,
-            surfaces     = surfListHandle.AddrOfPinnedObject()
+            surfaces = surfListHandle.AddrOfPinnedObject()
         };
 
         uint result = sm64_surface_object_create(ref surfObj);
@@ -426,9 +533,6 @@ internal static class Interop
     {
         sm64_set_mario_state(marioId, flags);
     }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void DebugPrintFuncDelegate(string str);
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -460,6 +564,7 @@ public struct SM64MarioState
     public float[] Velocity;
 
     public float FacingAngle;
+
     public short Health;
 
     public uint ActionFlags;
@@ -498,7 +603,7 @@ public struct SM64MarioState
 
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
 
-    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint;
+    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint || (ActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
     public bool IsAttacking => (ActionFlags & (uint)ActionFlag.Attacking) != 0;
     public bool IsFirstPerson => IsFlyingOrSwimming;
     public bool IsFlyingOrSwimming => (ActionFlags & (uint)ActionFlag.SwimmingOrFlying) != 0;
@@ -541,7 +646,7 @@ internal struct SM64ObjectTransform
     {
         return new SM64ObjectTransform
         {
-            Position      = VecToArr(position.ToMarioPosition()),
+            Position = VecToArr(position.ToMarioPosition()),
             EulerRotation = VecToArr(rotation.EulerAngles.ToMarioRotation())
         };
 
@@ -550,9 +655,71 @@ internal struct SM64ObjectTransform
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct SM64SurfaceObjectTransform
+{
+    public float aPosX;
+    public float aPosY;
+    public float aPosZ;
+
+    public float aVelX;
+    public float aVelY;
+    public float aVelZ;
+
+    public short aFaceAnglePitch;
+    public short aFaceAngleYaw;
+    public short aFaceAngleRoll;
+
+    public short aAngleVelPitch;
+    public short aAngleVelYaw;
+    public short aAngleVelRoll;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct SM64SurfaceObject
 {
     public SM64ObjectTransform transform;
     public uint surfaceCount;
     public IntPtr surfaces;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct SM64SurfaceCollisionData
+{
+    public short type;
+    public short force;
+    public byte flags;
+    public byte room;
+    public int lowerY;
+    public int upperY;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+    public int[] vertex1;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+    public int[] vertex2;
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+    public int[] vertex3;
+
+    public float3 normal;
+
+    public float originOffset;
+
+    public byte isValid;
+
+    public IntPtr transform;
+
+    public ushort terrain;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct SM64FloorCollisionData
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+    public float[] unused;
+
+    public float normalX;
+    public float normalY;
+    public float normalZ;
+    public float originOffset;
 }

@@ -19,22 +19,59 @@ public static class SM64Constants
 
     public enum SM64SurfaceType
     {
-        Default = 0x0000,          // Environment default
-        Burning = 0x0001,          // Lava / Frostbite (in SL), but is used mostly for Lava
-        Hangable = 0x0005,         // Ceiling that Mario can climb on
-        Slow = 0x0009,             // Slow down Mario, unused
-        VerySlippery = 0x0013,     // Very slippery, mostly used for slides
-        Slippery = 0x0014,         // Slippery
-        NotSlippery = 0x0015,      // Non-slippery, climbable
-        ShallowQuicksand = 0x0021, // Shallow Quicksand (depth of 10 units)
-        DeepQuicksand = 0x0022,    // Quicksand (lethal, slow, depth of 160 units)
-        InstantQuicksand = 0x0023, // Quicksand (lethal, instant)
-        Ice = 0x002E,              // Slippery Ice, in snow levels and THI's water floor
-        Hard = 0x0030,             // Hard floor (Always has fall damage)
-        HardSlippery = 0x0035,     // Hard and slippery (Always has fall damage)
-        HardVerySlippery = 0x0036, // Hard and very slippery (Always has fall damage)
-        HardNotSlippery = 0x0037,  // Hard and Non-slippery (Always has fall damage)
-        VerticalWind = 0x0038      // Death at bottom with vertical wind
+        Default = 0x0000,                // Environment default
+        Burning = 0x0001,                // Lava / Frostbite (in SL), but is used mostly for Lava
+        Unused0004 = 0x0004,             // Unused, has no function and has parameters
+        Hangable = 0x0005,               // Ceiling that Mario can climb on
+        Slow = 0x0009,                   // Slow down Mario, unused
+        DeathPlane = 0x000A,             // Death floor
+        CloseCamera = 0x000B,            // Close camera
+        Water = 0x000D,                  // Water, has no action, used on some waterboxes below
+        FlowingWater = 0x000E,           // Water (flowing), has parameters
+        Intangible = 0x0012,             // Intangible (Separates BBH mansion from merry-go-round, for room usage)
+        VerySlippery = 0x0013,           // Very slippery, mostly used for slides
+        Slippery = 0x0014,               // Slippery
+        NotSlippery = 0x0015,            // Non-slippery, climbable
+        TtmVines = 0x0016,               // TTM vines, has no action defined
+        MgrMusic = 0x001A,               // Plays the Merry go round music, see handle_merry_go_round_music in bbh_merry_go_round.inc.c for more details
+        ShallowQuicksand = 0x0021,       // Shallow Quicksand (depth of 10 units)
+        DeepQuicksand = 0x0022,          // Quicksand (lethal, slow, depth of 160 units)
+        InstantQuicksand = 0x0023,       // Quicksand (lethal, instant)
+        DeepMovingQuicksand = 0x0024,    // Moving quicksand (flowing, depth of 160 units)
+        ShallowMovingQuicksand = 0x0025, // Moving quicksand (flowing, depth of 25 units)
+        Quicksand = 0x0026,              // Moving quicksand (60 units)
+        MovingQuicksand = 0x0027,        // Moving quicksand (flowing, depth of 60 units)
+        WallMisc = 0x0028,               // Used for some walls, Cannon to adjust the camera, and some objects like Warp Pipe
+        NoiseDefault = 0x0029,           // Default floor with noise
+        NoiseSlippery = 0x002A,          // Slippery floor with noise
+        HorizontalWind = 0x002C,         // Horizontal wind, has parameters
+        InstantMovingQuicksand = 0x002D, // Quicksand (lethal, flowing)
+        Ice = 0x002E,                    // Slippery Ice, in snow levels and THI's water floor
+        Hard = 0x0030,                   // Hard floor (Always has fall damage)
+        TimerStart = 0x0033,             // Timer start (Peach's secret slide)
+        TimerEnd = 0x0034,               // Timer stop (Peach's secret slide)
+        HardSlippery = 0x0035,           // Hard and slippery (Always has fall damage)
+        HardVerySlippery = 0x0036,       // Hard and very slippery (Always has fall damage)
+        HardNotSlippery = 0x0037,        // Hard and Non-slippery (Always has fall damage)
+        VerticalWind = 0x0038,           // Death at bottom with vertical wind
+        BossFightCamera = 0x0065,        // Wide camera for BoB and WF bosses
+        CameraFreeRoam = 0x0066,         // Free roam camera for THI and TTC
+        Thi3Wallkick = 0x0068,           // Surface where there's a wall kick section in THI 3rd area, has no action defined
+        Camera8Dir = 0x0069,             // Surface that enables far camera for platforms, used in THI
+        CameraMiddle = 0x006E,           // Surface camera that returns to the middle, used on the 4 pillars of SSL
+        CameraRotateRight = 0x006F,      // Surface camera that rotates to the right (Bowser 1 & THI)
+        CameraRotateLeft = 0x0070,       // Surface camera that rotates to the left (BoB & TTM)
+        CameraBoundary = 0x0072,         // Intangible Area, only used to restrict camera movement
+        NoiseVerySlippery73 = 0x0073,    // Very slippery floor with noise, unused
+        NoiseVerySlippery74 = 0x0074,    // Very slippery floor with noise, unused
+        NoiseVerySlippery = 0x0075,      // Very slippery floor with noise, used in CCM
+        NoCamCollision = 0x0076,         // Surface with no cam collision flag
+        NoCamCollision77 = 0x0077,       // Surface with no cam collision flag, unused
+        NoCamColVerySlippery = 0x0078,   // Surface with no cam collision flag, very slippery with noise (THI)
+        NoCamColSlippery = 0x0079,       // Surface with no cam collision flag, slippery with noise (CCM, PSS and TTM slides)
+        Switch = 0x007A,                 // Surface with no cam collision flag, non-slippery with noise, used by switches and Dorrie
+        VanishCapWalls = 0x007B,         // Vanish cap walls, pass through them with Vanish Cap
+        Trapdoor = 0x00FF                // Bowser Left trapdoor, has no action defined
     }
 
 #region Music
@@ -45,6 +82,7 @@ public static class SM64Constants
     /// <summary>
     /// Represents the different music sequences in the game.
     /// </summary>
+    [Flags]
     public enum MusicSequence : ushort
     {
         SoundPlayer = 0x00,
@@ -120,7 +158,7 @@ public static class SM64Constants
         Count,
         None = 0xFFFF
     }
-    
+
     public static readonly ushort[] Musics =
     {
         (ushort)MusicSequence.MenuTitleScreen,
@@ -159,6 +197,7 @@ public static class SM64Constants
     /// <summary>
     /// Represents the playback status of a sound.
     /// </summary>
+    [Flags]
     public enum SoundPlaybackStatus : uint
     {
         Stopped = 0,
@@ -1403,6 +1442,7 @@ public static class SM64Constants
     public const StateFlag SpecialCaps = StateFlag.VanishCap | StateFlag.MetalCap | StateFlag.WingCap;
     public const StateFlag Caps = StateFlag.NormalCap | SpecialCaps;
 
+    [Flags]
     public enum MarioCapType : uint
     {
         NormalCap = StateFlag.NormalCap,
@@ -1416,6 +1456,7 @@ public static class SM64Constants
     /// <summary>
     /// High-level categorization of Mario's actions.
     /// </summary>
+    /// [Flags]
     public enum ActionGroup : uint
     {
         Stationary = 0U,    // 0x00000000
@@ -1431,6 +1472,7 @@ public static class SM64Constants
     /// Flags that describe the properties of Mario's current action and represents all of Mario's possible actions
     /// </summary>
     [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [Flags]
     public enum ActionFlag : uint
     {
         // Base Mario Actions

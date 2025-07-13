@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -396,11 +397,14 @@ public class SM64Mario : IDisposable
             }
 
             // Check for deaths, so we delete the prop
-            if (!_isDying && CurrentState.IsDead)
+            float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
+            bool isDeathPlane = (data.type & (short)SM64SurfaceType.DeathPlane) == (short)SM64SurfaceType.DeathPlane;
+            if (!_isDying && CurrentState.IsDead || !_isDying && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 50 && isDeathPlane) /* Find a better value for the distance check */
             {
                 _isDying = true;
-                MarioSlot.RunInSeconds(3f, () => Interop.PlaySound(Sounds.Menu_BowserLaugh, MarioSlot.GlobalPosition));
-                MarioSlot.RunInSeconds(15f, () => SetMarioAsNuked(true));
+                bool isQuickSand = (ActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
+                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySound(Sounds.Menu_BowserLaugh, MarioSlot.GlobalPosition));
+                MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 3f : 15f, () => SetMarioAsNuked(true));
             }
         }
         else
