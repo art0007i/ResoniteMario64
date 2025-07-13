@@ -414,7 +414,7 @@ public class SM64Mario : IDisposable
         }
 
         // Just for now until Collider Shenanigans is implemented
-        Dictionary<Slot, SM64Mario> marios = SM64Context.Instance.Marios.GetTempDictionary();
+        Dictionary<RefID, SM64Mario> marios = SM64Context.Instance.Marios.GetTempDictionary();
         SM64Mario attackingMario = marios.Values.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
         if (attackingMario != null)
         {

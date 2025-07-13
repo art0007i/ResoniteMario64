@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
@@ -11,7 +12,7 @@ public partial class SM64Context : IDisposable
     // private readonly List<SM64ColliderDynamic> _surfaceObjects = new();
     public static SM64Context Instance;
 
-    public readonly Dictionary<Slot, SM64Mario> Marios = new Dictionary<Slot, SM64Mario>();
+    public readonly Dictionary<RefID, SM64Mario> Marios = new Dictionary<RefID, SM64Mario>();
 
     internal double LastTick;
 
@@ -49,7 +50,7 @@ public partial class SM64Context : IDisposable
             LastTick = World.Time.WorldTime;
         }
 
-        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
+        Dictionary<RefID, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario mario in marios.Values)
         {
             mario.ContextUpdateSynced();
@@ -67,7 +68,7 @@ public partial class SM64Context : IDisposable
         }
         */
 
-        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
+        Dictionary<RefID, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario mario in marios.Values)
         {
             mario.ContextFixedUpdateSynced();
@@ -78,14 +79,16 @@ public partial class SM64Context : IDisposable
 
     public static SM64Mario AddMario(Slot root)
     {
+        ResoniteMod.Msg($"Trying to add mario for SlotID: {root.ReferenceID}");
+        
         SM64Mario mario = null;
 
         if (EnsureInstanceExists(root.World))
         {
-            if (!Instance.Marios.ContainsKey(root))
+            if (!Instance.Marios.ContainsKey(root.ReferenceID))
             {
                 mario = new SM64Mario(root);
-                Instance.Marios.Add(root, mario);
+                Instance.Marios.Add(root.ReferenceID, mario);
                 if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
             }
         }
@@ -99,7 +102,7 @@ public partial class SM64Context : IDisposable
 
         Interop.MarioDelete(mario.MarioId);
 
-        Instance.Marios.Remove(mario.MarioSlot);
+        Instance.Marios.Remove(mario.MarioSlot.ReferenceID);
 
         if (Instance.Marios.Count == 0)
         {
@@ -131,7 +134,7 @@ public partial class SM64Context : IDisposable
     
     public void Dispose()
     {
-        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
+        Dictionary<RefID, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario mario in marios.Values)
         {
             mario.Dispose();

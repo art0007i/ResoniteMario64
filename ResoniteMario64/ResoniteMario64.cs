@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
+using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -48,10 +50,10 @@ public class ResoniteMario64 : ResoniteMod
     // Local
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true);
-    
+
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
-    
+
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
 
@@ -67,7 +69,21 @@ public class ResoniteMario64 : ResoniteMod
     {
         Config = GetConfiguration();
 
-        // TODO: sm64.dll needs to be either in unity's plugin folder, or game main dir.
+        // Extract the native binary to the root Resonite folder
+        const string dllName = "sm64.dll";
+        try
+        {
+            Msg($"Copying the sm64.dll to Resonite/{dllName}");
+            using var resourceStream = typeof(ResoniteMario64).Assembly.GetManifestResourceStream(dllName);
+            using var fileStream = File.Open(dllName, FileMode.Create, FileAccess.Write);
+            resourceStream!.CopyTo(fileStream);
+        }
+        catch (IOException ex)
+        {
+            Error("Failed to copy native library.");
+            Error(ex);
+            return;
+        }
 
         // Load the ROM
         try
@@ -133,7 +149,7 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] { typeof(WorldManager), typeof(bool), typeof(bool) })]
+    [HarmonyPatch(typeof(World), nameof(World.StartRunning))]
     private class WorldConstructorPatch
     {
         public static void Postfix(World __instance)
@@ -145,6 +161,14 @@ public class ResoniteMario64 : ResoniteMod
                     SM64Context.AddMario(child);
                 }
             };
+
+            foreach (Slot child in __instance.AllSlots)
+            {
+                if (child.Tag == "Mario")
+                {
+                    SM64Context.AddMario(child);
+                }
+            }
         }
     }
 
@@ -157,7 +181,7 @@ public class ResoniteMario64 : ResoniteMod
             {
                 Slot mario = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
                 mario.GlobalPosition = __instance.Slot.GlobalPosition;
-                
+
                 return !SM64Context.TryAddMario(mario);
             }
 
@@ -209,7 +233,7 @@ public class ResoniteMario64 : ResoniteMod
                 try
                 {
                     SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-                    if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
+                    if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target?.ReferenceID ?? RefID.Null, out SM64Mario mario) is true)
                     {
                         if (mario.IsLocal)
                         {
