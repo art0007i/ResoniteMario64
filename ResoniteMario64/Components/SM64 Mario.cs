@@ -10,6 +10,9 @@ using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.Constants;
 using static ResoniteMario64.libsm64.SM64Constants;
+#if IsNet9
+using Renderite.Shared;
+#endif
 
 namespace ResoniteMario64.Components;
 

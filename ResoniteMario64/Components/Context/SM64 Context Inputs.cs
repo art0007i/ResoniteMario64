@@ -6,6 +6,9 @@ using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using static ResoniteMario64.Constants;
+#if IsNet9
+using Renderite.Shared;
+#endif
 
 namespace ResoniteMario64.Components.Context;
 

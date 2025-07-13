@@ -4,6 +4,9 @@ using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
+#if IsNet9
+using Renderite.Shared;
+#endif
 
 namespace ResoniteMario64.Components.Context;
 

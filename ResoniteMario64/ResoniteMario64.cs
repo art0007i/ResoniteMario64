@@ -69,6 +69,12 @@ public class ResoniteMario64 : ResoniteMod
     {
         Config = GetConfiguration();
 
+        #if IsNet9
+        
+        // aaaaaaaa
+        
+        #endif
+        
         // Extract the native binary to the root Resonite folder
         const string dllName = "sm64.dll";
         try

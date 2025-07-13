@@ -13,33 +13,40 @@
         <GamePath>$(MSBuildThisFileDirectory)Resonite</GamePath>
         <GamePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</GamePath>
         <GamePath Condition="Exists('E:\Programs\Steam\steamapps\common\Resonite\')">E:\Programs\Steam\steamapps\common\Resonite\</GamePath>
+        <GamePath Condition="Exists('C:\Users\colac\AppData\Local\RESO Launcher\profiles\pre_release\Game\')">C:\Users\colac\AppData\Local\RESO Launcher\profiles\pre_release\Game\</GamePath>
         
-        <GameLibs>$(GamePath)</GameLibs>
-        <GameLibs Condition="Exists('$(GamePath)Resonite_Data\Managed')">$(GamePath)Resonite_Data\Managed</GameLibs>
-
         <CopyLocal>false</CopyLocal>
 
         <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
         <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
         <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
     </PropertyGroup>
+    
+    <PropertyGroup>
+        <IsNet9 Condition="Exists('$(GamePath)\Resonite.dll')">true</IsNet9>
+        <IsNet9 Condition="!Exists('$(GamePath)\Resonite.dll')">false</IsNet9>
+    </PropertyGroup>
 
-    <PropertyGroup Condition="Exists('$(GamePath)Resonite_Data\Managed')">
-        <GameLibs>$(GamePath)Resonite_Data\Managed\</GameLibs>
+    <PropertyGroup Condition="'$(IsNet9)' == 'false'">
         <TargetFramework>net472</TargetFramework>
+
+        <GameLibs>$(GamePath)Resonite_Data\Managed\</GameLibs>
     </PropertyGroup>
 
-    <PropertyGroup Condition="!Exists('$(GamePath)Resonite_Data\Managed')">
+    <PropertyGroup Condition="'$(IsNet9)' == 'true'">
         <TargetFramework>net9.0</TargetFramework>
+        
+        <DefineConstants>IsNet9</DefineConstants>
+        <GameLibs>$(GamePath)</GameLibs>
     </PropertyGroup>
 
-    <ItemGroup Condition="!Exists('$(GamePath)Resonite_Data\Managed')">
+    <ItemGroup Condition="'$(IsNet9)' == 'true'">
         <Reference Include="Renderite.Shared">
             <HintPath>$(GameLibs)Renderite.Shared.dll</HintPath>
         </Reference>
     </ItemGroup>
 
-    <ItemGroup Condition="Exists('$(GamePath)Resonite_Data\Managed')">
+    <ItemGroup Condition="'$(IsNet9)' == 'false'">
         <Reference Include="System.Memory">
             <HintPath>$(GameLibs)System.Memory.dll</HintPath>
         </Reference>
