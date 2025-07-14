@@ -91,11 +91,12 @@ public class SM64Mario : IDisposable
 
     public SM64Mario(Slot slot)
     {
+        ResoniteMod.Debug("Constructing mario");
         slot.ReferenceID.ExtractIDs(out _, out byte userByte);
         MarioUser = slot.World.GetUserByAllocationID(userByte);
+        ResoniteMod.Debug("is local " + IsLocal);
 
         MarioSlot = slot;
-        MarioSlot.DestroyWhenUserLeaves(MarioUser);
         MarioSlot.Tag = MarioTag;
 
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
@@ -104,17 +105,28 @@ public class SM64Mario : IDisposable
         _marioGrabbable = MarioSlot.GetComponentOrAttach<Grabbable>();
 
         CapsuleCollider coll = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
-        coll.Offset.Value = new float3(0, 0.075f * MarioScale);
-        coll.Radius.Value = 0.05f * MarioScale;
-        coll.Height.Value = 0.15f * MarioScale;
+        if (IsLocal)
+        {
+            coll.Offset.Value = new float3(0, 0.075f * MarioScale);
+            coll.Radius.Value = 0.05f * MarioScale;
+            coll.Height.Value = 0.15f * MarioScale;
+        }
+        ResoniteMod.Debug("got comp refs");
 
         MarioSlot.OnPrepareDestroy += _ => Dispose();
         float3 initPos = MarioSlot.GlobalPosition;
+        
+        ResoniteMod.Debug("adding interop");
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
 
+        ResoniteMod.Debug("adding renderer");
         CreateMarioRenderer();
 
         if (!IsLocal) return;
+        
+        ResoniteMod.Debug("setting up streams");
+        
+        MarioSlot.DestroyWhenUserLeaves(MarioUser);
 
         Slot vars = MarioSlot.AddSlot("Inputs");
         vars.Tag = MarioTag;
@@ -143,6 +155,8 @@ public class SM64Mario : IDisposable
 
         DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
         stateFlags.VariableName.Value = StateFlagsTag;
+        
+        ResoniteMod.Debug("huge success");
     }
 
     // Inputs
@@ -264,6 +278,7 @@ public class SM64Mario : IDisposable
         _colorBufferColors = new color[3 * Interop.SM64GeoMaxTriangles];
         _uvBuffer = new float2[3 * Interop.SM64GeoMaxTriangles];
 
+        ResoniteMod.Debug("buffers 👍");
         // Create Mario Slot
         _marioRendererObject = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal)
                 ? MarioSlot.World.AddLocalSlot("MarioRenderer")
@@ -275,6 +290,7 @@ public class SM64Mario : IDisposable
         _marioMaterial = _marioRendererObject.AttachComponent<PBS_DualSidedMetallic>();
         _marioMaterialClipped = _marioRendererObject.AttachComponent<PBS_VertexColorMetallic>();
         _marioMaterialMetal = _marioRendererObject.AttachComponent<XiexeToonMaterial>();
+        ResoniteMod.Debug("materials 👍");
 
         // I generated this texture inside Interop.cs (look for 'mario.png')
         // then uploaded it and saved it to my inventory. I think it's better this way, because it gets cached
@@ -307,12 +323,16 @@ public class SM64Mario : IDisposable
         _marioMaterialMetal.Color.Value = colorX.Black;
         _marioMaterialMetal.MatcapTint.Value = colorX.White * 1.5f;
         _marioMaterialMetal.OffsetUnits.Value = -1f;
+        
+        ResoniteMod.Debug("textures 👍");
 
         _marioMeshRenderer.Materials.Add();
         _marioMeshRenderer.Materials.Add(_marioMaterial);
 
         _marioMeshRenderer.Mesh.Target = _marioMeshProvider;
         _marioMesh = new MeshX();
+        
+        ResoniteMod.Debug("meshx 👍");
 
         _marioRendererObject.LocalScale = new float3(-1, 1, 1) / Interop.ScaleFactor;
         _marioRendererObject.LocalPosition = float3.Zero;
@@ -323,11 +343,13 @@ public class SM64Mario : IDisposable
         {
             marioTris.AddTriangle(i * 3, i * 3 + 1, i * 3 + 2);
         }
+        ResoniteMod.Debug("tris 👍");
 
         _marioMeshProvider.LocalManualUpdate = true;
         _marioMeshProvider.HighPriorityIntegration.Value = true;
 
         _enabled = true;
+        ResoniteMod.Debug("done 👍");
     }
 
     // Game Tick
@@ -443,7 +465,7 @@ public class SM64Mario : IDisposable
         }
 
         // Just for now until Collider Shenanigans is implemented
-        Dictionary<RefID, SM64Mario> marios = SM64Context.Instance.Marios.GetTempDictionary();
+        Dictionary<Slot, SM64Mario> marios = SM64Context.Instance.Marios.GetTempDictionary();
         SM64Mario attackingMario = marios.Values.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
         if (attackingMario != null)
         {
@@ -693,13 +715,13 @@ public class SM64Mario : IDisposable
         {
             if (MarioSlot is { IsRemoved: false })
             {
-                MarioSlot.Destroy();
+                MarioSlot?.Destroy();
             }
         }
 
         if (_marioRendererObject is { IsRemoved: false })
         {
-            _marioRendererObject.Destroy();
+            _marioRendererObject?.Destroy();
         }
 
         if (Interop.IsGlobalInit)

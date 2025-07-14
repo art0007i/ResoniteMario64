@@ -69,12 +69,6 @@ public class ResoniteMario64 : ResoniteMod
     {
         Config = GetConfiguration();
 
-        #if IsNet9
-        
-        // aaaaaaaa
-        
-        #endif
-        
         // Extract the native binary to the root Resonite folder
         const string dllName = "sm64.dll";
         try
@@ -131,7 +125,7 @@ public class ResoniteMario64 : ResoniteMod
         harmony.PatchAll();
     }
 
-    [HarmonyPatch(typeof(World), nameof(World.Destroy))]
+    /*[HarmonyPatch(typeof(World), nameof(World.Destroy))]
     private class WorldCleanupPatch
     {
         public static void Prefix(World __instance)
@@ -141,7 +135,7 @@ public class ResoniteMario64 : ResoniteMod
                 SM64Context.Instance?.Dispose();
             }
         }
-    }
+    }*/
 
     [HarmonyPatch(typeof(UpdateManager), nameof(UpdateManager.RunUpdates))]
     private class WorldUpdatePatch
@@ -155,26 +149,26 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    [HarmonyPatch(typeof(World), nameof(World.StartRunning))]
+    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] { typeof(WorldManager), typeof(bool), typeof(bool) })]
     private class WorldConstructorPatch
     {
         public static void Postfix(World __instance)
         {
+            if (__instance.IsUserspace()) return;
+            Msg("patch successful");
             __instance.RootSlot.ChildAdded += (slot, child) =>
             {
-                if (child.Tag == "Mario")
-                {
-                    SM64Context.AddMario(child);
-                }
-            };
+                Debug("Child added " + child.Name + " / " + child.Tag);
 
-            foreach (Slot child in __instance.AllSlots)
-            {
-                if (child.Tag == "Mario")
+                __instance.RunInUpdates(1, () =>
                 {
-                    SM64Context.AddMario(child);
-                }
-            }
+                    Debug("Child added (deferred) " + child.Name + " / " + child.Tag);
+                    if (child.Tag == MarioTag)
+                    {
+                        SM64Context.AddMario(child);
+                    }
+                });
+            };
         }
     }
 
@@ -189,6 +183,17 @@ public class ResoniteMario64 : ResoniteMod
                 mario.GlobalPosition = __instance.Slot.GlobalPosition;
 
                 return !SM64Context.TryAddMario(mario);
+            }
+
+            if (__instance.Slot.Tag == "KillInstance")
+            {
+                __instance.RunSynchronously(() =>
+                {
+                    if (SM64Context.Instance != null)
+                    {
+                        SM64Context.Instance.Dispose();
+                    }
+                });
             }
 
             return true;
@@ -239,7 +244,7 @@ public class ResoniteMario64 : ResoniteMod
                 try
                 {
                     SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-                    if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target?.ReferenceID ?? RefID.Null, out SM64Mario mario) is true)
+                    if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
                     {
                         if (mario.IsLocal)
                         {

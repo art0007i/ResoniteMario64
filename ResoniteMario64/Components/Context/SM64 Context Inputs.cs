@@ -57,7 +57,7 @@ public partial class SM64Context
             InputBlock = block;
         }
 
-        if (Marios.Count > 0 && !(inp.GetKey(Key.Control) || inp.VR_Active))
+        if (AnyControlledMarios && !inp.GetKey(Key.Control) && !inp.VR_Active)
         {
             Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == $"SM64 {InputBlockTag}");
             if (currentBlock == null)
@@ -84,7 +84,7 @@ public partial class SM64Context
                 : input;
     }
 
-    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World && Instance.Marios.Count > 0 && c.InputInterface.VR_Active && c.Side.Value == hand;
+    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World && (Instance?.AnyControlledMarios ?? false) && c.InputInterface.VR_Active && c.Side.Value == hand;
 
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker
