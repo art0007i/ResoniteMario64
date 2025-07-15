@@ -120,6 +120,13 @@ public sealed partial class SM64Context : IDisposable
         bool success = EnsureInstanceExists(root.World);
         if (!success) return null;
 
+        int maxLocalMarios = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMariosPerPerson);
+        if (Instance.Marios.Values.Count(x => x.IsLocal) >= maxLocalMarios && root.GetAllocatingUser() == root.LocalUser)
+        {
+            ResoniteMod.Error($"You cannot have more than {maxLocalMarios} Mario's");
+            return null;
+        }
+
         ResoniteMod.Msg("instance?  " + success);
         if (!Instance.Marios.ContainsKey(root))
         {
@@ -210,13 +217,9 @@ public sealed partial class SM64Context : IDisposable
             LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
             loco?.SupressSources?.RemoveAll(InputBlock);
 
-            if (_marioAudioSlot != null)
+            if (_marioAudioSlot is { IsRemoved: false } && _marioAudioSlot.GetAllocatingUser() == _marioAudioSlot.LocalUser)
             {
-                _marioAudioSlot.ReferenceID.ExtractIDs(out _, out byte userByte);
-                if (World.GetUserByAllocationID(userByte) == World.LocalUser)
-                {
-                    _marioAudioSlot?.Destroy();
-                }
+                _marioAudioSlot?.Destroy();
             }
 
             ResoniteMod.Debug("Finished disposing SM64Context");

@@ -95,8 +95,7 @@ public sealed class SM64Mario : IDisposable
     public SM64Mario(Slot slot)
     {
         ResoniteMod.Debug("Constructing mario");
-        slot.ReferenceID.ExtractIDs(out _, out byte userByte);
-        MarioUser = slot.World.GetUserByAllocationID(userByte);
+        MarioUser = slot.GetAllocatingUser();
         ResoniteMod.Debug("is local " + IsLocal);
 
         MarioSlot = slot;
@@ -361,7 +360,10 @@ public sealed class SM64Mario : IDisposable
     private void CreateNonModdedRenderer()
     {
         Uri uri = ResoniteMario64.Config.GetValue(ResoniteMario64.keyMarioUrl);
-        if (uri == null) return;
+        if (uri == null)
+        {
+            uri = new Uri("resdb:///d85c309f7aa0c909f6b1518c4a74dacc383760c516425bec6617e8ebe8dd50da.brson");
+        }
         
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
         if (_marioNonModdedRendererSlot == null && IsLocal)
@@ -474,7 +476,7 @@ public sealed class SM64Mario : IDisposable
             // }
         }
         
-        if (_marioGrabbable != null)
+        if (_marioGrabbable is { IsRemoved: false })
         {
             bool pickup = IsBeingGrabbed;
 
@@ -621,7 +623,7 @@ public sealed class SM64Mario : IDisposable
             case MarioCapType.VanishCap:
             case MarioCapType.MetalCap:
             case MarioCapType.WingCap:
-                if (CurrentState.IsWearingCap(capType))
+                if (Utils.HasCapType(SyncedStateFlags, capType))
                 {
                     Interop.MarioCapExtend(MarioId, duration);
                 }
@@ -663,7 +665,9 @@ public sealed class SM64Mario : IDisposable
 
     private void SetAction(uint actionFlags) => Interop.MarioSetAction(MarioId, actionFlags);
 
-    private void SetState(uint flags) => Interop.MarioSetState(MarioId, flags);
+    private void SetState(StateFlag stateFlag) => Interop.MarioSetState(MarioId, stateFlag);
+    
+    private void SetState(uint stateFlags) => Interop.MarioSetState(MarioId, stateFlags);
 
     private void SetVelocity(float3 unityVelocity) => Interop.MarioSetVelocity(MarioId, unityVelocity);
 
@@ -692,10 +696,13 @@ public sealed class SM64Mario : IDisposable
         if (CurrentState.IsDead) return;
         float3 throwVelocityFlat = CurrentState.ScaledPosition - PreviousState.ScaledPosition;
         SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
-        bool hasWingCap = CurrentState.IsWearingCap(MarioCapType.WingCap);
-        SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
-        SetVelocity(throwVelocityFlat);
-        SetForwardVelocity(throwVelocityFlat.Magnitude);
+        if (throwVelocityFlat.Magnitude > 0.01f)
+        {
+            bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
+            SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
+            SetVelocity(throwVelocityFlat);
+            SetForwardVelocity(throwVelocityFlat.Magnitude);
+        }
     }
 
     public void Heal(byte healthPoints)

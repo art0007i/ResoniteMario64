@@ -523,10 +523,15 @@ internal static class Interop
     {
         sm64_set_mario_action(marioId, actionFlags);
     }
-
-    public static void MarioSetState(uint marioId, uint flags)
+    
+    public static void MarioSetState(uint marioId, StateFlag stateFlag)
     {
-        sm64_set_mario_state(marioId, flags);
+        sm64_set_mario_state(marioId, (uint)stateFlag);
+    }
+
+    public static void MarioSetState(uint marioId, uint stateFlags)
+    {
+        sm64_set_mario_state(marioId, stateFlags);
     }
 }
 
@@ -579,17 +584,6 @@ public struct SM64MarioState
     public bool IsSwimming => (ActionFlags & (uint)ActionFlag.Swimming) != 0;
     public bool IsFlying => (ActionFlags & (uint)ActionFlag.Flying) != 0;
     public bool IsTeleporting => (ActionFlags & (uint)StateFlag.Teleporting) != 0;
-
-    public bool IsWearingCap(MarioCapType capType)
-    {
-        return capType switch
-        {
-            MarioCapType.VanishCap => (StateFlags & (uint)StateFlag.VanishCap) != 0,
-            MarioCapType.MetalCap  => (StateFlags & (uint)StateFlag.MetalCap) != 0,
-            MarioCapType.WingCap   => (StateFlags & (uint)StateFlag.WingCap) != 0,
-            _                      => capType == MarioCapType.NormalCap
-        };
-    }
 }
 
 [StructLayout(LayoutKind.Sequential)]

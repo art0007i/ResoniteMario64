@@ -156,4 +156,10 @@ public static class Utils
     }
 
     public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
+
+    public static User GetAllocatingUser(this Slot slot)
+    {
+        slot.ReferenceID.ExtractIDs(out _, out byte userByte);
+        return slot.World.GetUserByAllocationID(userByte);
+    }
 }
