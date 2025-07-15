@@ -670,14 +670,33 @@ public sealed class SM64Mario : IDisposable
 
     private void SetState(uint stateFlags) => Interop.MarioSetState(MarioId, stateFlags);
 
-    private void SetVelocity(float3 unityVelocity) => Interop.MarioSetVelocity(MarioId, unityVelocity);
+    private void SetVelocity(float3 frooxVelocity) => Interop.MarioSetVelocity(MarioId, frooxVelocity);
 
-    private void SetForwardVelocity(float unityVelocity) => Interop.MarioSetForwardVelocity(MarioId, unityVelocity);
+    private void SetForwardVelocity(float frooxVelocity) => Interop.MarioSetForwardVelocity(MarioId, frooxVelocity);
 
     private void Hold()
     {
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.Grabbed);
+    }
+    
+    private void Throw()
+    {
+        if (CurrentState.IsDead) return;
+        float3 throwVelocityFlat = CurrentState.ScaledPosition - PreviousState.ScaledPosition;
+        if (throwVelocityFlat.Magnitude > 0.01f)
+        {
+            SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
+            bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
+            SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
+            SetVelocity(throwVelocityFlat);
+            SetForwardVelocity(throwVelocityFlat.Magnitude);
+        }
+        else
+        {
+            SetFaceAngle(floatQ.LookRotation(MarioSlot.LocalRotation * float3.Forward));
+            SetAction(ActionFlag.Freefall);
+        }
     }
 
     public void TeleportStart()
@@ -691,21 +710,7 @@ public sealed class SM64Mario : IDisposable
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.TeleportFadeIn);
     }
-
-    private void Throw()
-    {
-        if (CurrentState.IsDead) return;
-        float3 throwVelocityFlat = CurrentState.ScaledPosition - PreviousState.ScaledPosition;
-        SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
-        if (throwVelocityFlat.Magnitude > 0.01f)
-        {
-            bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
-            SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
-            SetVelocity(throwVelocityFlat);
-            SetForwardVelocity(throwVelocityFlat.Magnitude);
-        }
-    }
-
+    
     public void Heal(byte healthPoints)
     {
         if (CurrentState.IsDead)

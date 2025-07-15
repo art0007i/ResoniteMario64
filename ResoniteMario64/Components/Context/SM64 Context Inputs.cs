@@ -54,6 +54,13 @@ public sealed partial class SM64Context
             Stomp = inp.GetKey(Key.Shift);
             Kick = inp.Mouse.LeftButton.Held;
         }
+        else
+        {
+            Joystick = float2.Zero;
+            Jump = false;
+            Stomp = false;
+            Kick = false;
+        }
 
         if (InputBlock == null || InputBlock.IsRemoved)
         {
@@ -82,10 +89,12 @@ public sealed partial class SM64Context
 
     private float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
-        float vert = up ? 1 : down ? -1 : 0;
-        float hori = left ? 1 : right ? -1 : 0;
-
-        float2 input = new float2(hori, vert);
+        float2 input = float2.Zero;
+        
+        if (up) input += new float2(0f, 1f);
+        if (down) input += new float2(0f, -1f);
+        if (left) input += new float2(1f);
+        if (right) input += new float2(-1f);
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
         return length > 1.0f

@@ -17,7 +17,8 @@ public sealed class SM64DynamicCollider : IDisposable
     private readonly uint _surfaceObjectId;
     
     public Collider Collider { get; }
-    
+    public float3 InitScale { get; }
+
     private float3 LastPosition { get; set; }
     private floatQ LastRotation { get; set; }
 
@@ -58,6 +59,7 @@ public sealed class SM64DynamicCollider : IDisposable
         Collider = col;
         LastPosition = col.Slot.GlobalPosition;
         LastRotation = col.Slot.GlobalRotation;
+        InitScale = col.Slot.GlobalScale;
         
         string[] tagParts = col.Slot.Tag?.Split(',');
         Utils.ParseTagParts(tagParts, out SurfaceType, out TerrainType);

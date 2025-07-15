@@ -226,14 +226,8 @@ internal static class Interop
 
         sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
         sm64_audio_init(romHandle.AddrOfPinnedObject());
-
-        // With audio this has became waaaay too spammy ;_;
-        // #if DEBUG
-        // var callbackDelegate = new DebugPrintFuncDelegate(DebugPrintCallback);
-        // sm64_register_debug_print_function(Marshal.GetFunctionPointerForDelegate(callbackDelegate));
-        // #endif
         
-        MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
+        /*MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
         for (int ix = 0; ix < SM64TextureWidth; ix++)
         for (int iy = 0; iy < SM64TextureHeight; iy++)
         {
@@ -248,11 +242,11 @@ internal static class Interop
             {
                 color = new color32(255, 255, 255, 0);
             }
-
+        
             MarioTexture.SetPixel32(ix, iy, color);
         }
-
-        // marioTexture.Save("mario.png");
+        
+        // MarioTexture.Save("mario.png");*/
 
         romHandle.Free();
         textureDataHandle.Free();
@@ -335,9 +329,9 @@ internal static class Interop
         sm64_play_sound_global((int)SoundBank[soundKey]);
     }
 
-    public static void PlaySound(Sounds soundKey, float3 unityPosition)
+    public static void PlaySound(Sounds soundKey, float3 frooxPosition)
     {
-        float3 marioPos = unityPosition.ToMarioPosition();
+        float3 marioPos = frooxPosition.ToMarioPosition();
         float[] position = { marioPos.x, marioPos.y, marioPos.z };
         GCHandle posPointer = GCHandle.Alloc(position, GCHandleType.Pinned);
 
@@ -351,9 +345,9 @@ internal static class Interop
         sm64_mario_delete(marioId);
     }
 
-    public static void MarioTakeDamage(uint marioId, float3 unityPosition, uint damage)
+    public static void MarioTakeDamage(uint marioId, float3 frooxPosition, uint damage)
     {
-        float3 marioPos = unityPosition.ToMarioPosition();
+        float3 marioPos = frooxPosition.ToMarioPosition();
         sm64_mario_take_damage(marioId, damage, 0, marioPos.x, marioPos.y, marioPos.z);
     }
 
@@ -365,15 +359,15 @@ internal static class Interop
                                 currentState.Position[2] - previousState.Position[2]);
     }
 
-    public static void MarioSetVelocity(uint marioId, float3 unityVelocity)
+    public static void MarioSetVelocity(uint marioId, float3 frooxVelocity)
     {
-        float3 marioVelocity = unityVelocity.ToMarioPosition();
+        float3 marioVelocity = frooxVelocity.ToMarioPosition();
         sm64_set_mario_velocity(marioId, marioVelocity.x, marioVelocity.y, marioVelocity.z);
     }
 
-    public static void MarioSetForwardVelocity(uint marioId, float unityVelocity)
+    public static void MarioSetForwardVelocity(uint marioId, float frooxVelocity)
     {
-        sm64_set_mario_forward_velocity(marioId, unityVelocity * ScaleFactor);
+        sm64_set_mario_forward_velocity(marioId, frooxVelocity * ScaleFactor);
     }
 
     public static void CreateAndAppendSurfaces(List<SM64Surface> outSurfaces, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
@@ -443,7 +437,7 @@ internal static class Interop
     public static uint SurfaceObjectCreate(float3 position, floatQ rotation, SM64Surface[] surfaces)
     {
         GCHandle surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
-        SM64ObjectTransform t = SM64ObjectTransform.FromUnityWorld(position, rotation);
+        SM64ObjectTransform t = SM64ObjectTransform.FromFrooxWorld(position, rotation);
 
         SM64SurfaceObject surfObj = new SM64SurfaceObject
         {
@@ -461,7 +455,7 @@ internal static class Interop
 
     public static void SurfaceObjectMove(uint id, float3 position, floatQ rotation)
     {
-        SM64ObjectTransform t = SM64ObjectTransform.FromUnityWorld(position, rotation);
+        SM64ObjectTransform t = SM64ObjectTransform.FromFrooxWorld(position, rotation);
         sm64_surface_object_move(id, ref t);
     }
 
@@ -605,7 +599,7 @@ internal struct SM64ObjectTransform
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
     private float[] EulerRotation;
 
-    public static SM64ObjectTransform FromUnityWorld(float3 position, floatQ rotation)
+    public static SM64ObjectTransform FromFrooxWorld(float3 position, floatQ rotation)
     {
         return new SM64ObjectTransform
         {

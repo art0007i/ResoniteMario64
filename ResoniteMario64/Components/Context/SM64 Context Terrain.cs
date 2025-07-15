@@ -62,9 +62,14 @@ public sealed partial class SM64Context
     {
         if (Instance == null) return false;
         
-        if (Instance._sm64DynamicColliders.ContainsKey(surfaceObject))
+        if (Instance._sm64DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
         {
-            return false;
+            if (value.InitScale.Approximately(surfaceObject.Slot.GlobalScale, 0.001f))
+            {
+                return false;
+            }
+
+            value.Dispose();
         }
 
         SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject);
