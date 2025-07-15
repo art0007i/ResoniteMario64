@@ -120,13 +120,6 @@ public sealed partial class SM64Context : IDisposable
         bool success = EnsureInstanceExists(root.World);
         if (!success) return null;
 
-        int maxLocalMarios = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMariosPerPerson);
-        if (Instance.Marios.Values.Count(x => x.IsLocal) >= maxLocalMarios && root.GetAllocatingUser() == root.LocalUser)
-        {
-            ResoniteMod.Error($"You cannot have more than {maxLocalMarios} Mario's");
-            return null;
-        }
-
         ResoniteMod.Msg("instance?  " + success);
         if (!Instance.Marios.ContainsKey(root))
         {

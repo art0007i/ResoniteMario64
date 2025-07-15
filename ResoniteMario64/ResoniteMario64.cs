@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Security.Cryptography;
-using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -36,9 +34,11 @@ public class ResoniteMario64 : ResoniteMod
     public static ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
     
     // [AutoRegisterConfigKey]
-    // public static ModConfigurationKey<float> KEY_MARIO_CULL_DISTANCE = new("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
-    [AutoRegisterConfigKey]
-    public static ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine.", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
+    // public static ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
+    
+    // [AutoRegisterConfigKey]
+    // public static ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine.", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
+    
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<int> KeyMaxMeshColliderTris = new ModConfigurationKey<int>("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
 

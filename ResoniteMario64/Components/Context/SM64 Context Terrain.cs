@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Timers;
+﻿using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.libsm64;

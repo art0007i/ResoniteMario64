@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -114,11 +112,12 @@ public sealed class SM64Mario : IDisposable
             coll.Radius.Value = 0.05f * MarioScale;
             coll.Height.Value = 0.15f * MarioScale;
         }
+
         ResoniteMod.Debug("got comp refs");
 
         MarioSlot.OnPrepareDestroy += _ => Dispose();
         float3 initPos = MarioSlot.GlobalPosition;
-        
+
         ResoniteMod.Debug("adding interop");
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
 
@@ -127,7 +126,7 @@ public sealed class SM64Mario : IDisposable
         MarioSlot.RunInUpdates(3, CreateNonModdedRenderer);
 
         if (!IsLocal) return;
-        
+
         ResoniteMod.Debug("setting up streams");
         MarioSlot.DestroyWhenUserLeaves(MarioUser);
 
@@ -158,7 +157,7 @@ public sealed class SM64Mario : IDisposable
 
         DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
         stateFlags.VariableName.Value = StateFlagsTag;
-        
+
         ResoniteMod.Debug("huge success");
     }
 
@@ -281,7 +280,7 @@ public sealed class SM64Mario : IDisposable
         _colorBufferColors = new color[3 * Interop.SM64GeoMaxTriangles];
         _uvBuffer = new float2[3 * Interop.SM64GeoMaxTriangles];
         ResoniteMod.Debug("buffers 👍");
-        
+
         // Create Mario Slot
         _marioRendererSlot = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal)
                 ? MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}")
@@ -327,7 +326,7 @@ public sealed class SM64Mario : IDisposable
         _marioMaterialMetal.Color.Value = colorX.Black;
         _marioMaterialMetal.MatcapTint.Value = colorX.White * 1.5f;
         _marioMaterialMetal.OffsetUnits.Value = -2f;
-        
+
         ResoniteMod.Debug("textures 👍");
 
         _marioMeshRenderer.Materials.Add();
@@ -335,7 +334,7 @@ public sealed class SM64Mario : IDisposable
 
         _marioMeshRenderer.Mesh.Target = _marioMeshProvider;
         _marioMesh = new MeshX();
-        
+
         ResoniteMod.Debug("meshx 👍");
 
         _marioRendererSlot.LocalScale = new float3(-1, 1, 1) / Interop.ScaleFactor;
@@ -347,6 +346,7 @@ public sealed class SM64Mario : IDisposable
         {
             marioTris.AddTriangle(i * 3, i * 3 + 1, i * 3 + 2);
         }
+
         ResoniteMod.Debug("tris 👍");
 
         _marioMeshProvider.Mesh = _marioMesh;
@@ -364,7 +364,7 @@ public sealed class SM64Mario : IDisposable
         {
             uri = new Uri("resdb:///d85c309f7aa0c909f6b1518c4a74dacc383760c516425bec6617e8ebe8dd50da.brson");
         }
-        
+
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
         if (_marioNonModdedRendererSlot == null && IsLocal)
         {
@@ -379,7 +379,7 @@ public sealed class SM64Mario : IDisposable
                 ResoniteMod.Debug("Setup Non-Modded Renderer");
             });
         }
-        
+
         ResoniteMod.Debug("non-modded finish");
     }
 
@@ -475,7 +475,7 @@ public sealed class SM64Mario : IDisposable
             //     _startedTeleporting = Time.time;
             // }
         }
-        
+
         if (_marioGrabbable is { IsRemoved: false })
         {
             bool pickup = IsBeingGrabbed;
@@ -613,7 +613,7 @@ public sealed class SM64Mario : IDisposable
     public void SetFaceAngle(floatQ rot) => Interop.MarioSetFaceAngle(MarioId, rot);
 
     public void SetHealthPoints(float healthPoints) => Interop.MarioSetHealthPoints(MarioId, healthPoints);
-    
+
     public void TakeDamage(float3 worldPosition, uint damage) => Interop.MarioTakeDamage(MarioId, worldPosition, damage);
 
     public void WearCap(MarioCapType capType, float duration = 15f, bool playMusic = true)
@@ -639,6 +639,7 @@ public sealed class SM64Mario : IDisposable
 
                     Interop.MarioCap(MarioId, flag, duration, playMusic);
                 }
+
                 break;
             case MarioCapType.NormalCap:
                 SetState(CurrentState.StateFlags & ~(uint)(
@@ -666,7 +667,7 @@ public sealed class SM64Mario : IDisposable
     private void SetAction(uint actionFlags) => Interop.MarioSetAction(MarioId, actionFlags);
 
     private void SetState(StateFlag stateFlag) => Interop.MarioSetState(MarioId, stateFlag);
-    
+
     private void SetState(uint stateFlags) => Interop.MarioSetState(MarioId, stateFlags);
 
     private void SetVelocity(float3 unityVelocity) => Interop.MarioSetVelocity(MarioId, unityVelocity);
@@ -746,7 +747,6 @@ public sealed class SM64Mario : IDisposable
         Kick,
         Stomp
     }
-
 
     public void Dispose()
     {

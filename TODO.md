@@ -9,6 +9,6 @@
 - Implement WaterBoxes
 - Implement Pickups for mario
 - Implement Water/Gas Level settings
-- Implement MaxMariosPerUser / Mario Culling
+- Implement Max Animated Marios Per User / Mario Distance Culling
 - Allow Mario to be hurt by specific Colliders
 - Maybe Implement? Generate a Mario Texture from libsm64 instead of resdb
