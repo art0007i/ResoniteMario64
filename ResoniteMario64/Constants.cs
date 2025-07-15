@@ -3,6 +3,7 @@
 public static class Constants
 {
     public const string MarioTag = "Mario";
+    public const string MarioNonMRendererTag = "NonModdedRenderer";
     public const string JoystickTag = "Joystick";
     public const string JumpTag = "Jump";
     public const string PunchTag = "Punch";

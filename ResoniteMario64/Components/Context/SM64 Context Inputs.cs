@@ -12,7 +12,7 @@ using Renderite.Shared;
 
 namespace ResoniteMario64.Components.Context;
 
-public partial class SM64Context
+public sealed partial class SM64Context
 {
     public Comment InputBlock;
 
@@ -21,13 +21,18 @@ public partial class SM64Context
     public bool Kick;
     public bool Stomp;
 
+    public bool MovementBlocked = true;
+
     private void HandleInputs()
     {
-        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
-        if (loco == null) return;
-
         InputInterface inp = World.InputInterface;
-        if (inp.VR_Active)
+        if (inp.GetKeyUp(Key.Period))
+        {
+            MovementBlocked = !MovementBlocked;
+        }
+
+        bool shouldRun = !World.LocalUser.HasActiveFocus() && MovementBlocked;
+        if (inp.VR_Active && shouldRun)
         {
             InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
             InteractionHandler off = main.OtherTool;
@@ -37,7 +42,7 @@ public partial class SM64Context
             Stomp = main.Inputs.Grab.Held;
             Kick = main.Inputs.Interact.Held;
         }
-        else
+        else if (shouldRun)
         {
             bool w = inp.GetKey(Key.W);
             bool s = inp.GetKey(Key.S);
@@ -57,17 +62,21 @@ public partial class SM64Context
             InputBlock = block;
         }
 
-        if (AnyControlledMarios && !inp.GetKey(Key.Control) && !inp.VR_Active)
+        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
+        if (loco != null)
         {
-            Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == $"SM64 {InputBlockTag}");
-            if (currentBlock == null)
+            if (AnyControlledMarios && !inp.VR_Active && MovementBlocked)
             {
-                loco.SupressSources.Add(InputBlock);
+                Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == $"SM64 {InputBlockTag}");
+                if (currentBlock == null)
+                {
+                    loco.SupressSources.Add(InputBlock);
+                }
             }
-        }
-        else
-        {
-            loco.SupressSources.RemoveAll(InputBlock);
+            else
+            {
+                loco.SupressSources.RemoveAll(InputBlock);
+            }
         }
     }
 
@@ -84,7 +93,13 @@ public partial class SM64Context
                 : input;
     }
 
-    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World && (Instance?.AnyControlledMarios ?? false) && c.InputInterface.VR_Active && c.Side.Value == hand;
+    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand)
+        => Instance?.World == c.World &&
+           (Instance?.AnyControlledMarios ?? false) &&
+           c.InputInterface.VR_Active &&
+           c.Side.Value == hand &&
+           (Instance?.World?.LocalUser.HasActiveFocus() ?? false) &&
+           (Instance?.MovementBlocked ?? false);
 
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker

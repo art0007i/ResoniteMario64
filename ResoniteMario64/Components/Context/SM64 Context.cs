@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FrooxEngine;
+using HarmonyLib;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.Constants;
@@ -11,45 +12,70 @@ using Renderite.Shared;
 
 namespace ResoniteMario64.Components.Context;
 
-public partial class SM64Context : IDisposable
+public sealed partial class SM64Context : IDisposable
 {
-    // private readonly List<SM64ColliderDynamic> _surfaceObjects = new();
-    public static SM64Context Instance;
+    public static SM64Context Instance { get; private set; }
 
+    private readonly Dictionary<Collider, SM64DynamicCollider> _sm64DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
     public readonly Dictionary<Slot, SM64Mario> Marios = new Dictionary<Slot, SM64Mario>();
+
     public bool AnyControlledMarios => Marios.Values.Any(x => x.IsLocal);
+
+    public World World { get; }
 
     internal double LastTick;
 
-    public World World;
+    private bool _forceUpdate;
+
+    private bool _disposed;
 
     private SM64Context(World wld)
     {
         World = wld;
 
-        wld.WorldDestroyed += world => { Dispose(); };
+        wld.WorldDestroyed += _ => { Dispose(); };
 
         Interop.GlobalInit(ResoniteMario64.SuperMario64UsZ64RomBytes);
 
         SetAudioSource();
 
         // Update context's colliders
-        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
-        /*ResoniteMario64.KEY_MAX_MESH_COLLIDER_TRIS.OnChanged += (newValue) => {
-            Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
-        };
-        */
-        QueueStaticSurfacesUpdate();
+        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(wld));
+
+        ResoniteMario64.KeyMaxMeshColliderTris.OnChanged += _ => { Instance._forceUpdate = true; };
+
+        wld.RunInUpdates(3, Init);
+    }
+
+    private void Init()
+    {
+        if (_disposed) return;
+
+        World.RootSlot.ForeachComponentInChildren<Collider>(c =>
+        {
+            if (Utils.IsGoodDynamicCollider(c))
+            {
+                AddCollider(c);
+            }
+        });
     }
 
     public void OnCommonUpdate()
     {
-        HandleInputs();
+        if (_disposed) return;
 
         if (World.InputInterface.GetKeyDown(Key.Semicolon))
         {
-            QueueStaticSurfacesUpdate();
+            _forceUpdate = true;
         }
+
+        if (_forceUpdate)
+        {
+            StaticTerrainUpdate();
+            _forceUpdate = false;
+        }
+
+        HandleInputs();
 
         if (World.Time.WorldTime - LastTick >= ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f)
         {
@@ -66,19 +92,20 @@ public partial class SM64Context : IDisposable
 
     private void SM64GameTick()
     {
+        if (_disposed) return;
+
         ProcessAudio();
 
-        /*lock (_surfaceObjects) {
-            foreach (var o in _surfaceObjects) {
-                o.ContextFixedUpdateSynced();
-            }
+        Dictionary<Collider, SM64DynamicCollider> dynamicColliders = _sm64DynamicColliders.GetTempDictionary();
+        foreach (SM64DynamicCollider dynamicCol in dynamicColliders.Values)
+        {
+            dynamicCol?.ContextFixedUpdateSynced();
         }
-        */
 
         Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
         foreach (SM64Mario mario in marios.Values)
         {
-            mario.ContextFixedUpdateSynced();
+            mario?.ContextFixedUpdateSynced();
         }
     }
 
@@ -102,17 +129,15 @@ public partial class SM64Context : IDisposable
             if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
         }
 
-        foreach (Slot child in root.Parent.Children)
+        root.Parent.RunInUpdates(3, () =>
         {
-            if (child.Tag != MarioTag) continue;
-            if (!Instance.Marios.ContainsKey(child))
+            root.Parent.Children.Where(x => x.Tag == MarioTag && !Instance.Marios.ContainsKey(x)).Do(root2 =>
             {
                 ResoniteMod.Msg("Non-duplicate mario.");
-                mario = new SM64Mario(child);
-                Instance.Marios.Add(root, mario);
-                if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
-            }
-        }
+                var mario2 = new SM64Mario(root2);
+                Instance.Marios.Add(root2, mario2);
+            });
+        });
 
         return mario;
     }
@@ -133,7 +158,6 @@ public partial class SM64Context : IDisposable
 
     private static bool EnsureInstanceExists(World wld)
     {
-        // TODO: add way to have multiple instances (Dictionary of World to Instance)
         if (Instance != null && wld != Instance.World)
         {
             bool destroy = wld.Focus == World.WorldFocus.Focused;
@@ -156,22 +180,49 @@ public partial class SM64Context : IDisposable
 
     public void Dispose()
     {
-        ResoniteMod.Debug("Setting instanse as naked");
-        Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
-        foreach (SM64Mario mario in marios.Values)
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (disposing)
         {
-            mario.Dispose();
+            ResoniteMod.Debug("Disposing SM64Context");
+
+            Dictionary<Slot, SM64Mario> marios = Marios.GetTempDictionary();
+            foreach (SM64Mario mario in marios.Values)
+            {
+                mario?.Dispose();
+            }
+            Marios.Clear();
+
+            Dictionary<Collider, SM64DynamicCollider> dynamicColliders = _sm64DynamicColliders.GetTempDictionary();
+            foreach (SM64DynamicCollider col in dynamicColliders.Values)
+            {
+                col?.Dispose();
+            }
+            _sm64DynamicColliders.Clear();
+
+            LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
+            loco?.SupressSources?.RemoveAll(InputBlock);
+
+            if (_marioAudioSlot != null)
+            {
+                _marioAudioSlot.ReferenceID.ExtractIDs(out _, out byte userByte);
+                if (World.GetUserByAllocationID(userByte) == World.LocalUser)
+                {
+                    _marioAudioSlot?.Destroy();
+                }
+            }
+
+            ResoniteMod.Debug("Finished disposing SM64Context");
         }
-        ResoniteMod.Debug("all marios set as naked");
 
         Interop.GlobalTerminate();
-
-        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
-        loco?.SupressSources?.RemoveAll(InputBlock);
-
-        _marioAudioSlot?.Destroy();
-        ResoniteMod.Debug("done disposing");
-
         Instance = null;
     }
 }

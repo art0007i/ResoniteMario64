@@ -13,7 +13,7 @@ namespace ResoniteMario64;
 public static class Utils
 {
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
-    
+
     public static bool HasCapType(uint flags, MarioCapType capType)
     {
         return capType switch
@@ -35,14 +35,20 @@ public static class Utils
         }
     }
 
-    private static bool IsGoodCollider(Collider col) =>
-            // Ignore disabled
+    public static bool IsGoodStaticCollider(Collider col) =>
             col.Enabled
             && col.Slot.IsActive
-            // Ignore non character colliders and non Tagged Colliders
-            && (col.CharacterCollider.Value || col.Slot.Tag?.Contains("SM64 Collider") is true)
-            // Ignore triggers
-            && col.Type.Value != ColliderType.Trigger;
+            && CollidesWithCharacters(col) || col.Slot.Tag?.Contains("SM64 StaticCollider") is true
+            && col.Slot.Tag?.Contains("SM64 DynamicCollider") is not true;
+
+    public static bool IsGoodDynamicCollider(Collider col) =>
+            col.Enabled 
+            && col.Slot.IsActive
+            && col.Type.Value != ColliderType.Trigger
+            && col.Slot.Tag?.Contains("SM64 DynamicCollider") is true
+            && col.Slot.Tag?.Contains("SM64 StaticCollider") is not true;
+
+    public static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
@@ -51,36 +57,10 @@ public static class Utils
 
         foreach (Collider obj in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
-            if (!IsGoodCollider(obj)) continue;
-
-            SM64SurfaceType surfaceType = SM64SurfaceType.Default;
-            SM64TerrainType terrainType = SM64TerrainType.Grass;
+            if (!IsGoodStaticCollider(obj)) continue;
 
             string[] tagParts = obj.Slot.Tag?.Split(',');
-            if (tagParts != null)
-            {
-                foreach (string part in tagParts)
-                {
-                    string trimmed = part.Trim();
-
-                    if (trimmed.StartsWith("SurfaceType_", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string enumName = trimmed.Substring("SurfaceType_".Length);
-                        if (Enum.TryParse(enumName, true, out SM64SurfaceType parsedSurface))
-                        {
-                            surfaceType = parsedSurface;
-                        }
-                    }
-                    else if (trimmed.StartsWith("TerrainType_", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string enumName = trimmed.Substring("TerrainType_".Length);
-                        if (Enum.TryParse(enumName, true, out SM64TerrainType parsedTerrain))
-                        {
-                            terrainType = parsedTerrain;
-                        }
-                    }
-                }
-            }
+            Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType);
 
             if (obj is MeshCollider meshCollider)
             {
@@ -94,14 +74,15 @@ public static class Utils
 
         // Ignore all meshes colliders with a null shared mesh, or non-readable
         List<(MeshCollider collider, SM64SurfaceType surfaceType, SM64TerrainType terrainType)> nonReadableMeshColliders = meshColliders.Where(mc => mc.collider.Mesh.Target == null || !mc.collider.Mesh.IsAssetAvailable).ToList();
-#if DEBUG
+
         foreach (var invalid in nonReadableMeshColliders)
         {
-            ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is " +
-                             $"{(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, " +
-                             "so we won't be able to use this as a collider for Mario :(");
+            if (Utils.CheckDebug())
+                ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is " +
+                                 $"{(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, " +
+                                 "so we won't be able to use this as a collider for Mario :(");
         }
-#endif
+
         meshColliders.RemoveAll(mc => mc.collider.Mesh.Target == null || !mc.collider.Mesh.IsAssetAvailable);
 
         // Sort the meshColliders list by the length of their triangles array in ascending order
@@ -110,28 +91,52 @@ public static class Utils
         // Add the mesh colliders until we reach the max mesh collider polygon limit
         int maxTris = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMeshColliderTris);
         int totalMeshColliderTris = 0;
-        
+
         foreach ((MeshCollider meshCollider, SM64SurfaceType surfaceType, SM64TerrainType terrainType) in meshColliders)
         {
             int meshTrisCount = meshCollider.Mesh.Asset.Data.TotalTriangleCount;
             int newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
             if (newTotalMeshColliderTris > maxTris)
             {
-#if DEBUG
-                ResoniteMod.Debug("[MeshCollider] Collider has too many triangles. " + meshCollider);
-#endif
+                if (Utils.CheckDebug()) ResoniteMod.Warn("[MeshCollider] Collider has too many triangles. " + meshCollider);
                 continue;
             }
-
-#if DEBUG
-            ResoniteMod.Debug($"[MeshCollider] Adding mesh collider. (Remaining tris: {maxTris - newTotalMeshColliderTris}) " + meshCollider);   
-#endif
 
             GetTransformedSurfaces(meshCollider, surfaces, surfaceType, terrainType);
             totalMeshColliderTris = newTotalMeshColliderTris;
         }
 
         return surfaces.ToArray();
+    }
+    
+    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType)
+    {
+        surfaceType = SM64SurfaceType.Default;
+        terrainType = SM64TerrainType.Grass;
+        
+        if (tagParts == null) return;
+        
+        foreach (string part in tagParts)
+        {
+            string trimmed = part.Trim();
+
+            if (trimmed.StartsWith("SurfaceType_", StringComparison.OrdinalIgnoreCase))
+            {
+                string enumName = trimmed.Substring("SurfaceType_".Length);
+                if (Enum.TryParse(enumName, true, out SM64SurfaceType parsedSurface))
+                {
+                    surfaceType = parsedSurface;
+                }
+            }
+            else if (trimmed.StartsWith("TerrainType_", StringComparison.OrdinalIgnoreCase))
+            {
+                string enumName = trimmed.Substring("TerrainType_".Length);
+                if (Enum.TryParse(enumName, true, out SM64TerrainType parsedTerrain))
+                {
+                    terrainType = parsedTerrain;
+                }
+            }
+        }
     }
 
     // Function used for static colliders. Returns correct global positions, rotations and scales.
@@ -149,4 +154,6 @@ public static class Utils
 
         return surfaces;
     }
+
+    public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
 }

@@ -64,6 +64,9 @@
         <Reference Include="Awwdio">
             <HintPath>$(GameLibs)Awwdio.dll</HintPath>
         </Reference>
+        <Reference Include="SkyFrost.Base.Models">
+            <HintPath>$(GameLibs)SkyFrost.Base.Models.dll</HintPath>
+        </Reference>
         <Reference Include="Elements.Assets">
             <HintPath>$(GameLibs)Elements.Assets.dll</HintPath>
         </Reference>

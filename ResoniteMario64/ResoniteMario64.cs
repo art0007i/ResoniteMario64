@@ -34,8 +34,7 @@ public class ResoniteMario64 : ResoniteMod
     // PERFORMANCE
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
-
-    // TODO: implement these settings (maybe)
+    
     // [AutoRegisterConfigKey]
     // public static ModConfigurationKey<float> KEY_MARIO_CULL_DISTANCE = new("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
     // [AutoRegisterConfigKey]
@@ -54,6 +53,9 @@ public class ResoniteMario64 : ResoniteMod
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
 
+    [AutoRegisterConfigKey]
+    public static ModConfigurationKey<Uri> keyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario", () => new Uri("resdb:///d85c309f7aa0c909f6b1518c4a74dacc383760c516425bec6617e8ebe8dd50da.brson"));
+    
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
 
@@ -155,14 +157,11 @@ public class ResoniteMario64 : ResoniteMod
         public static void Postfix(World __instance)
         {
             if (__instance.IsUserspace()) return;
-            Msg("patch successful");
+
             __instance.RootSlot.ChildAdded += (slot, child) =>
             {
-                Debug("Child added " + child.Name + " / " + child.Tag);
-
                 __instance.RunInUpdates(1, () =>
                 {
-                    Debug("Child added (deferred) " + child.Name + " / " + child.Tag);
                     if (child.Tag == MarioTag)
                     {
                         SM64Context.AddMario(child);
@@ -171,7 +170,7 @@ public class ResoniteMario64 : ResoniteMod
             };
         }
     }
-
+    
     [HarmonyPatch(typeof(Button), "RunPressed")]
     private class RunButtonPressed
     {
@@ -200,7 +199,33 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    // TODO: figure out a physical synchronizable representation of mario.
+    [HarmonyPatch(typeof(UserRoot))]
+    private class UserRootPatch
+    {
+        private const string VariableName = "User/ResoniteMario64.HasInstance";
+        [HarmonyPatch("OnStart"), HarmonyPostfix]
+        public static void OnStartPatch(UserRoot __instance)
+        {
+            if (__instance.ActiveUser != __instance.LocalUser) return;
+            
+            DynamicValueVariable<bool> variable = __instance.Slot.AttachComponent<DynamicValueVariable<bool>>();
+            variable.VariableName.Value = VariableName;
+        }
+
+        private static bool _previousExist;
+        [HarmonyPatch("OnCommonUpdate"), HarmonyPostfix]
+        public static void CommonUpdatePatch(UserRoot __instance)
+        {
+            if (__instance.ActiveUser != __instance.LocalUser) return;
+            
+            bool value = SM64Context.Instance != null;
+            if (value == _previousExist) return;
+            
+            __instance.Slot.WriteDynamicVariable(VariableName, value);
+            _previousExist = value;
+        }
+    }
+    
     [HarmonyPatch(typeof(Slot), nameof(Slot.BuildInspectorUI))]
     private class SlotUiAddon
     {
@@ -239,45 +264,44 @@ public class ResoniteMario64 : ResoniteMod
                 });
             };
 
-            if (SM64Context.Instance != null)
+            if (SM64Context.Instance == null) return;
+            
+            try
             {
-                try
+                SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
+                if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
                 {
-                    SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-                    if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
+                    if (mario.IsLocal)
                     {
-                        if (mario.IsLocal)
+                        ui.Spacer(8);
+
+                        foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
                         {
-                            ui.Spacer(8);
-
-                            foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
-                            {
-                                ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, true); };
-                            }
-
-                            ui.Spacer(8);
-
-                            ui.Button("Heal Mario").LocalPressed += (b, e) => { mario.Heal(1); };
-
-                            ui.Spacer(8);
-
-                            ui.Button("Damage Mario").LocalPressed += (b, e) => { mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1); };
-                            ui.Button("Kill Mario").LocalPressed += (b, e) => { mario.SetHealthPoints(0); };
-                            ui.Button("Nuke Mario").LocalPressed += (b, e) => { mario.SetMarioAsNuked(true); };
-
-                            ui.Spacer(8);
+                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, true); };
                         }
-                    }
-                    else if (inspector?.ComponentView?.Target?.Tag == $"SM64 {AudioTag}")
-                    {
-                        ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
-                        ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
+
+                        ui.Spacer(8);
+
+                        ui.Button("Heal Mario").LocalPressed += (b, e) => { mario.Heal(1); };
+
+                        ui.Spacer(8);
+
+                        ui.Button("Damage Mario").LocalPressed += (b, e) => { mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1); };
+                        ui.Button("Kill Mario").LocalPressed += (b, e) => { mario.SetHealthPoints(0); };
+                        ui.Button("Nuke Mario").LocalPressed += (b, e) => { mario.SetMarioAsNuked(true); };
+
+                        ui.Spacer(8);
                     }
                 }
-                catch (Exception e)
+                else if (inspector?.ComponentView?.Target?.Tag == $"SM64 {AudioTag}")
                 {
-                    Error(e);
+                    ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
+                    ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
                 }
+            }
+            catch (Exception e)
+            {
+                Error(e);
             }
         }
     }

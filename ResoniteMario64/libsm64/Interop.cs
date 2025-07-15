@@ -54,8 +54,8 @@ internal static class Interop
     public const float SM64Deg2Angle = 182.04459f;
 
     public static Bitmap2D MarioTexture { get; private set; }
-
     public static bool IsGlobalInit { get; private set; }
+    
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void SM64DebugPrintFunctionPtr(string message);
@@ -106,7 +106,7 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_set_sound_volume(float vol);
 
-    /* Mario Lifecycle */
+    // Mario Lifecycle
     [DllImport("sm64")]
     private static extern uint sm64_mario_create(float x, float y, float z);
 
@@ -116,7 +116,7 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_mario_delete(uint marioId);
 
-    /* Mario Actions & Status */
+    // Mario Actions & Status
     [DllImport("sm64")]
     private static extern void sm64_set_mario_action(uint marioId, uint action);
 
@@ -157,7 +157,7 @@ internal static class Interop
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool sm64_mario_attack(uint marioId, float x, float y, float z, float hitboxHeight);
 
-    /* Mario Transform */
+    // Mario Transform 
     [DllImport("sm64")]
     private static extern void sm64_set_mario_position(uint marioId, float x, float y, float z);
 
@@ -180,7 +180,7 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_set_mario_gas_level(uint marioId, int level);
 
-    /* Static & Dynamic Surfaces */
+    // Static & Dynamic Surfaces
     [DllImport("sm64")]
     private static extern void sm64_static_surfaces_load(SM64Surface[] surfaces, ulong numSurfaces);
 
@@ -193,7 +193,7 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern void sm64_surface_object_delete(uint objectId);
 
-    /* Collision & Geometry Queries */
+    // Collision & Geometry Queries
     [DllImport("sm64")]
     private static extern int sm64_surface_find_wall_collision(ref float x, ref float y, ref float z, float offsetY, float radius);
 
@@ -218,11 +218,6 @@ internal static class Interop
     [DllImport("sm64")]
     private static extern float sm64_surface_find_poison_gas_level(float x, float z);
 
-    private static void DebugPrintCallback(string str)
-    {
-        ResoniteMod.Msg($"[libsm64] {str}");
-    }
-
     public static void GlobalInit(byte[] rom)
     {
         GCHandle romHandle = GCHandle.Alloc(rom, GCHandleType.Pinned);
@@ -237,8 +232,7 @@ internal static class Interop
         // var callbackDelegate = new DebugPrintFuncDelegate(DebugPrintCallback);
         // sm64_register_debug_print_function(Marshal.GetFunctionPointerForDelegate(callbackDelegate));
         // #endif
-
-        // TODO: Use mario texture that we read here, instead of a hardcoded resdb link
+        
         MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
         for (int ix = 0; ix < SM64TextureWidth; ix++)
         for (int iy = 0; iy < SM64TextureHeight; iy++)
@@ -291,9 +285,7 @@ internal static class Interop
 
     public static void StaticSurfacesLoad(SM64Surface[] surfaces)
     {
-        ResoniteMod.Msg("Reloading all static collider surfaces, this can be caused by the Game Engine " +
-                        "Initialized/Destroyed or some component with static colliders was loaded/deleted. " +
-                        $"You might notice some lag spike... Total Polygons: {surfaces.Length}");
+        ResoniteMod.Debug($"Reloading all static collider surfaces - Total Polygons: {surfaces.Length}");
         sm64_static_surfaces_load(surfaces, (ulong)surfaces.Length);
     }
 

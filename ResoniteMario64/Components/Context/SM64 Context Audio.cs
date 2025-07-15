@@ -7,7 +7,7 @@ using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Components.Context;
 
-public partial class SM64Context
+public sealed partial class SM64Context
 {
     private const int NativeSampleRate = 32000;
     private const int TargetSampleRate = 48000;
@@ -40,13 +40,9 @@ public partial class SM64Context
         {
             _marioAudioSlot = World.RootSlot.FindChildOrAdd($"SM64 {AudioTag}", false);
             _marioAudioSlot.Tag = $"SM64 {AudioTag}";
-            _marioAudioSlot.OnPrepareDestroy += slot =>
-            {
-                if (Interop.IsGlobalInit)
-                {
-                    slot.RunInUpdates(slot.LocalUser.AllocationID * 3, SetAudioSource);
-                }
-            };
+            
+            _marioAudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+            _marioAudioSlot.OnPrepareDestroy += HandleAudioDestroy;
 
             _marioAudioOutput = _marioAudioSlot.GetComponentOrAttach<AudioOutput>(out bool attached);
             if (attached || _marioAudioOutput.Source.Target == null)
@@ -57,9 +53,22 @@ public partial class SM64Context
                 _marioAudioOutput.DopplerLevel.Value = 0;
                 _marioAudioOutput.IgnoreAudioEffects.Value = true;
                 _marioAudioOutput.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
-                _marioAudioOutput.Volume.Value = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
             }
+
+            userSlot.RunInUpdates(userSlot.LocalUser.AllocationID + 1, () =>
+            {
+                ValueUserOverride<float> overrideForUser = _marioAudioOutput.Volume.OverrideForUser(userSlot.LocalUser, ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume));
+                overrideForUser.Default.Value = ResoniteMario64.KeyAudioVolume.TryComputeDefaultTyped(out float value) ? value : 0f;
+            });
         });
+    }
+
+    private void HandleAudioDestroy(Slot slot)
+    {
+        if (Interop.IsGlobalInit)
+        {
+            slot.RunInUpdates(slot.LocalUser.AllocationID * 3, SetAudioSource);
+        }
     }
 
     private void ProcessAudio()
