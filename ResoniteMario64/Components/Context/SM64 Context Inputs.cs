@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -26,13 +27,14 @@ public sealed partial class SM64Context
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
-        if (inp.GetKeyUp(Key.Period))
+        if (inp.GetKeyUp(Key.Period) || inp.GetDevices<StandardGamepad>(x => x.Menu.Pressed).Count != 0)
         {
             MovementBlocked = !MovementBlocked;
         }
 
         bool shouldRun = !World.LocalUser.HasActiveFocus() && MovementBlocked;
-        if (inp.VR_Active && shouldRun)
+        bool shouldGamepad = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyUseGamepad) && inp.GetDevices<StandardGamepad>().Count != 0;
+        if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
             InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
             InteractionHandler off = main.OtherTool;
@@ -42,7 +44,7 @@ public sealed partial class SM64Context
             Stomp = main.Inputs.Grab.Held;
             Kick = main.Inputs.Interact.Held;
         }
-        else if (shouldRun)
+        else if (!shouldGamepad && shouldRun)
         {
             bool w = inp.GetKey(Key.W);
             bool s = inp.GetKey(Key.S);
@@ -54,6 +56,26 @@ public sealed partial class SM64Context
             Stomp = inp.GetKey(Key.Shift);
             Kick = inp.Mouse.LeftButton.Held;
         }
+        else if (shouldGamepad && shouldRun)
+        {
+            float2 accum = float2.Zero;
+            bool jump = false;
+            bool stomp = false;
+            bool kick = false;
+
+            inp.ForEachDevice<StandardGamepad>(d =>
+            {
+                accum += d.LeftThumbstick.Value;
+                jump |= d.A.Held;
+                stomp |= d.LeftTrigger.Value > 0.1f;
+                kick |= d.B.Held;
+            });
+
+            Joystick = MathX.Clamp(accum, -float2.One, float2.One);
+            Jump = jump;
+            Stomp = stomp;
+            Kick = kick;
+        }
         else
         {
             Joystick = float2.Zero;
@@ -64,8 +86,8 @@ public sealed partial class SM64Context
 
         if (InputBlock == null || InputBlock.IsRemoved)
         {
-            Comment block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == $"SM64 {InputBlockTag}");
-            block.Text.Value = $"SM64 {InputBlockTag}";
+            Comment block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
+            block.Text.Value = InputBlockTag;
             InputBlock = block;
         }
 
@@ -74,7 +96,7 @@ public sealed partial class SM64Context
         {
             if (AnyControlledMarios && !inp.VR_Active && MovementBlocked)
             {
-                Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == $"SM64 {InputBlockTag}");
+                Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
                 if (currentBlock == null)
                 {
                     loco.SupressSources.Add(InputBlock);

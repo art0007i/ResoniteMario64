@@ -15,7 +15,10 @@ public sealed class SM64DynamicCollider : IDisposable
     public readonly SM64TerrainType TerrainType;
 
     private readonly uint _surfaceObjectId;
-    
+
+    public World World { get; }
+    public SM64Context Context { get; }
+
     public Collider Collider { get; }
     public float3 InitScale { get; }
 
@@ -56,6 +59,9 @@ public sealed class SM64DynamicCollider : IDisposable
 
     public SM64DynamicCollider(Collider col)
     {
+        World = col.World;
+        Context = SM64Context.Instance;
+        
         Collider = col;
         LastPosition = col.Slot.GlobalPosition;
         LastRotation = col.Slot.GlobalRotation;
@@ -112,7 +118,7 @@ public sealed class SM64DynamicCollider : IDisposable
 
         if (Interop.IsGlobalInit)
         {
-            SM64Context.UnregisterDynamicCollider(Collider);
+            Context.UnregisterDynamicCollider(Collider);
             Interop.SurfaceObjectDelete(_surfaceObjectId);
         }
 

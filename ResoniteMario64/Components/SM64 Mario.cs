@@ -31,6 +31,9 @@ public sealed class SM64Mario : IDisposable
     public DynamicVariableSpace MarioSpace { get; }
     public bool IsLocal => MarioUser.IsLocalUser;
 
+    public World World { get; }
+    public SM64Context Context { get; }
+
 #region Renderer
 
     // Renderer/Mesh
@@ -88,7 +91,10 @@ public sealed class SM64Mario : IDisposable
 
     private SM64MarioState[] _states;
     private readonly Grabbable _marioGrabbable;
+    private readonly CapsuleCollider _marioCollider;
     private bool _wasPickedUp;
+
+    private float _waterLevel;
 
     public SM64Mario(Slot slot)
     {
@@ -96,21 +102,24 @@ public sealed class SM64Mario : IDisposable
         MarioUser = slot.GetAllocatingUser();
         ResoniteMod.Debug("is local " + IsLocal);
 
+        World = slot.World;
+        Context = SM64Context.Instance;
+        
         MarioSlot = slot;
         MarioSlot.Tag = MarioTag;
-        if (IsLocal) MarioSlot.Name += $" #{SM64Context.Instance.Marios.Count(x => x.Value.IsLocal)}";
+        if (IsLocal) MarioSlot.Name += $" #{Context.Marios.Count(x => x.Value.IsLocal)}";
 
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
-        MarioSpace.SpaceName.Value = MarioTag;
+        MarioSpace.SpaceName.Value = MarioSpaceName;
 
         _marioGrabbable = MarioSlot.GetComponentOrAttach<Grabbable>();
 
-        CapsuleCollider coll = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
+        _marioCollider = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
         if (IsLocal)
         {
-            coll.Offset.Value = new float3(0, 0.075f * MarioScale);
-            coll.Radius.Value = 0.05f * MarioScale;
-            coll.Height.Value = 0.15f * MarioScale;
+            _marioCollider.Offset.Value = new float3(0, 0.075f * MarioScale);
+            _marioCollider.Radius.Value = 0.05f * MarioScale;
+            _marioCollider.Height.Value = 0.15f * MarioScale;
         }
 
         ResoniteMod.Debug("got comp refs");
@@ -120,6 +129,8 @@ public sealed class SM64Mario : IDisposable
 
         ResoniteMod.Debug("adding interop");
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
+        _waterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float waterLevel) ? waterLevel : -100f;
+        Interop.SetWaterLevel(MarioId, _waterLevel);
 
         ResoniteMod.Debug("adding renderer");
         CreateMarioRenderer();
@@ -128,41 +139,38 @@ public sealed class SM64Mario : IDisposable
         if (!IsLocal) return;
 
         ResoniteMod.Debug("setting up streams");
-        MarioSlot.DestroyWhenUserLeaves(MarioUser);
-
         Slot vars = MarioSlot.AddSlot("Inputs");
-        vars.Tag = MarioTag;
 
         DynamicReferenceVariable<IValue<float2>> joystick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
-        joystick1.VariableName.Value = JoystickTag;
+        joystick1.VariableName.Value = JoystickVarName;
         joystick1.Reference.Target = JoystickStream;
 
         DynamicReferenceVariable<IValue<bool>> jump1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        jump1.VariableName.Value = JumpTag;
+        jump1.VariableName.Value = JumpVarName;
         jump1.Reference.Target = JumpStream;
 
         DynamicReferenceVariable<IValue<bool>> kick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        kick1.VariableName.Value = PunchTag;
+        kick1.VariableName.Value = PunchVarName;
         kick1.Reference.Target = PunchStream;
 
         DynamicReferenceVariable<IValue<bool>> stomp1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        stomp1.VariableName.Value = CrouchTag;
+        stomp1.VariableName.Value = CrouchVarName;
         stomp1.Reference.Target = CrouchStream;
 
         DynamicValueVariable<float> healthPoints = vars.AttachComponent<DynamicValueVariable<float>>();
-        healthPoints.VariableName.Value = HealthPointsTag;
+        healthPoints.VariableName.Value = HealthPointsVarName;
 
         DynamicValueVariable<uint> actionFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
-        actionFlags.VariableName.Value = ActionFlagsTag;
+        actionFlags.VariableName.Value = ActionFlagsVarName;
 
         DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
-        stateFlags.VariableName.Value = StateFlagsTag;
+        stateFlags.VariableName.Value = StateFlagsVarName;
 
         ResoniteMod.Debug("huge success");
     }
 
     // Inputs
-    private float2 Joystick => MarioSpace.TryReadValue(JoystickTag, out IValue<float2> joystick) ? joystick?.Value ?? float2.Zero : float2.Zero;
+    private float2 Joystick => MarioSpace.TryReadValue(JoystickVarName, out IValue<float2> joystick) ? joystick?.Value ?? float2.Zero : float2.Zero;
     private ValueStream<float2> _joystickStream;
     private ValueStream<float2> JoystickStream
     {
@@ -170,7 +178,7 @@ public sealed class SM64Mario : IDisposable
         {
             if (_joystickStream == null || _joystickStream.IsRemoved)
             {
-                _joystickStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickTag}", out bool created);
+                _joystickStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickVarName}", out bool created);
                 if (created)
                 {
                     _joystickStream.Group = "SM64";
@@ -185,7 +193,7 @@ public sealed class SM64Mario : IDisposable
         set => _joystickStream = value;
     }
 
-    private bool Jump => MarioSpace.TryReadValue(JumpTag, out IValue<bool> jump) && jump?.Value is true;
+    private bool Jump => MarioSpace.TryReadValue(JumpVarName, out IValue<bool> jump) && jump?.Value is true;
     private ValueStream<bool> _jumpStream;
     private ValueStream<bool> JumpStream
     {
@@ -193,7 +201,7 @@ public sealed class SM64Mario : IDisposable
         {
             if (_jumpStream == null || _jumpStream.IsRemoved)
             {
-                _jumpStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpTag}", out bool created);
+                _jumpStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpVarName}", out bool created);
                 if (created)
                 {
                     _jumpStream.Group = "SM64";
@@ -208,7 +216,7 @@ public sealed class SM64Mario : IDisposable
         set => _jumpStream = value;
     }
 
-    private bool Punch => MarioSpace.TryReadValue(PunchTag, out IValue<bool> kick) && kick?.Value is true;
+    private bool Punch => MarioSpace.TryReadValue(PunchVarName, out IValue<bool> kick) && kick?.Value is true;
     private ValueStream<bool> _punchStream;
     private ValueStream<bool> PunchStream
     {
@@ -216,7 +224,7 @@ public sealed class SM64Mario : IDisposable
         {
             if (_punchStream == null || _punchStream.IsRemoved)
             {
-                _punchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchTag}", out bool created);
+                _punchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchVarName}", out bool created);
                 if (created)
                 {
                     _punchStream.Group = "SM64";
@@ -231,7 +239,7 @@ public sealed class SM64Mario : IDisposable
         set => _punchStream = value;
     }
 
-    private bool Crouch => MarioSpace.TryReadValue(CrouchTag, out IValue<bool> stomp) && stomp?.Value is true;
+    private bool Crouch => MarioSpace.TryReadValue(CrouchVarName, out IValue<bool> stomp) && stomp?.Value is true;
     private ValueStream<bool> _crouchStream;
     private ValueStream<bool> CrouchStream
     {
@@ -239,7 +247,7 @@ public sealed class SM64Mario : IDisposable
         {
             if (_crouchStream == null || _crouchStream.IsRemoved)
             {
-                _crouchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchTag}", out bool created);
+                _crouchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchVarName}", out bool created);
                 if (created)
                 {
                     _crouchStream.Group = "SM64";
@@ -254,9 +262,9 @@ public sealed class SM64Mario : IDisposable
         set => _crouchStream = value;
     }
 
-    public float SyncedHealthPoints => MarioSpace.TryReadValue(HealthPointsTag, out float healthPoints) ? healthPoints : 255;
-    public uint SyncedActionFlags => MarioSpace.TryReadValue(ActionFlagsTag, out uint actionFlags) ? actionFlags : 0;
-    public uint SyncedStateFlags => MarioSpace.TryReadValue(StateFlagsTag, out uint stateFlags) ? stateFlags : 0;
+    public float SyncedHealthPoints => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
+    public uint SyncedActionFlags => MarioSpace.TryReadValue(ActionFlagsVarName, out uint actionFlags) ? actionFlags : 0;
+    public uint SyncedStateFlags => MarioSpace.TryReadValue(StateFlagsVarName, out uint stateFlags) ? stateFlags : 0;
 
     public uint CurrentActionFlags => CurrentState.ActionFlags;
     public uint CurrentStateFlags => CurrentState.StateFlags;
@@ -382,7 +390,7 @@ public sealed class SM64Mario : IDisposable
 
         ResoniteMod.Debug("non-modded finish");
     }
-
+    
     // Game Tick
     public void ContextFixedUpdateSynced()
     {
@@ -433,10 +441,10 @@ public sealed class SM64Mario : IDisposable
 
         if (IsLocal)
         {
-            MarioSpace.TryWriteValue(ActionFlagsTag, CurrentActionFlags);
-            MarioSpace.TryWriteValue(StateFlagsTag, CurrentStateFlags);
+            MarioSpace.TryWriteValue(ActionFlagsVarName, CurrentActionFlags);
+            MarioSpace.TryWriteValue(StateFlagsVarName, CurrentStateFlags);
 
-            // Check for deaths, so we delete the prop
+            // Check for deaths, so we delete mario
             float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
             bool isDeathPlane = (data.type & (short)SM64SurfaceType.DeathPlane) == (short)SM64SurfaceType.DeathPlane;
             if (!_isDying && CurrentState.IsDead || !_isDying && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 50 && isDeathPlane) /* Find a better value for the distance check */
@@ -444,7 +452,7 @@ public sealed class SM64Mario : IDisposable
                 _isDying = true;
                 bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
                 MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySound(Sounds.Menu_BowserLaugh, MarioSlot.GlobalPosition));
-                MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 3f : 15f, () => SetMarioAsNuked(true));
+                MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
             }
         }
         else
@@ -470,7 +478,7 @@ public sealed class SM64Mario : IDisposable
             }
 
             // Trigger teleport for remotes
-            // if (Utils.IsTeleporting(SyncedStateFlags) && Time.time > _startedTeleporting + 5 * CVRSM64Teleporter.TeleportDuration)
+            // if (Utils.IsTeleporting(SyncedStateFlags) && Time.time > _startedTeleporting + 5 * SM64Teleporter.TeleportDuration)
             // {
             //     _startedTeleporting = Time.time;
             // }
@@ -496,11 +504,38 @@ public sealed class SM64Mario : IDisposable
         }
 
         // Just for now until Collider Shenanigans is implemented
-        Dictionary<Slot, SM64Mario> marios = SM64Context.Instance.Marios.GetTempDictionary();
-        SM64Mario attackingMario = marios.Values.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
+        List<SM64Mario> marios = Context.Marios.Values.GetTempList();
+        SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
         if (attackingMario != null)
         {
             TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
+        }
+        
+        List<Collider> waterBoxes = Context._waterBoxes.GetTempList();
+        bool setWaterLevel = false;
+        float newWaterLevel = -100f;
+
+        foreach (Collider waterBox in waterBoxes)
+        {
+            if (waterBox.IsRemoved || waterBox.IsDisposed) continue;
+
+            if (_marioCollider.GlobalBoundingBox.Center.IsBetween(waterBox.GlobalBoundingBox.min, waterBox.GlobalBoundingBox.max))
+            {
+                newWaterLevel = waterBox.GlobalBoundingBox.max.Y;
+                setWaterLevel = true;
+                break;
+            }
+        }
+
+        if (!setWaterLevel)
+        {
+            newWaterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float fallbackLevel) ? fallbackLevel : -100f;
+        }
+
+        if (!MathX.Approximately(_waterLevel, newWaterLevel))
+        {
+            _waterLevel = newWaterLevel;
+            Interop.SetWaterLevel(MarioId, _waterLevel);
         }
 
         if (Utils.HasCapType(SyncedStateFlags, MarioCapType.MetalCap))
@@ -525,7 +560,7 @@ public sealed class SM64Mario : IDisposable
 
         if (!_marioMeshProvider.Enabled)
         {
-            ResoniteMod.Debug("Shit fucked :(");
+            ResoniteMod.Error("!!!!!!!!!! Shit fucked :(");
             _marioMeshProvider.Enabled = true;
         }
 
@@ -545,7 +580,7 @@ public sealed class SM64Mario : IDisposable
         if (!_enabled || _isNuked || _disposed) return;
 
         // lerp from previous state to current (this means when you make an input it's delayed by one frame, but it means we can have nice interpolation)
-        float t = (float)((MarioSlot.Time.WorldTime - SM64Context.Instance.LastTick) / (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f));
+        float t = (float)((MarioSlot.Time.WorldTime - Context.LastTick) / (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f));
 
         int j = 1 - _buffIndex;
 
@@ -569,7 +604,7 @@ public sealed class SM64Mario : IDisposable
 
         if (IsLocal)
         {
-            MarioSlot.WriteDynamicVariable(HealthPointsTag, CurrentState.HealthPoints);
+            MarioSlot.WriteDynamicVariable(HealthPointsVarName, CurrentState.HealthPoints);
         }
         else
         {
@@ -591,17 +626,17 @@ public sealed class SM64Mario : IDisposable
 
     private float3 GetCameraLookDirection() => (MarioUser?.Root?.ViewRotation ?? floatQ.Identity) * float3.Forward;
 
-    private static float2 GetJoystickAxes() => SM64Context.Instance == null ? float2.Zero : SM64Context.Instance.Joystick;
+    private float2 GetJoystickAxes() => Context?.Joystick ?? float2.Zero;
 
-    private static bool GetButtonHeld(Button button)
+    private bool GetButtonHeld(Button button)
     {
-        if (SM64Context.Instance == null) return false;
+        if (Context == null) return false;
 
         return button switch
         {
-            Button.Jump  => SM64Context.Instance.Jump,
-            Button.Kick  => SM64Context.Instance.Kick,
-            Button.Stomp => SM64Context.Instance.Stomp,
+            Button.Jump  => Context.Jump,
+            Button.Kick  => Context.Kick,
+            Button.Stomp => Context.Stomp,
             _            => false
         };
     }
@@ -657,7 +692,7 @@ public sealed class SM64Mario : IDisposable
         _isNuked = true;
         bool deleteMario = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDeleteAfterDeath) || delete;
 
-        ResoniteMod.Debug($"One of our Marios died, it has been 15 seconds and we're going to {(deleteMario ? "delete the mario" : "stop its engine updates")}.");
+        ResoniteMod.Debug($"One of our Marios died, so {(deleteMario ? "delete the mario" : "stop its engine updates")}.");
 
         if (deleteMario) Dispose();
     }

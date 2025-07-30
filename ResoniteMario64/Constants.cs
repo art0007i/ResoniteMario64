@@ -2,16 +2,36 @@
 
 public static class Constants
 {
-    public const string MarioTag = "Mario";
-    public const string MarioNonMRendererTag = "NonModdedRenderer";
-    public const string JoystickTag = "Joystick";
-    public const string JumpTag = "Jump";
-    public const string PunchTag = "Punch";
-    public const string CrouchTag = "Crouch";
-    public const string HealthPointsTag = "HealthPoints";
-    public const string ActionFlagsTag = "ActionFlags";
-    public const string StateFlagsTag = "StateFlags";
+    // Slot Names
+    public const string TempSlotName = "__TEMP";
+    public const string ContextSlotName = "ResoniteMario64 Instance";
+    public const string ConfigSlotName = "Config";
+    public const string AudioSlotName = "Audio";
+    public const string MarioContainersSlotName = "Mario Containers";
     
-    public const string AudioTag = "Audio";
-    public const string InputBlockTag = "InputBlock";
+    // DynamicVariableSpaceTags
+    public const string ContextSpaceName = "SM64Context";
+    public const string MarioSpaceName = "Mario";
+
+    // DynamicVariable Val/Ref Names
+    // Tags for SM64 Context
+    public const string HostVarName = "Host";
+    public const string ScaleVarName = "Scale";
+    public const string WaterVarName = "WaterLevel";
+    // Tags for Mario Instances
+    public const string JoystickVarName = "Joystick";
+    public const string JumpVarName = "Jump";
+    public const string PunchVarName = "Punch";
+    public const string CrouchVarName = "Crouch";
+    public const string HealthPointsVarName = "HealthPoints";
+    public const string ActionFlagsVarName = "ActionFlags";
+    public const string StateFlagsVarName = "StateFlags";
+    
+    // Actual Tags
+    public const string ContextTag = "SM64 Context";
+    public const string MarioTag = "SM64 Mario";
+    public const string MarioNonMRendererTag = "SM64 Non-Modded Renderer";
+    public const string AudioTag = "SM64 Audio";
+    public const string ConfigTag = "SM64 Config";
+    public const string InputBlockTag = "SM64 InputBlock";
 }

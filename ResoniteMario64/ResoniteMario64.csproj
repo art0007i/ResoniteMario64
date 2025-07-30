@@ -13,7 +13,7 @@
         <GamePath>$(MSBuildThisFileDirectory)Resonite</GamePath>
         <GamePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</GamePath>
         <GamePath Condition="Exists('E:\Programs\Steam\steamapps\common\Resonite\')">E:\Programs\Steam\steamapps\common\Resonite\</GamePath>
-        <GamePath Condition="Exists('C:\Users\colac\AppData\Local\RESO Launcher\profiles\pre_release\Game\')">C:\Users\colac\AppData\Local\RESO Launcher\profiles\pre_release\Game\</GamePath>
+        <GamePath Condition="Exists('C:\Users\colac\AppData\Local\RESO Launcher\profiles\prerelease\Game\')">C:\Users\colac\AppData\Local\RESO Launcher\profiles\prerelease\Game\</GamePath>
         
         <CopyLocal>false</CopyLocal>
 

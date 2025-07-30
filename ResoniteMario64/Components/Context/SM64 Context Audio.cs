@@ -22,14 +22,14 @@ public sealed partial class SM64Context
     private readonly StereoSample[] _convertedBuffer = new StereoSample[(int)(NativeBufferSize * (TargetSampleRate / (float)NativeSampleRate))];
     private double _audioAccumulator;
     private AudioOutput _marioAudioOutput;
-    private Slot _marioAudioSlot;
+    private Slot AudioSlot;
     private OpusStream<StereoSample> _marioAudioStream;
 
     private CircularBufferWriteState<StereoSample> _writeState;
 
     private void SetAudioSource()
     {
-        _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(World.LocalUser, $"SM64 {AudioTag}", out bool created);
+        _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(World.LocalUser, $"{AudioTag} - {World.LocalUser.UserID}", out bool created);
         if (created)
         {
             _marioAudioStream.Group = "SM64";
@@ -38,28 +38,69 @@ public sealed partial class SM64Context
         Slot userSlot = World.LocalUser.Root.Slot;
         userSlot.RunSynchronously(() =>
         {
-            _marioAudioSlot = World.RootSlot.FindChildOrAdd($"SM64 {AudioTag}", false);
-            _marioAudioSlot.Tag = $"SM64 {AudioTag}";
-            
-            _marioAudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
-            _marioAudioSlot.OnPrepareDestroy += HandleAudioDestroy;
-
-            _marioAudioOutput = _marioAudioSlot.GetComponentOrAttach<AudioOutput>(out bool attached);
-            if (attached || _marioAudioOutput.Source.Target == null)
+            bool useLocalAudio = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLocalAudio);
+            float defaultVolume = ResoniteMario64.KeyAudioVolume.TryComputeDefaultTyped(out float defaultValue) ? defaultValue : 0f;
+            if (useLocalAudio)
             {
-                _marioAudioOutput.Source.Target = _marioAudioStream;
-                _marioAudioOutput.SpatialBlend.Value = 0;
-                _marioAudioOutput.Spatialize.Value = false;
-                _marioAudioOutput.DopplerLevel.Value = 0;
-                _marioAudioOutput.IgnoreAudioEffects.Value = true;
-                _marioAudioOutput.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+                Slot localSlot = userSlot.FindLocalChildOrAdd(AudioSlotName);
+                localSlot.Tag = AudioTag;
+
+                AudioOutput localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
+                if (localAttached || localAudio.Source.Target == null)
+                {
+                    localAudio.Source.Target = _marioAudioStream;
+                    localAudio.Volume.Value = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
+                    localAudio.SpatialBlend.Value = 0;
+                    localAudio.Spatialize.Value = false;
+                    localAudio.DopplerLevel.Value = 0;
+                    localAudio.IgnoreAudioEffects.Value = true;
+                    localAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+                }
+
+                AudioSlot = localSlot;
+                _marioAudioOutput = localAudio;
+            }
+
+            Slot globalSlot = ContextSlot.FindChildOrAdd(AudioSlotName, false);
+            globalSlot.Tag = AudioTag;
+
+            AudioOutput globalAudio = globalSlot.GetComponentOrAttach<AudioOutput>(out bool globalAttached);
+            if (globalAttached || globalAudio.Source.Target == null)
+            {
+                globalAudio.Source.Target = _marioAudioStream;
+                globalAudio.Volume.Value = defaultVolume;
+                globalAudio.SpatialBlend.Value = 0;
+                globalAudio.Spatialize.Value = false;
+                globalAudio.DopplerLevel.Value = 0;
+                globalAudio.IgnoreAudioEffects.Value = true;
+                globalAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
             }
 
             userSlot.RunInUpdates(userSlot.LocalUser.AllocationID + 1, () =>
             {
-                ValueUserOverride<float> overrideForUser = _marioAudioOutput.Volume.OverrideForUser(userSlot.LocalUser, ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume));
-                overrideForUser.Default.Value = ResoniteMario64.KeyAudioVolume.TryComputeDefaultTyped(out float value) ? value : 0f;
+                float volume = useLocalAudio ? 0f : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
+
+                ValueUserOverride<float> overrideForUser = globalAudio.Volume.OverrideForUser(userSlot.LocalUser, volume);
+                overrideForUser.Default.Value = defaultVolume;
             });
+
+            if (!useLocalAudio)
+            {
+                AudioSlot = globalSlot;
+                _marioAudioOutput = globalAudio;
+            }
+
+            AudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+            AudioSlot.OnPrepareDestroy += HandleAudioDestroy;
+
+            ResoniteMario64.KeyLocalAudio.OnChanged -= HandleLocalAudioChange;
+            ResoniteMario64.KeyLocalAudio.OnChanged += HandleLocalAudioChange;
+
+            ResoniteMario64.KeyDisableAudio.OnChanged -= HandleDisableChange;
+            ResoniteMario64.KeyDisableAudio.OnChanged += HandleDisableChange;
+
+            ResoniteMario64.KeyAudioVolume.OnChanged -= HandleVolumeChange;
+            ResoniteMario64.KeyAudioVolume.OnChanged += HandleVolumeChange;
         });
     }
 
@@ -71,43 +112,75 @@ public sealed partial class SM64Context
         }
     }
 
+    private void HandleVolumeChange(object value)
+    {
+        if (AudioSlot == null || _marioAudioOutput == null) return;
+
+        if (AudioSlot.IsLocalElement)
+        {
+            _marioAudioOutput.Volume.Value = (float)value;
+        }
+        else
+        {
+            _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, (float)value);
+        }
+    }
+
+    private void HandleDisableChange(object value)
+    {
+        if (AudioSlot == null) return;
+
+        if (AudioSlot.GetAllocatingUser() == World.LocalUser)
+        {
+            AudioSlot.Destroy();
+        }
+    }
+
+    private void HandleLocalAudioChange(object value)
+    {
+        if (AudioSlot == null) return;
+
+        if (AudioSlot.IsLocalElement)
+        {
+            AudioSlot.Destroy();
+        }
+
+        SetAudioSource();
+    }
+
     private void ProcessAudio()
     {
-        if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDisableAudio)) return;
-        if (_marioAudioStream == null) return;
+        if (_marioAudioStream == null || ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDisableAudio))
+        {
+            return;
+        }
 
         double elapsed = _audioStopwatch.Elapsed.TotalMilliseconds;
         _audioStopwatch.Restart();
         _audioAccumulator += elapsed;
 
-        // Clamp accumulator to avoid runaway overflow
         if (_audioAccumulator > AudioTickInterval * 4)
         {
             _audioAccumulator = AudioTickInterval * 4;
         }
 
-        // Run at 30Hz max
-        if (_audioAccumulator >= AudioTickInterval)
-        {
-            _audioAccumulator -= AudioTickInterval;
+        if (_audioAccumulator < AudioTickInterval) return;
 
-            Interop.AudioTick(_audioBuffer, (uint)(NativeBufferCount / _marioAudioStream.FrameSize * _marioAudioStream.FrameSize));
+        _audioAccumulator -= AudioTickInterval;
 
-            int written = DownmixAndResampleStereo(
-                _audioBuffer,
-                NativeSampleRate,
-                TargetSampleRate,
-                _convertedBuffer
-            );
+        Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.FrameSize);
 
-            if (written <= 0) return;
-            if (_marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode < written)
-            {
-                return;
-            }
+        int written = DownmixAndResampleStereo(
+            _audioBuffer,
+            NativeSampleRate,
+            TargetSampleRate,
+            _convertedBuffer
+        );
 
-            _marioAudioStream.Write(_convertedBuffer.AsSpan(0, written), ref _writeState);
-        }
+        if (written <= 0) return;
+        if (written > _marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode) return;
+
+        _marioAudioStream.Write(_convertedBuffer.AsSpan(0, written), ref _writeState);
     }
 
     private static int DownmixAndResampleMono(short[] input, float inputRate, float outputRate, MonoSample[] output)

@@ -1,4 +1,5 @@
-﻿using System.Timers;
+﻿using System.Collections.Generic;
+using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.libsm64;
@@ -8,11 +9,13 @@ namespace ResoniteMario64.Components.Context;
 
 public sealed partial class SM64Context
 {
+    private readonly Dictionary<Collider, SM64DynamicCollider> _sm64DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
+    internal readonly List<Collider> _waterBoxes = new List<Collider>();
+    
+    
     private static Timer _staticUpdateTimer;
-
-    public static void QueueStaticSurfacesUpdate()
+    public void QueueStaticSurfacesUpdate()
     {
-        if (Instance == null) return;
         if (_staticUpdateTimer != null) return;
 
         _staticUpdateTimer = new Timer(1500);
@@ -22,7 +25,7 @@ public sealed partial class SM64Context
             _staticUpdateTimer.Dispose();
             _staticUpdateTimer = null;
             
-            Instance._forceUpdate = true;
+            _forceUpdate = true;
         };
         _staticUpdateTimer.AutoReset = false;
         _staticUpdateTimer.Start();
@@ -30,12 +33,10 @@ public sealed partial class SM64Context
 
     private void StaticTerrainUpdate()
     {
-        if (Instance == null) return;
-
         Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
     }
 
-    public static void AddCollider(Collider instance)
+    public void AddCollider(Collider instance)
     {
         if (Utils.IsGoodStaticCollider(instance))
         {
@@ -49,20 +50,35 @@ public sealed partial class SM64Context
         {
             RegisterDynamicCollider(instance);
         }
+
+        if (Utils.IsGoodWaterBox(instance))
+        {
+            if (!_waterBoxes.Contains(instance))
+            {
+                _waterBoxes.Add(instance);
+                
+                instance.Slot.OnPrepareDestroy -= HandleWaterBoxDestroyed;
+                instance.Slot.OnPrepareDestroy += HandleWaterBoxDestroyed;
+            }
+        }
     }
 
-    private static void HandleStaticColliderDestroyed(Slot slot)
+    private void HandleStaticColliderDestroyed(Slot slot)
     {
-        if (Instance == null) return;
-
-        Instance._forceUpdate = true;
+        _forceUpdate = true;
+    }
+    
+    private void HandleWaterBoxDestroyed(Slot slot)
+    {
+        slot.ForeachComponentInChildren<Collider>(col =>
+        {
+            _waterBoxes.Remove(col);
+        });
     }
 
-    public static bool RegisterDynamicCollider(Collider surfaceObject)
+    public bool RegisterDynamicCollider(Collider surfaceObject)
     {
-        if (Instance == null) return false;
-        
-        if (Instance._sm64DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
+        if (_sm64DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
         {
             if (value.InitScale.Approximately(surfaceObject.Slot.GlobalScale, 0.001f))
             {
@@ -73,17 +89,15 @@ public sealed partial class SM64Context
         }
 
         SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject);
-        Instance._sm64DynamicColliders.Add(surfaceObject, col);
+        _sm64DynamicColliders.Add(surfaceObject, col);
 
         ResoniteMod.Debug($"Successfully Registered DynamicCollider - {surfaceObject.ReferenceID}");
         return true;
     }
 
-    public static void UnregisterDynamicCollider(Collider surfaceObject)
+    public void UnregisterDynamicCollider(Collider surfaceObject)
     {
-        if (Instance == null) return;
-        
-        Instance._sm64DynamicColliders.Remove(surfaceObject);
+        _sm64DynamicColliders.Remove(surfaceObject);
 
         ResoniteMod.Debug($"Successfully Unregistered DynamicCollider - {surfaceObject.ReferenceID}");
     }
@@ -94,13 +108,13 @@ public sealed partial class SM64Context
         [HarmonyPatch("OnAwake"), HarmonyPostfix]
         public static void OnAwakePatch(Collider __instance)
         {
-            __instance.RunInUpdates(1, () => { AddCollider(__instance); });
+            __instance.RunInUpdates(1, () => { SM64Context.Instance?.AddCollider(__instance); });
         }
 
         [HarmonyPatch("OnChanges"), HarmonyPostfix]
         public static void OnChangesPatch(Collider __instance)
         {
-            __instance.RunInUpdates(1, () => { AddCollider(__instance); });
+            __instance.RunInUpdates(1, () => { SM64Context.Instance?.AddCollider(__instance); });
         }
     }
 }

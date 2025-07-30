@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
+using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -18,6 +21,9 @@ public class ResoniteMario64 : ResoniteMod
     // Rom
     private const string SuperMario64UsZ64RomHashHex = "20b854b239203baf6c961b850a4a51a2"; // MD5 hash
     private const string SuperMario64UsZ64RomName = "baserom.us.z64";
+    
+    [AutoRegisterConfigKey]
+    public static ModConfigurationKey<bool> KeyUseGamepad = new ModConfigurationKey<bool>("use_gamepad", "Whether to use gamepads for input or not.", () => false);
 
     // AUDIO
     [AutoRegisterConfigKey]
@@ -28,6 +34,9 @@ public class ResoniteMario64 : ResoniteMod
 
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<float> KeyAudioVolume = new ModConfigurationKey<float>("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider) edit: 3 means probably 3 decimal places
+    
+    [AutoRegisterConfigKey]
+    public static ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => false);
 
     // PERFORMANCE
     [AutoRegisterConfigKey]
@@ -55,6 +64,7 @@ public class ResoniteMario64 : ResoniteMod
 
     [AutoRegisterConfigKey]
     public static ModConfigurationKey<Uri> keyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
+
     
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
@@ -150,23 +160,34 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] { typeof(WorldManager), typeof(bool), typeof(bool) })]
-    private class WorldConstructorPatch
+    [HarmonyPatch(typeof(World), "StartRunning")]
+    private class WorldStartRunningPatch
     {
         public static void Postfix(World __instance)
         {
             if (__instance.IsUserspace()) return;
 
-            __instance.RootSlot.ChildAdded += (slot, child) =>
+            __instance.RunInUpdates(1, () =>
             {
-                __instance.RunInUpdates(1, () =>
+                Slot tempSlot = __instance.RootSlot.FindChild(TempSlotName);
+                if (tempSlot != null)
                 {
-                    if (child.Tag == MarioTag)
+                    Slot contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
+                    if (contextSlot != null)
                     {
-                        SM64Context.AddMario(child);
+                        if (SM64Context.EnsureInstanceExists(__instance))
+                        {
+                            SM64Context.Instance.MarioContainersSlot.ForeachChild(slot =>
+                            {
+                                if (slot.Tag == MarioTag)
+                                {
+                                    SM64Context.TryAddMario(slot);
+                                }
+                            });
+                        }
                     }
-                });
-            };
+                }
+            });
         }
     }
     
@@ -192,6 +213,8 @@ public class ResoniteMario64 : ResoniteMod
                         SM64Context.Instance.Dispose();
                     }
                 });
+                
+                return false;
             }
 
             return true;
@@ -202,6 +225,7 @@ public class ResoniteMario64 : ResoniteMod
     private class UserRootPatch
     {
         private const string VariableName = "User/ResoniteMario64.HasInstance";
+        
         [HarmonyPatch("OnStart"), HarmonyPostfix]
         public static void OnStartPatch(UserRoot __instance)
         {
@@ -242,13 +266,35 @@ public class ResoniteMario64 : ResoniteMod
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
+            
+            ui.Spacer(4);
+            
+            ValueField<float> field = ui.Current.AttachComponent<ValueField<float>>();
+            ui.Button("Set WaterLevel").LocalPressed += (b, e) =>
+            {
+                b.RunSynchronously(() =>
+                {
+                    if (Interop.IsGlobalInit)
+                    {
+                        List<SM64Mario> marios = SM64Context.Instance.Marios.Values.Where(x => x.IsLocal).GetTempList();
+                        foreach (SM64Mario mario in marios)
+                        {
+                            Interop.SetWaterLevel(mario.MarioId, field.Value.Value);
+                        }
+                    }
+                });
+            };
+            ui.PrimitiveMemberEditor(field.Value);
+            
+            ui.Spacer(4);
+
             ui.Button("Rebuild Static Surfaces").LocalPressed += (b, e) =>
             {
                 b.RunSynchronously(() =>
                 {
                     if (SM64Context.Instance != null)
                     {
-                        SM64Context.QueueStaticSurfacesUpdate();
+                        SM64Context.Instance.QueueStaticSurfacesUpdate();
                     }
                 });
             };
@@ -268,7 +314,7 @@ public class ResoniteMario64 : ResoniteMod
             try
             {
                 SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-                if (inspector?.ComponentView?.Target?.Tag == "Mario" && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
+                if (inspector?.ComponentView?.Target?.Tag == MarioTag && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
                 {
                     if (mario.IsLocal)
                     {
@@ -292,8 +338,10 @@ public class ResoniteMario64 : ResoniteMod
                         ui.Spacer(8);
                     }
                 }
-                else if (inspector?.ComponentView?.Target?.Tag == $"SM64 {AudioTag}")
+                else if (inspector?.ComponentView?.Target?.Tag == AudioTag)
                 {
+                    ui.Spacer(8);
+                    
                     ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
                     ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
                 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Elements.Assets;
 using Elements.Core;
+using ResoniteMario64.Components.Context;
 using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
 #if IsNet9
@@ -13,29 +14,22 @@ namespace ResoniteMario64.libsm64;
 
 public static class MarioExtensions
 {
-    public static float3 ToMarioRotation(this float3 rot)
-    {
-        return new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
-
-        float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
-        float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
-    }
-    
-    public static float3 FromMarioRotation(this float3 rot)
-    {
-        return new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
-
-        float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
-        float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
-    }
+    public static float3 ToMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
+    public static float3 FromMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
     public static float3 FromMarioPosition(this float3 pos) => pos / Interop.ScaleFactor * new float3(-1, 1, 1);
+    
+    public static float ToMarioFloat(this float value) => Interop.ScaleFactor * value;
+    public static float FromMarioFloat(this float value) => value / Interop.ScaleFactor;
+    
+    private static float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
+    private static float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
 }
 
 internal static class Interop
 {
-    public static float ScaleFactor => ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
+    public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) is true ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
 
     public const int SM64TextureWidth = 64 * 11;
     public const int SM64TextureHeight = 64;
@@ -54,7 +48,7 @@ internal static class Interop
     public const float SM64Deg2Angle = 182.04459f;
 
     public static Bitmap2D MarioTexture { get; private set; }
-    public static bool IsGlobalInit { get; private set; }
+    public static bool IsGlobalInit;
     
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -395,6 +389,11 @@ internal static class Interop
         }
     }
 
+    public static void SetWaterLevel(uint marioId, float waterLevel)
+    {
+        sm64_set_mario_water_level(marioId, (int)waterLevel.ToMarioFloat());
+    }
+    
     public static float FindFloor(float3 pos, out SM64SurfaceCollisionData data)
     {
         float3 marioPos = pos.ToMarioPosition();

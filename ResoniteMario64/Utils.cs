@@ -33,6 +33,11 @@ public static class Utils
         return col.Enabled && col.Slot.IsActive && col.Type.Value != ColliderType.Trigger && col.Slot.Tag?.Contains("SM64 DynamicCollider") is true && col.Slot.Tag?.Contains("SM64 StaticCollider") is not true;
     }
 
+    public static bool IsGoodWaterBox(Collider col)
+    {
+        return col.Enabled && col.Slot.IsActive && col.Slot.Tag?.Contains("SM64 WaterBox") is true;
+    }
+
     private static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
@@ -145,6 +150,8 @@ public static class Utils
     public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
     
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
+    public static List<T> GetTempList<T>(this List<T> source) => new List<T>(source);
+    public static List<T> GetTempList<T>(this IEnumerable<T> source) => new List<T>(source);
 
     public static bool HasCapType(uint flags, MarioCapType capType)
     {
