@@ -63,9 +63,9 @@ public sealed partial class SM64Context : IDisposable
 
     public Slot MarioContainersSlot { get; private set; }
     public Slot MyMariosSlot { get; private set; }
-    
+
     public DynamicVariableSpace ContextVariableSpace { get; set; }
-    
+
     public readonly Dictionary<Slot, SM64Mario> Marios = new Dictionary<Slot, SM64Mario>();
 
     public bool AnyControlledMarios => Marios.Values.Any(x => x.IsLocal);
@@ -83,6 +83,11 @@ public sealed partial class SM64Context : IDisposable
         World = world;
         world.WorldDestroyed += _ => Dispose();
 
+        ResoniteMario64.KeyUseGamepad.OnChanged += _ =>
+        {
+            World.Input.InvalidateBindings();
+        };
+
         InitContextWorld(world);
 
         if (!Interop.IsGlobalInit)
@@ -99,7 +104,7 @@ public sealed partial class SM64Context : IDisposable
         {
             World.RootSlot.ForeachComponentInChildren<Collider>(c =>
             {
-                if (Utils.IsGoodDynamicCollider(c) || Utils.IsGoodWaterBox(c))
+                if (Utils.IsGoodDynamicCollider(c) || Utils.IsGoodInteractable(c) || Utils.IsGoodWaterBox(c))
                 {
                     AddCollider(c);
                 }
@@ -112,17 +117,20 @@ public sealed partial class SM64Context : IDisposable
         if (ContextSlot == null)
         {
             Slot contextSlot = TempSlot.AddSlot(ContextSlotName, false);
+            contextSlot.OrderOffset = -1000;
             contextSlot.Tag = ContextTag;
 
             ContextSlot = contextSlot;
         }
 
+        // Variable Space
         ContextVariableSpace = ContextSlot.GetComponentOrAttach<DynamicVariableSpace>(out bool spaceAttached);
         if (spaceAttached)
         {
             ContextVariableSpace.SpaceName.Value = ContextSpaceName;
         }
 
+        // Context Host
         DynamicReferenceVariable<User> contextHost = ContextSlot.GetComponentOrAttach<DynamicReferenceVariable<User>>(out bool hostAttached);
         if (hostAttached)
         {
@@ -155,6 +163,12 @@ public sealed partial class SM64Context : IDisposable
             scale.Value.Value = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
         }
 
+        scale.Value.OnValueChange += val =>
+        {
+            SM64Context.Instance?.Dispose();
+            SM64Context.EnsureInstanceExists(val.World);
+        };
+
         ResoniteMario64.KeyMarioScaleFactor.OnChanged += value =>
         {
             float newScale = (float)(value ?? 0f);
@@ -164,7 +178,8 @@ public sealed partial class SM64Context : IDisposable
                 ContextSlot.WriteDynamicVariable(ScaleVarName, newScale);
             }
         };
-        
+
+        // Water Level
         DynamicValueVariable<float> waterLevel = configSlot.GetComponentOrAttach<DynamicValueVariable<float>>(out bool waterAttached, x => x.VariableName.Value == WaterVarName);
         if (waterAttached)
         {
@@ -182,12 +197,15 @@ public sealed partial class SM64Context : IDisposable
             }
         };
 
+        // Setup Container Slots
         MarioContainersSlot = ContextSlot.FindChildOrAdd(MarioContainersSlotName, false);
+        MarioContainersSlot.OrderOffset = 1000;
         MarioContainersSlot.Tag = null;
-        
+
         MyMariosSlot = MarioContainersSlot.FindChildOrAdd($"{world.LocalUser.UserName}'s Marios", false);
+        MyMariosSlot.OrderOffset = MyMariosSlot.LocalUser.AllocationID * 3;
         MyMariosSlot.Tag = null;
-        
+
         MyMariosSlot.DestroyWhenUserLeaves(world.LocalUser);
     }
 
@@ -244,17 +262,15 @@ public sealed partial class SM64Context : IDisposable
 
     public static SM64Mario AddMario(Slot slot)
     {
-        ResoniteMod.Msg($"Trying to add mario for SlotID: {slot.ReferenceID}");
+        ResoniteMod.Msg($"Adding Mario for SlotID: {slot.ReferenceID}");
 
         SM64Mario mario = null;
 
         bool success = EnsureInstanceExists(slot.World);
         if (!success) return null;
 
-        ResoniteMod.Msg("instance?  " + success);
         if (!Instance.Marios.ContainsKey(slot))
         {
-            ResoniteMod.Msg("Non-duplicate mario.");
             slot.Parent = Instance.MyMariosSlot;
 
             mario = new SM64Mario(slot);
@@ -262,17 +278,19 @@ public sealed partial class SM64Context : IDisposable
             if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
         }
 
+        ResoniteMod.Msg("Added mario for SlotID: " + slot.ReferenceID);
+
         slot.Parent.RunInUpdates(3, () =>
         {
             slot.Parent.Children.Where(x => x.Tag == MarioTag && !Instance.Marios.ContainsKey(x)).Do(root2 =>
             {
-                ResoniteMod.Msg("Non-duplicate mario.");
+                ResoniteMod.Msg("Adding existing Mario for SlotID: " + root2.ReferenceID);
                 var mario2 = new SM64Mario(root2);
                 Instance.Marios.Add(root2, mario2);
             });
         });
 
-        ResoniteMod.Msg("Added mario for SlotID: " + slot.ReferenceID);
+        SM64Context.Instance._forceUpdate = true;
 
         return mario;
     }
@@ -306,15 +324,15 @@ public sealed partial class SM64Context : IDisposable
         }
 
         if (Instance != null) return true;
+
+        ResoniteMod.Debug("Ensuring SM64Context instance exists for world: " + world.Name);
         Instance = new SM64Context(world);
+        ResoniteMod.Debug("Instance Created!");
 
         return Instance != null;
     }
 
-    private static void HandleSlotRemoved(Slot slot)
-    {
-        SM64Context.Instance?.Dispose();
-    }
+    private static void HandleSlotRemoved(Slot slot) => SM64Context.Instance?.Dispose();
 
     public void Dispose()
     {
@@ -331,6 +349,7 @@ public sealed partial class SM64Context : IDisposable
         {
             ResoniteMod.Debug("Disposing SM64Context");
 
+            // Explode Marios
             List<SM64Mario> marios = Marios.Values.GetTempList();
             foreach (SM64Mario mario in marios)
             {
@@ -339,6 +358,7 @@ public sealed partial class SM64Context : IDisposable
 
             Marios.Clear();
 
+            // Explode Colliders
             List<SM64DynamicCollider> dynamicColliders = _sm64DynamicColliders.Values.GetTempList();
             foreach (SM64DynamicCollider col in dynamicColliders)
             {
@@ -347,16 +367,40 @@ public sealed partial class SM64Context : IDisposable
 
             _sm64DynamicColliders.Clear();
 
+            // Free Locomotion
             LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
             loco?.SupressSources?.RemoveAll(InputBlock);
 
+            // Explode AudioSlot if created by LocalUser
             if (AudioSlot is { IsRemoved: false } && AudioSlot.GetAllocatingUser() == AudioSlot.LocalUser)
             {
                 AudioSlot?.Destroy();
                 AudioSlot = null;
             }
 
-            MyMariosSlot = null;
+            // Explode out Mario Container
+            if (MyMariosSlot is { IsRemoved: false })
+            {
+                MyMariosSlot?.Destroy();
+                MyMariosSlot = null;
+            }
+
+            // Explode ContextSlot if any no marios are left
+            // This is DEBUG
+            bool toRemove = true;
+            foreach (Slot child in MarioContainersSlot.Children)
+            {
+                if (child.Children.Any())
+                {
+                    toRemove = false;
+                }
+            }
+
+            if (toRemove)
+            {
+                ContextSlot?.Destroy();
+            }
+
             MarioContainersSlot = null;
 
             ResoniteMod.Debug("Finished disposing SM64Context");

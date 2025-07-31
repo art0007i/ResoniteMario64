@@ -27,7 +27,7 @@ public sealed partial class SM64Context
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
-        if (inp.GetKeyUp(Key.Period) || inp.GetDevices<StandardGamepad>(x => x.Menu.Pressed).Count != 0)
+        if (inp.GetKeyUp(Key.Period) || inp.GetDevices<StandardGamepad>().Any(x => x.Menu.Pressed))
         {
             MovementBlocked = !MovementBlocked;
         }
@@ -56,7 +56,7 @@ public sealed partial class SM64Context
             Stomp = inp.GetKey(Key.Shift);
             Kick = inp.Mouse.LeftButton.Held;
         }
-        else if (shouldGamepad && shouldRun)
+        else if (shouldGamepad)
         {
             float2 accum = float2.Zero;
             bool jump = false;
@@ -94,7 +94,7 @@ public sealed partial class SM64Context
         LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco != null)
         {
-            if (AnyControlledMarios && !inp.VR_Active && MovementBlocked)
+            if (AnyControlledMarios && !inp.VR_Active && MovementBlocked && !shouldGamepad)
             {
                 Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
                 if (currentBlock == null)
@@ -168,5 +168,11 @@ public sealed partial class SM64Context
                 __instance.Inputs.Grab.RegisterBlocks = true;
             }*/
         }
+    }
+    
+    [HarmonyPatch(typeof(StandardGamepad), nameof(StandardGamepad.Bind))]
+    public class GamepadInputBlocker
+    {
+        public static bool Prefix() => !ResoniteMario64.Config.GetValue(ResoniteMario64.KeyUseGamepad);
     }
 }

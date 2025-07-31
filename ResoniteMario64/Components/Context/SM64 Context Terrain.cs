@@ -10,8 +10,8 @@ namespace ResoniteMario64.Components.Context;
 public sealed partial class SM64Context
 {
     private readonly Dictionary<Collider, SM64DynamicCollider> _sm64DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
-    internal readonly List<Collider> _waterBoxes = new List<Collider>();
-    
+    internal readonly List<Collider> WaterBoxes = new List<Collider>();
+    internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
     
     private static Timer _staticUpdateTimer;
     public void QueueStaticSurfacesUpdate()
@@ -50,12 +50,17 @@ public sealed partial class SM64Context
         {
             RegisterDynamicCollider(instance);
         }
-
+        
+        if (Utils.IsGoodInteractable(instance))
+        {
+            RegisterInteractable(instance);
+        }
+        
         if (Utils.IsGoodWaterBox(instance))
         {
-            if (!_waterBoxes.Contains(instance))
+            if (!WaterBoxes.Contains(instance))
             {
-                _waterBoxes.Add(instance);
+                WaterBoxes.Add(instance);
                 
                 instance.Slot.OnPrepareDestroy -= HandleWaterBoxDestroyed;
                 instance.Slot.OnPrepareDestroy += HandleWaterBoxDestroyed;
@@ -72,17 +77,17 @@ public sealed partial class SM64Context
     {
         slot.ForeachComponentInChildren<Collider>(col =>
         {
-            _waterBoxes.Remove(col);
+            WaterBoxes.Remove(col);
         });
     }
 
-    public bool RegisterDynamicCollider(Collider surfaceObject)
+    public void RegisterDynamicCollider(Collider surfaceObject)
     {
         if (_sm64DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
         {
             if (value.InitScale.Approximately(surfaceObject.Slot.GlobalScale, 0.001f))
             {
-                return false;
+                return;
             }
 
             value.Dispose();
@@ -90,16 +95,27 @@ public sealed partial class SM64Context
 
         SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject);
         _sm64DynamicColliders.Add(surfaceObject, col);
-
-        ResoniteMod.Debug($"Successfully Registered DynamicCollider - {surfaceObject.ReferenceID}");
-        return true;
     }
 
     public void UnregisterDynamicCollider(Collider surfaceObject)
     {
         _sm64DynamicColliders.Remove(surfaceObject);
+    }
+    
+    public void RegisterInteractable(Collider surfaceObject)
+    {
+        if (Interactables.ContainsKey(surfaceObject))
+        {
+            return;
+        }
 
-        ResoniteMod.Debug($"Successfully Unregistered DynamicCollider - {surfaceObject.ReferenceID}");
+        SM64Interactable col = new SM64Interactable(surfaceObject);
+        Interactables.Add(surfaceObject, col);
+    }
+
+    public void UnregisterInteractable(Collider surfaceObject)
+    {
+        Interactables.Remove(surfaceObject);
     }
 
     [HarmonyPatch(typeof(Collider))]

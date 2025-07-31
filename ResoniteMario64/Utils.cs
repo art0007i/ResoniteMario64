@@ -38,6 +38,11 @@ public static class Utils
         return col.Enabled && col.Slot.IsActive && col.Slot.Tag?.Contains("SM64 WaterBox") is true;
     }
 
+    public static bool IsGoodInteractable(Collider col)
+    {
+        return col.Enabled && col.Slot.IsActive && col.Slot.Tag?.Contains("SM64 Interactable") is true;
+    }
+
     private static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
@@ -50,7 +55,7 @@ public static class Utils
             if (!IsGoodStaticCollider(obj)) continue;
 
             string[] tagParts = obj.Slot.Tag?.Split(',');
-            Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType);
+            Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out _);
 
             if (obj is MeshCollider meshCollider)
             {
@@ -65,10 +70,7 @@ public static class Utils
         // Print all MeshColliders that are Null or Non-Readable
         if (Utils.CheckDebug())
         {
-            meshColliders.Where(InvalidCollider).Do(invalid =>
-            {
-                ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
-            });
+            meshColliders.Where(InvalidCollider).Do(invalid => { ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :("); });
         }
 
         // Remove all MeshColliders that are Null or Non-Readable
@@ -97,14 +99,15 @@ public static class Utils
 
         return surfaces.ToArray();
 
-        bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType) col)
-            => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
+        bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
     }
 
-    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType)
+    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;
+        interactableType = SM64InteractableType.GoldCoin;
+        idx = -1;
 
         if (tagParts == null) return;
 
@@ -114,7 +117,7 @@ public static class Utils
 
             if (trimmed.StartsWith("SurfaceType_", StringComparison.OrdinalIgnoreCase))
             {
-                string enumName = trimmed["SurfaceType_".Length..];
+                string enumName = trimmed.Substring("SurfaceType_".Length);
                 if (Enum.TryParse(enumName, true, out SM64SurfaceType parsedSurface))
                 {
                     surfaceType = parsedSurface;
@@ -122,10 +125,33 @@ public static class Utils
             }
             else if (trimmed.StartsWith("TerrainType_", StringComparison.OrdinalIgnoreCase))
             {
-                string enumName = trimmed["TerrainType_".Length..];
+                string enumName = trimmed.Substring("TerrainType_".Length);
                 if (Enum.TryParse(enumName, true, out SM64TerrainType parsedTerrain))
                 {
                     terrainType = parsedTerrain;
+                }
+            }
+            else if (trimmed.StartsWith("InteractableType_", StringComparison.OrdinalIgnoreCase))
+            {
+                string enumSuffix = trimmed.Substring("InteractableType_".Length);
+
+                int splitIndex = enumSuffix.Length;
+                while (splitIndex > 0 && char.IsDigit(enumSuffix[splitIndex - 1]))
+                {
+                    splitIndex--;
+                }
+
+                string enumName = enumSuffix.Substring(0, splitIndex);
+                string indexString = enumSuffix.Substring(splitIndex);
+                
+                if (Enum.TryParse(enumName, true, out SM64InteractableType parsedInteractable))
+                {
+                    interactableType = parsedInteractable;
+                    
+                    if (int.TryParse(indexString, out int parsedIndex))
+                    {
+                        idx = parsedIndex;
+                    }
                 }
             }
         }
@@ -146,11 +172,20 @@ public static class Utils
 
         return surfaces;
     }
-    
+
+    public static bool Overlaps(BoundingBox a, BoundingBox b)
+    {
+        return (a.min.X <= b.max.X && a.max.X >= b.min.X) &&
+               (a.min.Y <= b.max.Y && a.max.Y >= b.min.Y) &&
+               (a.min.Z <= b.max.Z && a.max.Z >= b.min.Z);
+    }
+
     public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
-    
+
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
+
     public static List<T> GetTempList<T>(this List<T> source) => new List<T>(source);
+
     public static List<T> GetTempList<T>(this IEnumerable<T> source) => new List<T>(source);
 
     public static bool HasCapType(uint flags, MarioCapType capType)

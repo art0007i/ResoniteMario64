@@ -104,7 +104,7 @@ public sealed class SM64Mario : IDisposable
 
         World = slot.World;
         Context = SM64Context.Instance;
-        
+
         MarioSlot = slot;
         MarioSlot.Tag = MarioTag;
         if (IsLocal) MarioSlot.Name += $" #{Context.Marios.Count(x => x.Value.IsLocal)}";
@@ -172,6 +172,7 @@ public sealed class SM64Mario : IDisposable
     // Inputs
     private float2 Joystick => MarioSpace.TryReadValue(JoystickVarName, out IValue<float2> joystick) ? joystick?.Value ?? float2.Zero : float2.Zero;
     private ValueStream<float2> _joystickStream;
+
     private ValueStream<float2> JoystickStream
     {
         get
@@ -195,6 +196,7 @@ public sealed class SM64Mario : IDisposable
 
     private bool Jump => MarioSpace.TryReadValue(JumpVarName, out IValue<bool> jump) && jump?.Value is true;
     private ValueStream<bool> _jumpStream;
+
     private ValueStream<bool> JumpStream
     {
         get
@@ -218,6 +220,7 @@ public sealed class SM64Mario : IDisposable
 
     private bool Punch => MarioSpace.TryReadValue(PunchVarName, out IValue<bool> kick) && kick?.Value is true;
     private ValueStream<bool> _punchStream;
+
     private ValueStream<bool> PunchStream
     {
         get
@@ -241,6 +244,7 @@ public sealed class SM64Mario : IDisposable
 
     private bool Crouch => MarioSpace.TryReadValue(CrouchVarName, out IValue<bool> stomp) && stomp?.Value is true;
     private ValueStream<bool> _crouchStream;
+
     private ValueStream<bool> CrouchStream
     {
         get
@@ -367,7 +371,7 @@ public sealed class SM64Mario : IDisposable
 
     private void CreateNonModdedRenderer()
     {
-        Uri uri = ResoniteMario64.Config.GetValue(ResoniteMario64.keyMarioUrl);
+        Uri uri = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioUrl);
         if (uri == null)
         {
             uri = new Uri("resdb:///d85c309f7aa0c909f6b1518c4a74dacc383760c516425bec6617e8ebe8dd50da.brson");
@@ -390,7 +394,7 @@ public sealed class SM64Mario : IDisposable
 
         ResoniteMod.Debug("non-modded finish");
     }
-    
+
     // Game Tick
     public void ContextFixedUpdateSynced()
     {
@@ -451,8 +455,14 @@ public sealed class SM64Mario : IDisposable
             {
                 _isDying = true;
                 bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
-                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySound(Sounds.Menu_BowserLaugh, MarioSlot.GlobalPosition));
+                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
+            }
+            
+            List<SM64Interactable> interactables = Context.Interactables.Values.GetTempList();
+            foreach (SM64Interactable interactable in interactables)
+            {
+                HandleInteractable(interactable);
             }
         }
         else
@@ -505,13 +515,13 @@ public sealed class SM64Mario : IDisposable
 
         // Just for now until Collider Shenanigans is implemented
         List<SM64Mario> marios = Context.Marios.Values.GetTempList();
-        SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, this.MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
+        SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
         if (attackingMario != null)
         {
             TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
         }
-        
-        List<Collider> waterBoxes = Context._waterBoxes.GetTempList();
+
+        List<Collider> waterBoxes = Context.WaterBoxes.GetTempList();
         bool setWaterLevel = false;
         float newWaterLevel = -100f;
 
@@ -653,6 +663,11 @@ public sealed class SM64Mario : IDisposable
 
     public void WearCap(MarioCapType capType, float duration = 15f, bool playMusic = true)
     {
+        if (playMusic)
+        {
+            playMusic = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayCapMusic);
+        }
+
         switch (capType)
         {
             case MarioCapType.VanishCap:
@@ -714,7 +729,7 @@ public sealed class SM64Mario : IDisposable
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.Grabbed);
     }
-    
+
     private void Throw()
     {
         if (CurrentState.IsDead) return;
@@ -731,6 +746,8 @@ public sealed class SM64Mario : IDisposable
         {
             SetFaceAngle(floatQ.LookRotation(MarioSlot.LocalRotation * float3.Forward));
             SetAction(ActionFlag.Freefall);
+            SetVelocity(float3.Zero);
+            SetForwardVelocity(0f);
         }
     }
 
@@ -745,7 +762,7 @@ public sealed class SM64Mario : IDisposable
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.TeleportFadeIn);
     }
-    
+
     public void Heal(byte healthPoints)
     {
         if (CurrentState.IsDead)
@@ -760,26 +777,54 @@ public sealed class SM64Mario : IDisposable
         }
     }
 
-    /*
-    public void PickupCoin(CVRSM64InteractableParticles.ParticleType coinType) {
-        if (!_enabled) return;
+    public void HandleInteractable(SM64Interactable interactable)
+    {
+        if (!_enabled || !interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
 
-        switch (coinType) {
-            case CVRSM64InteractableParticles.ParticleType.GoldCoin:
-                Interop.MarioHeal(MarioId, 1);
-                Interop.PlaySoundGlobal(SoundBitsKeys.SOUND_GENERAL_COIN);
+        switch (interactable.Type)
+        {
+            case SM64InteractableType.GoldCoin:
+                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+                Heal(1);
                 break;
-            case CVRSM64InteractableParticles.ParticleType.BlueCoin:
-                Interop.PlaySoundGlobal(SoundBitsKeys.SOUND_GENERAL_COIN);
-                Interop.MarioHeal(MarioId, 5);
+            case SM64InteractableType.BlueCoin:
+                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+                Heal(5);
                 break;
-            case CVRSM64InteractableParticles.ParticleType.RedCoin:
-                Interop.PlaySoundGlobal(SoundBitsKeys.SOUND_GENERAL_RED_COIN);
-                Interop.MarioHeal(MarioId, 2);
+            case SM64InteractableType.RedCoin:
+                Sounds redCoinSound = interactable.TypeId switch
+                {
+                    0 => Sounds.Menu_CollectRedCoin0,
+                    1 => Sounds.Menu_CollectRedCoin1,
+                    2 => Sounds.Menu_CollectRedCoin2,
+                    3 => Sounds.Menu_CollectRedCoin3,
+                    4 => Sounds.Menu_CollectRedCoin4,
+                    5 => Sounds.Menu_CollectRedCoin5,
+                    6 => Sounds.Menu_CollectRedCoin6,
+                    7 => Sounds.Menu_CollectRedCoin7,
+                    _ => Sounds.SOUND_GENERAL_RED_COIN
+                };
+                Interop.PlaySoundGlobal(redCoinSound);
+                Heal(2);
                 break;
+            case SM64InteractableType.VanishCap:
+                WearCap(MarioCapType.VanishCap);
+                break;
+            case SM64InteractableType.MetalCap:
+                WearCap(MarioCapType.MetalCap);
+                break;
+            case SM64InteractableType.WingCap:
+                WearCap(MarioCapType.WingCap);
+                break;
+            case SM64InteractableType.Star:
+            case SM64InteractableType.Cap:
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
+
+        interactable.Collider.Slot.ActiveSelf = false;
     }
-    */
 
     private enum Button
     {

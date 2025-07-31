@@ -74,6 +74,18 @@ public static class SM64Constants
         Trapdoor = 0x00FF                // Bowser Left trapdoor, has no action defined
     }
 
+    public enum SM64InteractableType
+    {
+        GoldCoin = 0,
+        RedCoin = 1,
+        BlueCoin = 2,
+        Star = 3,
+        Cap = 4,
+        VanishCap = 5,
+        MetalCap = 6,
+        WingCap = 7
+    }
+
 #region Music
 
     // seq_ids.h
@@ -208,17 +220,23 @@ public static class SM64Constants
 
     /// <summary>
     /// Constructs a 32-bit sound argument used for triggering audio playback.
-    /// Format:
-    /// - Byte 1 (bits 31–24):
-    ///   - Upper nibble (bits 31–28): Sound bank (custom classification, not the audio bank)
-    ///   - Lower nibble (bits 27–24): Playback bitflags
-    /// - Byte 2 (bits 23–16): Sound ID
-    /// - Byte 3 (bits 15–8): Priority
-    /// - Byte 4 (bits 7–0):
-    ///   - Upper nibble (bits 7–4): Additional flags
-    ///   - Lower nibble (bits 3–0): Sound status (typically set to SOUND_STATUS_STARTING)
+    ///
+    /// Bit layout:
+    /// - Bits 31–28 (bank):       Sound bank (custom classification, not the audio bank)
+    /// - Bits 27–24 (playFlags):  Playback bitflags (e.g., looping, spatialization)
+    /// - Bits 23–16 (soundID):    Sound ID to play
+    /// - Bits 15–8  (priority):   Priority level (higher value = higher priority)
+    /// - Bits 7–4   (flags2):     Additional flags (custom-defined usage)
+    /// - Bits 3–0   (status):     Sound status (typically set to SOUND_STATUS_STARTING)
     /// </summary>
-    private static uint SoundArgLoad(uint bank, uint playFlags, uint soundID, uint priority, uint flags2) => bank << 28 | playFlags << 24 | soundID << 16 | priority << 8 | flags2 << 4 | (uint)SoundPlaybackStatus.Starting;
+    /// <param name="bank">Bits 31–28. Sound bank (custom classification, not the audio bank)</param>
+    /// <param name="playFlags">Bits 27–24. Playback bitflags (e.g., loop, spatial)</param>
+    /// <param name="soundID">Bits 23–16. Sound ID to play</param>
+    /// <param name="priority">Bits 15–8. Priority of the sound (higher = more important)</param>
+    /// <param name="flags2">Bits 7–4. Additional flags (custom usage)</param>
+    /// <returns>A 32-bit unsigned integer encoding the sound parameters</returns>
+    private static uint SoundArgLoad(uint bank, uint playFlags, uint soundID, uint priority, uint flags2)
+        => bank << 28 | playFlags << 24 | soundID << 16 | priority << 8 | flags2 << 4 | (uint)SoundPlaybackStatus.Starting;
 
 #endregion
 
@@ -668,6 +686,14 @@ public static class SM64Constants
         Menu_StarSoundOkeyDokey,
         Menu_StarSoundLetsAGo,
         Menu_CollectRedCoin,
+        Menu_CollectRedCoin0,
+        Menu_CollectRedCoin1,
+        Menu_CollectRedCoin2,
+        Menu_CollectRedCoin3,
+        Menu_CollectRedCoin4,
+        Menu_CollectRedCoin5,
+        Menu_CollectRedCoin6,
+        Menu_CollectRedCoin7,
         Menu_CollectSecret,
 
         // General2
@@ -1151,6 +1177,14 @@ public static class SM64Constants
         { Sounds.Menu_StarSoundOkeyDokey, SoundArgLoad(7, 0, 0x23, 0xFF, 8) },
         { Sounds.Menu_StarSoundLetsAGo, SoundArgLoad(7, 0, 0x24, 0xFF, 8) },
         { Sounds.Menu_CollectRedCoin, SoundArgLoad(7, 8, 0x28, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin0, SoundArgLoad(7, 8, 0x28 + 0, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin1, SoundArgLoad(7, 8, 0x28 + 1, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin2, SoundArgLoad(7, 8, 0x28 + 2, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin3, SoundArgLoad(7, 8, 0x28 + 3, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin4, SoundArgLoad(7, 8, 0x28 + 4, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin5, SoundArgLoad(7, 8, 0x28 + 5, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin6, SoundArgLoad(7, 8, 0x28 + 6, 0x90, 8) },
+        { Sounds.Menu_CollectRedCoin7, SoundArgLoad(7, 8, 0x28 + 7, 0x90, 8) },
         { Sounds.Menu_CollectSecret, SoundArgLoad(7, 0, 0x30, 0x20, 8) },
 
         // General2

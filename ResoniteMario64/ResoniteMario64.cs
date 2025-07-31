@@ -23,24 +23,27 @@ public class ResoniteMario64 : ResoniteMod
     private const string SuperMario64UsZ64RomName = "baserom.us.z64";
     
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyUseGamepad = new ModConfigurationKey<bool>("use_gamepad", "Whether to use gamepads for input or not.", () => false);
+    public static readonly ModConfigurationKey<bool> KeyUseGamepad = new ModConfigurationKey<bool>("use_gamepad", "Whether to use gamepads for input or not.", () => false);
 
     // AUDIO
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyDisableAudio = new ModConfigurationKey<bool>("disable_audio", "Whether to disable all Super Mario 64 Music/Sounds or not.", () => false);
+    public static readonly ModConfigurationKey<bool> KeyDisableAudio = new ModConfigurationKey<bool>("disable_audio", "Whether to disable all Super Mario 64 Music/Sounds or not.", () => false);
 
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyPlayRandomMusic = new ModConfigurationKey<bool>("play_random_music", "Whether to play a random music when a mario joins or not.", () => true);
-
-    [AutoRegisterConfigKey]
-    public static ModConfigurationKey<float> KeyAudioVolume = new ModConfigurationKey<float>("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider) edit: 3 means probably 3 decimal places
+    public static readonly ModConfigurationKey<bool> KeyPlayRandomMusic = new ModConfigurationKey<bool>("play_random_music", "Whether to play a random music when a mario joins or not.", () => true);
     
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => false);
+    public static readonly ModConfigurationKey<bool> KeyPlayCapMusic = new ModConfigurationKey<bool>("play_cap_music", "Whether to play the Cap music when a mario picks one up or not.", () => true);
+
+    [AutoRegisterConfigKey]
+    public static readonly ModConfigurationKey<float> KeyAudioVolume = new ModConfigurationKey<float>("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider) edit: 3 means probably 3 decimal places
+    
+    [AutoRegisterConfigKey]
+    public static readonly ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => false);
 
     // PERFORMANCE
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
+    public static readonly ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
     
     // [AutoRegisterConfigKey]
     // public static ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
@@ -49,21 +52,21 @@ public class ResoniteMario64 : ResoniteMod
     // public static ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine.", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
     
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<int> KeyMaxMeshColliderTris = new ModConfigurationKey<int>("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
+    public static readonly ModConfigurationKey<int> KeyMaxMeshColliderTris = new ModConfigurationKey<int>("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
 
     // ENGINE
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<int> KeyGameTickMs = new ModConfigurationKey<int>("game_tick_ms", "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", () => 25); // slider 1, 100, 0
+    public static readonly ModConfigurationKey<int> KeyGameTickMs = new ModConfigurationKey<int>("game_tick_ms", "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", () => 25); // slider 1, 100, 0
 
     // Local
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true, true);
+    public static readonly ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true, true);
 
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
+    public static readonly ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
 
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<Uri> keyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
+    public static readonly ModConfigurationKey<Uri> KeyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
 
     
     public static ModConfiguration Config;
@@ -198,10 +201,17 @@ public class ResoniteMario64 : ResoniteMod
         {
             if (__instance.Slot.Tag == "SpawnMario")
             {
-                Slot mario = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
-                mario.GlobalPosition = __instance.Slot.GlobalPosition;
+                __instance.RunSynchronously(() =>
+                {
+                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == "__Temp") ?? __instance.World.RootSlot;
+                
+                    Slot mario = root.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
+                    mario.GlobalPosition = __instance.Slot.GlobalPosition;
 
-                return !SM64Context.TryAddMario(mario);
+                    SM64Context.TryAddMario(mario);
+                });
+                
+                return false;
             }
 
             if (__instance.Slot.Tag == "KillInstance")
@@ -229,23 +239,21 @@ public class ResoniteMario64 : ResoniteMod
         [HarmonyPatch("OnStart"), HarmonyPostfix]
         public static void OnStartPatch(UserRoot __instance)
         {
-            if (__instance.ActiveUser != __instance.LocalUser) return;
-            
-            DynamicValueVariable<bool> variable = __instance.Slot.AttachComponent<DynamicValueVariable<bool>>();
-            variable.VariableName.Value = VariableName;
+            __instance.RunInUpdates(3, () =>
+            {
+                if (__instance.ActiveUser != __instance.LocalUser) return;
+
+                DynamicValueVariable<bool> variable = __instance.Slot.AttachComponent<DynamicValueVariable<bool>>();
+                variable.VariableName.Value = VariableName;
+            });
         }
 
-        private static bool _previousExist;
         [HarmonyPatch("OnCommonUpdate"), HarmonyPostfix]
         public static void CommonUpdatePatch(UserRoot __instance)
         {
             if (__instance.ActiveUser != __instance.LocalUser) return;
             
-            bool value = SM64Context.Instance != null;
-            if (value == _previousExist) return;
-            
-            __instance.Slot.WriteDynamicVariable(VariableName, value);
-            _previousExist = value;
+            __instance.Slot.WriteDynamicVariable(VariableName, SM64Context.Instance != null);
         }
     }
     
@@ -266,28 +274,6 @@ public class ResoniteMario64 : ResoniteMod
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
-            
-            ui.Spacer(4);
-            
-            ValueField<float> field = ui.Current.AttachComponent<ValueField<float>>();
-            ui.Button("Set WaterLevel").LocalPressed += (b, e) =>
-            {
-                b.RunSynchronously(() =>
-                {
-                    if (Interop.IsGlobalInit)
-                    {
-                        List<SM64Mario> marios = SM64Context.Instance.Marios.Values.Where(x => x.IsLocal).GetTempList();
-                        foreach (SM64Mario mario in marios)
-                        {
-                            Interop.SetWaterLevel(mario.MarioId, field.Value.Value);
-                        }
-                    }
-                });
-            };
-            ui.PrimitiveMemberEditor(field.Value);
-            
-            ui.Spacer(4);
-
             ui.Button("Rebuild Static Surfaces").LocalPressed += (b, e) =>
             {
                 b.RunSynchronously(() =>
@@ -322,7 +308,7 @@ public class ResoniteMario64 : ResoniteMod
 
                         foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
                         {
-                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, true); };
+                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.GetValue(KeyDisableAudio)); };
                         }
 
                         ui.Spacer(8);
@@ -344,6 +330,8 @@ public class ResoniteMario64 : ResoniteMod
                     
                     ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
                     ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
+                    
+                    ui.Spacer(8);
                 }
             }
             catch (Exception e)
