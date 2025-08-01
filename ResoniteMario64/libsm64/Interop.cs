@@ -350,7 +350,7 @@ public static class Interop
         sm64_mario_take_damage(marioId, damage, 0, marioPos.x, marioPos.y, marioPos.z);
     }
 
-    public static void MarioSetVelocity(uint marioId, SM64MarioState previousState, SM64MarioState currentState)
+    public static unsafe void MarioSetVelocity(uint marioId, SM64MarioState previousState, SM64MarioState currentState)
     {
         sm64_set_mario_velocity(marioId,
                                 currentState.Position[0] - previousState.Position[0],
@@ -409,14 +409,7 @@ public static class Interop
         float3 marioPos = pos.ToMarioPosition();
         IntPtr floorPtr;
         float floorHeightMario = sm64_surface_find_floor(marioPos.x, marioPos.y, marioPos.z, out floorPtr);
-        if (floorPtr == IntPtr.Zero)
-        {
-            data = new SM64SurfaceCollisionData();
-        }
-        else
-        {
-            data = Marshal.PtrToStructure<SM64SurfaceCollisionData>(floorPtr);
-        }
+        data = floorPtr == IntPtr.Zero ? new SM64SurfaceCollisionData() : Marshal.PtrToStructure<SM64SurfaceCollisionData>(floorPtr);
         return floorHeightMario / Interop.ScaleFactor;
     }
     
@@ -430,16 +423,8 @@ public static class Interop
     public static float FindFloorHeightAndData(float3 pos, out SM64FloorCollisionData data)
     {
         float3 marioPos = pos.ToMarioPosition();
-        IntPtr floorGeo;
-        float floorHeightMario = sm64_surface_find_floor_height_and_data(marioPos.x, marioPos.y, marioPos.z, out floorGeo);
-        if (floorGeo == IntPtr.Zero)
-        {
-            data = new SM64FloorCollisionData();
-        }
-        else
-        {
-            data = Marshal.PtrToStructure<SM64FloorCollisionData>(floorGeo);
-        }
+        float floorHeightMario = sm64_surface_find_floor_height_and_data(marioPos.x, marioPos.y, marioPos.z, out IntPtr floorGeo);
+        data = floorGeo == IntPtr.Zero ? new SM64FloorCollisionData() : Marshal.PtrToStructure<SM64FloorCollisionData>(floorGeo);
         return floorHeightMario / Interop.ScaleFactor;
     }
 
@@ -558,13 +543,10 @@ public struct SM64MarioInputs
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SM64MarioState
+public unsafe struct SM64MarioState
 {
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public float[] Position;
-
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public float[] Velocity;
+    public fixed float Position[3];
+    public fixed float Velocity[3];
 
     public float FacingAngle;
 
@@ -575,7 +557,7 @@ public struct SM64MarioState
     public uint ParticleFlags;
     public short InvincibleTimer;
 
-    public float3 ScaledPosition => Position != null ? new float3(-Position[0], Position[1], Position[2]) / Interop.ScaleFactor : float3.Zero;
+    public float3 ScaledPosition => new float3(-Position[0], Position[1], Position[2]) / Interop.ScaleFactor;
     public floatQ ScaledRotation => floatQ.Euler(0f, MathX.Repeat(-MathX.Rad2Deg * FacingAngle + 180f, 360f) - 180f, 0f);
 
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
@@ -585,8 +567,8 @@ public struct SM64MarioState
     public bool IsFirstPerson => IsFlyingOrSwimming;
     public bool IsFlyingOrSwimming => (ActionFlags & (uint)ActionFlag.SwimmingOrFlying) != 0;
     public bool IsSwimming => (ActionFlags & (uint)ActionFlag.Swimming) != 0;
-    public bool IsFlying => (ActionFlags & (uint)ActionFlag.Flying) != 0;
-    public bool IsTeleporting => (ActionFlags & (uint)StateFlag.Teleporting) != 0;
+    public bool IsFlying => (ActionFlags & (uint)ActionFlag.Flying) == (uint)ActionFlag.Flying;
+    public bool IsTeleporting => (StateFlags & (uint)StateFlag.Teleporting) != 0;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -600,23 +582,26 @@ public struct SM64MarioGeometryBuffers
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SM64ObjectTransform
+public unsafe struct SM64ObjectTransform
 {
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    private float[] Position;
-
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    private float[] EulerRotation;
+    public fixed float Position[3];
+    public fixed float EulerRotation[3];
 
     public static SM64ObjectTransform FromFrooxWorld(float3 position, floatQ rotation)
     {
-        return new SM64ObjectTransform
-        {
-            Position = VecToArr(position.ToMarioPosition()),
-            EulerRotation = VecToArr(rotation.EulerAngles.ToMarioRotation())
-        };
+        SM64ObjectTransform result = new SM64ObjectTransform();
+        float3 pos = position.ToMarioPosition();
+        float3 rot = rotation.EulerAngles.ToMarioRotation();
 
-        float[] VecToArr(float3 v) => new[] { v.x, v.y, v.z };
+        result.Position[0] = pos.x;
+        result.Position[1] = pos.y;
+        result.Position[2] = pos.z;
+
+        result.EulerRotation[0] = rot.x;
+        result.EulerRotation[1] = rot.y;
+        result.EulerRotation[2] = rot.z;
+
+        return result;
     }
 }
 
@@ -649,7 +634,7 @@ public struct SM64SurfaceObject
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SM64SurfaceCollisionData
+public unsafe struct SM64SurfaceCollisionData
 {
     public short type;
     public short force;
@@ -658,31 +643,21 @@ public struct SM64SurfaceCollisionData
     public int lowerY;
     public int upperY;
 
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public int[] vertex1;
-
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public int[] vertex2;
-
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public int[] vertex3;
+    public fixed int vertex1[3];
+    public fixed int vertex2[3];
+    public fixed int vertex3[3];
 
     public float3 normal;
-
     public float originOffset;
-
     public byte isValid;
-
     public IntPtr transform;
-
     public ushort terrain;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SM64FloorCollisionData
+public unsafe struct SM64FloorCollisionData
 {
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-    public float[] unused;
+    public fixed float unused[4];
 
     public float normalX;
     public float normalY;

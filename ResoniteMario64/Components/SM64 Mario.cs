@@ -428,7 +428,7 @@ public sealed class SM64Mario : IDisposable
     }
 
     // Game Tick
-    public void ContextFixedUpdateSynced()
+    internal void ContextFixedUpdateSynced()
     {
         if (!_enabled || _isNuked || _disposed) return;
 
@@ -659,7 +659,7 @@ public sealed class SM64Mario : IDisposable
     }
 
     // Engine Tick
-    public void ContextUpdateSynced()
+    internal void ContextUpdateSynced()
     {
         if (!_enabled || _isNuked || _disposed) return;
 
@@ -747,6 +747,12 @@ public sealed class SM64Mario : IDisposable
             case MarioCapType.VanishCap:
             case MarioCapType.MetalCap:
             case MarioCapType.WingCap:
+                // Prevent Vanish and Wing from being active at the same time - This prevents a crash
+                if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap   && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+                {
+                    break;
+                }
+                
                 if (Utils.HasCapType(SyncedStateFlags, capType))
                 {
                     Interop.MarioCapExtend(MarioId, duration);
@@ -788,17 +794,17 @@ public sealed class SM64Mario : IDisposable
         if (deleteMario) Dispose();
     }
 
-    private void SetAction(ActionFlag actionFlag) => Interop.MarioSetAction(MarioId, actionFlag);
+    public void SetAction(ActionFlag actionFlag) => Interop.MarioSetAction(MarioId, actionFlag);
 
-    private void SetAction(uint actionFlags) => Interop.MarioSetAction(MarioId, actionFlags);
+    public void SetAction(uint actionFlags) => Interop.MarioSetAction(MarioId, actionFlags);
 
-    private void SetState(StateFlag stateFlag) => Interop.MarioSetState(MarioId, stateFlag);
+    public void SetState(StateFlag stateFlag) => Interop.MarioSetState(MarioId, stateFlag);
 
-    private void SetState(uint stateFlags) => Interop.MarioSetState(MarioId, stateFlags);
+    public void SetState(uint stateFlags) => Interop.MarioSetState(MarioId, stateFlags);
 
-    private void SetVelocity(float3 frooxVelocity) => Interop.MarioSetVelocity(MarioId, frooxVelocity);
+    public void SetVelocity(float3 frooxVelocity) => Interop.MarioSetVelocity(MarioId, frooxVelocity);
 
-    private void SetForwardVelocity(float frooxVelocity) => Interop.MarioSetForwardVelocity(MarioId, frooxVelocity);
+    public void SetForwardVelocity(float frooxVelocity) => Interop.MarioSetForwardVelocity(MarioId, frooxVelocity);
 
     private void Hold()
     {

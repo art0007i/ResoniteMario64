@@ -206,14 +206,14 @@ public sealed partial class SM64Context : IDisposable
         MarioContainersSlot.ChildAdded -= HandleContainerAdded;
         MarioContainersSlot.ChildAdded += HandleContainerAdded;
 
-        MarioContainersSlot.ForeachChild(c =>
+        MarioContainersSlot.ForeachChild(child =>
         {
-            if (c.Tag == MarioTag && !Marios.ContainsKey(c))
+            if (child.Tag == MarioContainerTag)
             {
-                ResoniteMod.Msg("Adding existing Mario for SlotID: " + c.ReferenceID);
-                var mario = new SM64Mario(c, this);
-                Marios.Add(c, mario);
+                child.ChildAdded -= HandleMarioAdded;
+                child.ChildAdded += HandleMarioAdded;
             }
+            HandleMarioAdded(null, child);
         });
 
         MyMariosSlot.DestroyWhenUserLeaves(world.LocalUser);
