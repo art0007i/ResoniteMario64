@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
-using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -178,9 +175,9 @@ public class ResoniteMario64 : ResoniteMod
                     Slot contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
                     if (contextSlot != null)
                     {
-                        if (SM64Context.EnsureInstanceExists(__instance))
+                        if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
                         {
-                            SM64Context.Instance.MarioContainersSlot.ForeachChild(slot =>
+                            context.MarioContainersSlot.ForeachChild(slot =>
                             {
                                 if (slot.Tag == MarioTag)
                                 {
@@ -203,7 +200,7 @@ public class ResoniteMario64 : ResoniteMod
             {
                 __instance.RunSynchronously(() =>
                 {
-                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == "__Temp") ?? __instance.World.RootSlot;
+                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == TempSlotName) ?? __instance.World.RootSlot.AddSlot(TempSlotName, false);
                 
                     Slot mario = root.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
                     mario.GlobalPosition = __instance.Slot.GlobalPosition;
@@ -266,7 +263,9 @@ public class ResoniteMario64 : ResoniteMod
             {
                 b.RunSynchronously(() =>
                 {
-                    Slot mario = __instance.World.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
+                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == TempSlotName) ?? __instance.World.RootSlot.AddSlot(TempSlotName, false);
+                
+                    Slot mario = root.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
                     mario.GlobalPosition = __instance.GlobalPosition;
 
                     b.LabelText = SM64Context.TryAddMario(mario) ? "Mario Spawned!" : "Mario Spawn Failed!";

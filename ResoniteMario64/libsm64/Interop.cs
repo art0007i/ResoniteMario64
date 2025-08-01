@@ -7,7 +7,6 @@ using ResoniteMario64.Components.Context;
 using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
 #if IsNet9
-using Renderite.Shared;
 #endif
 
 namespace ResoniteMario64.libsm64;
@@ -392,6 +391,11 @@ internal static class Interop
     public static void SetWaterLevel(uint marioId, float waterLevel)
     {
         sm64_set_mario_water_level(marioId, (int)waterLevel.ToMarioFloat());
+    }
+    
+    public static void SetGasLevel(uint marioId, float gasLevel)
+    {
+        sm64_set_mario_gas_level(marioId, (int)gasLevel.ToMarioFloat());
     }
     
     public static float FindFloor(float3 pos, out SM64SurfaceCollisionData data)

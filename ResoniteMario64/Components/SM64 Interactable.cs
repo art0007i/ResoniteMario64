@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Components.Context;
 using ResoniteMario64.libsm64;
@@ -22,11 +20,10 @@ public sealed class SM64Interactable : IDisposable
     
     private bool _disposed;
 
-    public SM64Interactable(Collider col)
+    public SM64Interactable(Collider col, SM64Context instance)
     {
         World = col.World;
-        Context = SM64Context.Instance;
-        
+        Context = instance;
         Collider = col;
         
         string[] tagParts = col.Slot.Tag?.Split(',');

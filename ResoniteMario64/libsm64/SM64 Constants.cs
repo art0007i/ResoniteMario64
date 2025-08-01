@@ -80,10 +80,11 @@ public static class SM64Constants
         RedCoin = 1,
         BlueCoin = 2,
         Star = 3,
-        Cap = 4,
+        NormalCap = 4,
         VanishCap = 5,
         MetalCap = 6,
-        WingCap = 7
+        WingCap = 7,
+        Damage = 8
     }
 
 #region Music

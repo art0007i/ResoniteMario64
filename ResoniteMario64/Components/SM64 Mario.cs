@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -45,10 +46,12 @@ public sealed class SM64Mario : IDisposable
 
     // Materials
     private bool IsMatSwitching { get; set; }
+    private bool IsMat2Switching { get; set; }
 
     private PBS_DualSidedMetallic _marioMaterial;
     private PBS_VertexColorMetallic _marioMaterialClipped;
     private XiexeToonMaterial _marioMaterialMetal;
+    private PBS_Metallic _marioMaterialVanish;
 
     private IAssetProvider<Material> CurrentMaterial
     {
@@ -57,14 +60,35 @@ public sealed class SM64Mario : IDisposable
         {
             if (IsMatSwitching) return;
             IsMatSwitching = true;
+
             _marioMeshRenderer.RunInUpdates(2, () =>
             {
-                if (_marioMeshRenderer.Materials.Count > 0)
+                if (_marioMeshRenderer.Materials.Count > 0 && _marioMeshRenderer.Materials[0] != value)
                 {
                     _marioMeshRenderer.Materials[0] = value;
                 }
 
                 IsMatSwitching = false;
+            });
+        }
+    }
+
+    private IAssetProvider<Material> CurrentFaceMaterial
+    {
+        get => _marioMeshRenderer.Materials.Count > 1 ? _marioMeshRenderer.Materials[1] : null;
+        set
+        {
+            if (IsMat2Switching) return;
+            IsMat2Switching = true;
+
+            _marioMeshRenderer.RunInUpdates(2, () =>
+            {
+                if (_marioMeshRenderer.Materials.Count > 1 && _marioMeshRenderer.Materials[1] != value)
+                {
+                    _marioMeshRenderer.Materials[1] = value;
+                }
+
+                IsMat2Switching = false;
             });
         }
     }
@@ -96,14 +120,14 @@ public sealed class SM64Mario : IDisposable
 
     private float _waterLevel;
 
-    public SM64Mario(Slot slot)
+    public SM64Mario(Slot slot, SM64Context instance)
     {
         ResoniteMod.Debug("Constructing mario");
         MarioUser = slot.GetAllocatingUser();
         ResoniteMod.Debug("is local " + IsLocal);
 
         World = slot.World;
-        Context = SM64Context.Instance;
+        Context = instance;
 
         MarioSlot = slot;
         MarioSlot.Tag = MarioTag;
@@ -304,6 +328,7 @@ public sealed class SM64Mario : IDisposable
         _marioMaterial = _marioRendererSlot.AttachComponent<PBS_DualSidedMetallic>();
         _marioMaterialClipped = _marioRendererSlot.AttachComponent<PBS_VertexColorMetallic>();
         _marioMaterialMetal = _marioRendererSlot.AttachComponent<XiexeToonMaterial>();
+        _marioMaterialVanish = _marioRendererSlot.AttachComponent<PBS_Metallic>();
         ResoniteMod.Debug("materials 👍");
 
         // I generated this texture inside Interop.cs (look for 'mario.png')
@@ -323,11 +348,18 @@ public sealed class SM64Mario : IDisposable
         marioTexture.URL.Value = new Uri("resdb:///f05ee58da859926aa5652bb92a07ad0d5ce5fb33979fd7ead9bc5ed78eb5b7d7.webp");
         marioTexture.WrapModeU.Value = TextureWrapMode.Clamp;
         marioTexture.WrapModeV.Value = TextureWrapMode.Clamp;
+
         _marioMaterial.AlbedoTexture.Target = marioTexture;
         _marioMaterial.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
         _marioMaterial.AlphaClip.Value = 1f;
         _marioMaterial.Culling.Value = Culling.Off;
         _marioMaterial.OffsetUnits.Value = -1f;
+
+        _marioMaterialVanish.AlbedoTexture.Target = marioTexture;
+        _marioMaterialVanish.AlbedoColor.Value = Utils.VanishCapColor;
+        _marioMaterialVanish.BlendMode.Value = BlendMode.Alpha;
+        _marioMaterialVanish.AlphaCutoff.Value = 1f;
+        _marioMaterialVanish.OffsetUnits.Value = -1f;
 
         StaticTexture2D marioTextureMetal = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTextureMetal.DirectLoad.Value = true;
@@ -458,7 +490,7 @@ public sealed class SM64Mario : IDisposable
                 MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
             }
-            
+
             List<SM64Interactable> interactables = Context.Interactables.Values.GetTempList();
             foreach (SM64Interactable interactable in interactables)
             {
@@ -555,11 +587,53 @@ public sealed class SM64Mario : IDisposable
                 CurrentMaterial = _marioMaterialMetal;
             }
         }
+        else if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+        {
+            if (_marioMaterialClipped.AlbedoColor.Value != Utils.VanishCapColor)
+            {
+                _marioMaterialClipped.AlbedoColor.Value = Utils.VanishCapColor;
+            }
+            
+            if (_marioMaterialClipped.RenderQueue.Value != 1)
+            {
+                _marioMaterialClipped.RenderQueue.Value = 1;
+            }
+            
+            if (_marioMaterialClipped.AlphaHandling.Value != FrooxEngine.AlphaHandling.AlphaBlend)
+            {
+                _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaBlend;
+            }
+            
+            if (CurrentFaceMaterial != _marioMaterialVanish)
+            {
+                CurrentFaceMaterial = _marioMaterialVanish;
+            }
+        }
         else
         {
+            if (_marioMaterialClipped.AlbedoColor.Value != Utils.White)
+            {
+                _marioMaterialClipped.AlbedoColor.Value = Utils.White;
+            }
+            
+            if (_marioMaterialClipped.RenderQueue.Value != -1)
+            {
+                _marioMaterialClipped.RenderQueue.Value = -1;
+            }
+            
+            if (_marioMaterialClipped.AlphaHandling.Value != FrooxEngine.AlphaHandling.AlphaClip)
+            {
+                _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
+            }
+            
             if (CurrentMaterial != _marioMaterialClipped)
             {
                 CurrentMaterial = _marioMaterialClipped;
+            }
+            
+            if (CurrentFaceMaterial != _marioMaterial)
+            {
+                CurrentFaceMaterial = _marioMaterial;
             }
         }
 
@@ -692,10 +766,12 @@ public sealed class SM64Mario : IDisposable
 
                 break;
             case MarioCapType.NormalCap:
-                SetState(CurrentState.StateFlags & ~(uint)(
-                             StateFlag.VanishCap |
-                             StateFlag.MetalCap |
-                             StateFlag.WingCap));
+                SetState(CurrentState.StateFlags & ~(uint)(StateFlag.VanishCap | StateFlag.MetalCap | StateFlag.WingCap));
+                if (playMusic)
+                {
+                    Interop.StopMusic();
+                }
+
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(capType), capType, null);
@@ -727,6 +803,12 @@ public sealed class SM64Mario : IDisposable
     private void Hold()
     {
         if (CurrentState.IsDead) return;
+
+        if ((CurrentActionFlags & (uint)ActionFlag.Sleeping) == (uint)ActionFlag.Sleeping)
+        {
+            SetAction(ActionFlag.WakingUp);
+        }
+
         SetAction(ActionFlag.Grabbed);
     }
 
@@ -781,15 +863,16 @@ public sealed class SM64Mario : IDisposable
     {
         if (!_enabled || !interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
 
+        bool disable = true;
         switch (interactable.Type)
         {
             case SM64InteractableType.GoldCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                Heal(1);
+                if (IsLocal) Heal(1);
                 break;
             case SM64InteractableType.BlueCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                Heal(5);
+                if (IsLocal) Heal(5);
                 break;
             case SM64InteractableType.RedCoin:
                 Sounds redCoinSound = interactable.TypeId switch
@@ -805,25 +888,40 @@ public sealed class SM64Mario : IDisposable
                     _ => Sounds.SOUND_GENERAL_RED_COIN
                 };
                 Interop.PlaySoundGlobal(redCoinSound);
-                Heal(2);
+                if (IsLocal) Heal(2);
                 break;
             case SM64InteractableType.VanishCap:
-                WearCap(MarioCapType.VanishCap);
+                if (IsLocal) WearCap(MarioCapType.VanishCap);
                 break;
             case SM64InteractableType.MetalCap:
-                WearCap(MarioCapType.MetalCap);
+                if (IsLocal) WearCap(MarioCapType.MetalCap);
                 break;
             case SM64InteractableType.WingCap:
-                WearCap(MarioCapType.WingCap);
+                if (IsLocal) WearCap(MarioCapType.WingCap);
+                break;
+            case SM64InteractableType.NormalCap:
+                if (IsLocal) WearCap(MarioCapType.NormalCap);
                 break;
             case SM64InteractableType.Star:
-            case SM64InteractableType.Cap:
+                Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
+                if (IsLocal) Heal(8);
+                SetAction(ActionFlag.Freefall);
+                SetVelocity(float3.Zero);
+                SetForwardVelocity(0f);
+                break;
+            case SM64InteractableType.Damage:
+                uint damage = interactable.TypeId == -1 ? 1 : (uint)interactable.TypeId;
+                TakeDamage(interactable.Collider.Slot.GlobalPosition, damage);
+                disable = false;
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
 
-        interactable.Collider.Slot.ActiveSelf = false;
+        if (IsLocal)
+        {
+            interactable.Collider.Slot.ActiveSelf = !disable;
+        }
     }
 
     private enum Button

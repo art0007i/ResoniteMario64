@@ -13,6 +13,9 @@ namespace ResoniteMario64;
 
 public static class Utils
 {
+    public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
+    public static readonly colorX White = colorX.White;
+    
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)

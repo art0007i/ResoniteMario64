@@ -3,15 +3,14 @@ using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.libsm64;
-using ResoniteModLoader;
 
 namespace ResoniteMario64.Components.Context;
 
 public sealed partial class SM64Context
 {
-    private readonly Dictionary<Collider, SM64DynamicCollider> _sm64DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
-    internal readonly List<Collider> WaterBoxes = new List<Collider>();
+    internal readonly Dictionary<Collider, SM64DynamicCollider> DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
+    internal readonly List<Collider> WaterBoxes = new List<Collider>();
     
     private static Timer _staticUpdateTimer;
     public void QueueStaticSurfacesUpdate()
@@ -83,7 +82,7 @@ public sealed partial class SM64Context
 
     public void RegisterDynamicCollider(Collider surfaceObject)
     {
-        if (_sm64DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
+        if (DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
         {
             if (value.InitScale.Approximately(surfaceObject.Slot.GlobalScale, 0.001f))
             {
@@ -93,13 +92,13 @@ public sealed partial class SM64Context
             value.Dispose();
         }
 
-        SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject);
-        _sm64DynamicColliders.Add(surfaceObject, col);
+        SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject, this);
+        DynamicColliders.Add(surfaceObject, col);
     }
 
     public void UnregisterDynamicCollider(Collider surfaceObject)
     {
-        _sm64DynamicColliders.Remove(surfaceObject);
+        DynamicColliders.Remove(surfaceObject);
     }
     
     public void RegisterInteractable(Collider surfaceObject)
@@ -109,7 +108,7 @@ public sealed partial class SM64Context
             return;
         }
 
-        SM64Interactable col = new SM64Interactable(surfaceObject);
+        SM64Interactable col = new SM64Interactable(surfaceObject, this);
         Interactables.Add(surfaceObject, col);
     }
 
