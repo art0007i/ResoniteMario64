@@ -76,6 +76,7 @@ public static class SM64Constants
 
     public enum SM64InteractableType
     {
+        None = -1,
         GoldCoin = 0,
         RedCoin = 1,
         BlueCoin = 2,

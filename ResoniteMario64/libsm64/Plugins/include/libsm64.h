@@ -5,11 +5,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef _WIN32
+#if defined(_WIN32)
     #ifdef SM64_LIB_EXPORT
         #define SM64_LIB_FN __declspec(dllexport)
     #else
         #define SM64_LIB_FN __declspec(dllimport)
+    #endif
+#elif defined(__GNUC__) && __GNUC__ >= 4
+    #ifdef SM64_LIB_EXPORT
+        #define SM64_LIB_FN __attribute__ ((visibility("default")))
+    #else
+        #define SM64_LIB_FN
     #endif
 #else
     #define SM64_LIB_FN

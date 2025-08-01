@@ -26,7 +26,7 @@ public static class MarioExtensions
     private static float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
 }
 
-internal static class Interop
+public static class Interop
 {
     public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) is true ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
 
@@ -253,6 +253,12 @@ internal static class Interop
         sm64_global_terminate();
         MarioTexture = null;
         IsGlobalInit = false;
+    }
+
+    public static void PlayMusic(MusicSequence music)
+    {
+        StopMusic();
+        sm64_play_music(0, (ushort)music, 0);
     }
 
     public static void PlayRandomMusic()
@@ -584,7 +590,7 @@ public struct SM64MarioState
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct SM64MarioGeometryBuffers
+public struct SM64MarioGeometryBuffers
 {
     public IntPtr position;
     public IntPtr normal;
@@ -594,7 +600,7 @@ internal struct SM64MarioGeometryBuffers
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct SM64ObjectTransform
+public struct SM64ObjectTransform
 {
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
     private float[] Position;
@@ -635,7 +641,7 @@ public struct SM64SurfaceObjectTransform
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct SM64SurfaceObject
+public struct SM64SurfaceObject
 {
     public SM64ObjectTransform transform;
     public uint surfaceCount;
@@ -643,7 +649,7 @@ internal struct SM64SurfaceObject
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct SM64SurfaceCollisionData
+public struct SM64SurfaceCollisionData
 {
     public short type;
     public short force;

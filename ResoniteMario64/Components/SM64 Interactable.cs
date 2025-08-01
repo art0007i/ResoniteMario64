@@ -12,6 +12,7 @@ public sealed class SM64Interactable : IDisposable
     public readonly SM64InteractableType Type;
 
     public readonly int TypeId;
+    public bool HasValue => TypeId != -1;
 
     public World World { get; }
     public SM64Context Context { get; }

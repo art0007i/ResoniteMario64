@@ -183,34 +183,34 @@ public sealed partial class SM64Context
         _marioAudioStream.Write(_convertedBuffer.AsSpan(0, written), ref _writeState);
     }
 
-    private static int DownmixAndResampleMono(short[] input, float inputRate, float outputRate, MonoSample[] output)
-    {
-        float ratio = inputRate / outputRate;
-        float pos = 0.0f;
-        int outputIndex = 0;
-
-        while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
-        {
-            int i = (int)pos * 2;
-
-            float l1 = input[i] / 32768.0f;
-            float r1 = input[i + 1] / 32768.0f;
-            float l2 = input[i + 2] / 32768.0f;
-            float r2 = input[i + 3] / 32768.0f;
-
-            float t = pos - (int)pos;
-
-            float s1 = (l1 + r1) * 0.5f;
-            float s2 = (l2 + r2) * 0.5f;
-
-            float sample = s1 * (1 - t) + s2 * t;
-
-            output[outputIndex++] = new MonoSample(sample);
-            pos += ratio;
-        }
-
-        return outputIndex;
-    }
+    // private static int DownmixAndResampleMono(short[] input, float inputRate, float outputRate, MonoSample[] output)
+    // {
+    //     float ratio = inputRate / outputRate;
+    //     float pos = 0.0f;
+    //     int outputIndex = 0;
+    //
+    //     while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
+    //     {
+    //         int i = (int)pos * 2;
+    //
+    //         float l1 = input[i] / 32768.0f;
+    //         float r1 = input[i + 1] / 32768.0f;
+    //         float l2 = input[i + 2] / 32768.0f;
+    //         float r2 = input[i + 3] / 32768.0f;
+    //
+    //         float t = pos - (int)pos;
+    //
+    //         float s1 = (l1 + r1) * 0.5f;
+    //         float s2 = (l2 + r2) * 0.5f;
+    //
+    //         float sample = s1 * (1 - t) + s2 * t;
+    //
+    //         output[outputIndex++] = new MonoSample(sample);
+    //         pos += ratio;
+    //     }
+    //
+    //     return outputIndex;
+    // }
 
     private static int DownmixAndResampleStereo(short[] input, float inputRate, float outputRate, StereoSample[] output)
     {

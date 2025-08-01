@@ -36,7 +36,7 @@ public class ResoniteMario64 : ResoniteMod
     public static readonly ModConfigurationKey<float> KeyAudioVolume = new ModConfigurationKey<float>("audio_volume", "The audio volume.", () => 0.1f); // slider 0f, 1f, 3 (whatever 3 means in BKTUILib.AddSlider) edit: 3 means probably 3 decimal places
     
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => false);
+    public static readonly ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => true);
 
     // PERFORMANCE
     [AutoRegisterConfigKey]
@@ -55,16 +55,15 @@ public class ResoniteMario64 : ResoniteMod
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<int> KeyGameTickMs = new ModConfigurationKey<int>("game_tick_ms", "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", () => 25); // slider 1, 100, 0
 
+    [AutoRegisterConfigKey]
+    public static readonly ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
+    
     // Local
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true, true);
-
-    [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<int> KeyMarioScaleFactor = new ModConfigurationKey<int>("mario_scale_factor", "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", () => 1000); // slider 1, 100, 0
-
+    
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<Uri> KeyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
-
     
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
@@ -191,6 +190,7 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
     
+    // TODO: Add more buttons here, and figure out a way to sync some of them
     [HarmonyPatch(typeof(Button), "RunPressed")]
     private class RunButtonPressed
     {
@@ -254,6 +254,7 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
     
+    // TODO: Either add a config to make these debug only, or remove them entirely for physical buttons
     [HarmonyPatch(typeof(Slot), nameof(Slot.BuildInspectorUI))]
     private class SlotUiAddon
     {

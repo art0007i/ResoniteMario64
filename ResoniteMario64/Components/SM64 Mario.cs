@@ -482,12 +482,12 @@ public sealed class SM64Mario : IDisposable
 
             // Check for deaths, so we delete mario
             float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
-            bool isDeathPlane = (data.type & (short)SM64SurfaceType.DeathPlane) == (short)SM64SurfaceType.DeathPlane;
+            bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
             if (!_isDying && CurrentState.IsDead || !_isDying && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 50 && isDeathPlane) /* Find a better value for the distance check */
             {
                 _isDying = true;
                 bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
-                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
+                if (IsLocal) MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
             }
 
@@ -593,17 +593,17 @@ public sealed class SM64Mario : IDisposable
             {
                 _marioMaterialClipped.AlbedoColor.Value = Utils.VanishCapColor;
             }
-            
+
             if (_marioMaterialClipped.RenderQueue.Value != 1)
             {
                 _marioMaterialClipped.RenderQueue.Value = 1;
             }
-            
+
             if (_marioMaterialClipped.AlphaHandling.Value != FrooxEngine.AlphaHandling.AlphaBlend)
             {
                 _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaBlend;
             }
-            
+
             if (CurrentFaceMaterial != _marioMaterialVanish)
             {
                 CurrentFaceMaterial = _marioMaterialVanish;
@@ -615,22 +615,22 @@ public sealed class SM64Mario : IDisposable
             {
                 _marioMaterialClipped.AlbedoColor.Value = Utils.White;
             }
-            
+
             if (_marioMaterialClipped.RenderQueue.Value != -1)
             {
                 _marioMaterialClipped.RenderQueue.Value = -1;
             }
-            
+
             if (_marioMaterialClipped.AlphaHandling.Value != FrooxEngine.AlphaHandling.AlphaClip)
             {
                 _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
             }
-            
+
             if (CurrentMaterial != _marioMaterialClipped)
             {
                 CurrentMaterial = _marioMaterialClipped;
             }
-            
+
             if (CurrentFaceMaterial != _marioMaterial)
             {
                 CurrentFaceMaterial = _marioMaterial;
@@ -827,9 +827,9 @@ public sealed class SM64Mario : IDisposable
         else
         {
             SetFaceAngle(floatQ.LookRotation(MarioSlot.LocalRotation * float3.Forward));
-            SetAction(ActionFlag.Freefall);
             SetVelocity(float3.Zero);
             SetForwardVelocity(0f);
+            SetAction(ActionFlag.Freefall);
         }
     }
 
@@ -863,6 +863,9 @@ public sealed class SM64Mario : IDisposable
     {
         if (!_enabled || !interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
 
+        int typeId = interactable.TypeId;
+        bool hasValue = interactable.HasValue;
+
         bool disable = true;
         switch (interactable.Type)
         {
@@ -875,7 +878,7 @@ public sealed class SM64Mario : IDisposable
                 if (IsLocal) Heal(5);
                 break;
             case SM64InteractableType.RedCoin:
-                Sounds redCoinSound = interactable.TypeId switch
+                Sounds redCoinSound = typeId switch
                 {
                     0 => Sounds.Menu_CollectRedCoin0,
                     1 => Sounds.Menu_CollectRedCoin1,
@@ -905,14 +908,26 @@ public sealed class SM64Mario : IDisposable
             case SM64InteractableType.Star:
                 Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
                 if (IsLocal) Heal(8);
-                SetAction(ActionFlag.Freefall);
-                SetVelocity(float3.Zero);
                 SetForwardVelocity(0f);
+                SetAction(ActionFlag.Freefall);
                 break;
             case SM64InteractableType.Damage:
-                uint damage = interactable.TypeId == -1 ? 1 : (uint)interactable.TypeId;
-                TakeDamage(interactable.Collider.Slot.GlobalPosition, damage);
+                bool isMarioCollider = interactable.Collider.Slot.IsChildOf(MarioSlot);
+
+                uint damage = typeId switch
+                {
+                    -1 or >= 10 => 1,
+                    _           => (uint)typeId
+                };
+
+                if (!isMarioCollider)
+                {
+                    TakeDamage(interactable.Collider.Slot.GlobalPosition, damage);
+                }
+
                 disable = false;
+                break;
+            case SM64InteractableType.None:
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
