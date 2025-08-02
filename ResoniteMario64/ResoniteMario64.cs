@@ -334,7 +334,7 @@ public class ResoniteMario64 : ResoniteMod
             try
             {
                 SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-                if (inspector?.ComponentView?.Target?.Tag == MarioTag && SM64Context.Instance?.Marios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
+                if (inspector?.ComponentView?.Target?.Tag == MarioTag && SM64Context.Instance?.AllMarios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
                 {
                     if (mario.IsLocal)
                     {

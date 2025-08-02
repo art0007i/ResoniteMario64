@@ -66,7 +66,7 @@ public static class Utils
             if (!IsGoodStaticCollider(obj)) continue;
 
             string[] tagParts = obj.Slot.Tag?.Split(',');
-            Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out _);
+            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out _);
 
             if (obj is MeshCollider meshCollider)
             {
@@ -113,11 +113,11 @@ public static class Utils
         bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
     }
 
-    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
+    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;
-        interactableType = SM64InteractableType.GoldCoin;
+        interactableType = SM64InteractableType.None;
         interactableId = -1;
 
         if (tagParts == null) return;
@@ -203,10 +203,11 @@ public static class Utils
     {
         return capType switch
         {
-            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0,
-            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0,
-            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0,
-            _                      => capType == MarioCapType.NormalCap
+            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
+            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
+            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
+            MarioCapType.NormalCap => (flags & (uint)StateFlag.NormalCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
+            _                      => throw new ArgumentOutOfRangeException(nameof(capType), capType, null)
         };
     }
 

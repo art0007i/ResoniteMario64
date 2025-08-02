@@ -69,7 +69,7 @@ public sealed class SM64DynamicCollider : IDisposable
         InitScale = col.Slot.GlobalScale;
         
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.ParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out _);
+        Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out _);
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {

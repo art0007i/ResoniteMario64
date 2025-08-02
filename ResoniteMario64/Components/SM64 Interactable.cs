@@ -28,7 +28,7 @@ public sealed class SM64Interactable : IDisposable
         Collider = col;
         
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.ParseTagParts(tagParts, out _, out _, out Type, out TypeId);
+        Utils.TryParseTagParts(tagParts, out _, out _, out Type, out TypeId);
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {

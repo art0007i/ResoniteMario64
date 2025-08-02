@@ -15,11 +15,12 @@ namespace ResoniteMario64.Components.Context;
 public sealed partial class SM64Context : IDisposable
 {
     public static SM64Context Instance { get; private set; }
+    
+    public DynamicVariableSpace ContextVariableSpace { get; set; }
 
     private Slot TempSlot => World.RootSlot?.FindChildOrAdd(TempSlotName, false);
 
     private Slot _contextSlot;
-
     private Slot ContextSlot
     {
         get
@@ -63,11 +64,11 @@ public sealed partial class SM64Context : IDisposable
     public Slot MarioContainersSlot { get; private set; }
     public Slot MyMariosSlot { get; private set; }
 
-    public DynamicVariableSpace ContextVariableSpace { get; set; }
+    
+    public readonly Dictionary<Slot, SM64Mario> AllMarios = new Dictionary<Slot, SM64Mario>();
+    public List<SM64Mario> MyMarios => AllMarios.Values.Where(x => x.IsLocal).GetTempList();
 
-    public readonly Dictionary<Slot, SM64Mario> Marios = new Dictionary<Slot, SM64Mario>();
-
-    public bool AnyControlledMarios => Marios.Values.Any(x => x.IsLocal);
+    public bool AnyControlledMarios => MyMarios.Count != 0;
 
     public World World { get; }
 
@@ -169,7 +170,7 @@ public sealed partial class SM64Context : IDisposable
 
         waterLevel.Value.OnValueChange += val =>
         {
-            List<SM64Mario> marios = Marios.Values.GetTempList();
+            List<SM64Mario> marios = AllMarios.Values.GetTempList();
             foreach (SM64Mario mario in marios)
             {
                 Interop.SetWaterLevel(mario.MarioId, val.Value);
@@ -187,7 +188,7 @@ public sealed partial class SM64Context : IDisposable
 
         gasLevel.Value.OnValueChange += val =>
         {
-            List<SM64Mario> marios = Marios.Values.GetTempList();
+            List<SM64Mario> marios = AllMarios.Values.GetTempList();
             foreach (SM64Mario mario in marios)
             {
                 Interop.SetGasLevel(mario.MarioId, val.Value);
@@ -221,11 +222,11 @@ public sealed partial class SM64Context : IDisposable
 
     private void HandleMarioAdded(Slot slot, Slot child)
     {
-        if (child.Tag == MarioTag && !Marios.ContainsKey(child))
+        if (child.Tag == MarioTag && !AllMarios.ContainsKey(child))
         {
             ResoniteMod.Msg("Adding existing Mario for SlotID: " + child.ReferenceID);
             var mario = new SM64Mario(child, this);
-            Marios.Add(child, mario);
+            AllMarios.Add(child, mario);
         }
     }
 
@@ -263,7 +264,7 @@ public sealed partial class SM64Context : IDisposable
 
         ProcessAudio();
 
-        List<SM64Mario> marios = Marios.Values.GetTempList();
+        List<SM64Mario> marios = AllMarios.Values.GetTempList();
         foreach (SM64Mario mario in marios)
         {
             mario.ContextUpdateSynced();
@@ -280,7 +281,7 @@ public sealed partial class SM64Context : IDisposable
             dynamicCol?.ContextFixedUpdateSynced();
         }
 
-        List<SM64Mario> marios = Marios.Values.GetTempList();
+        List<SM64Mario> marios = AllMarios.Values.GetTempList();
         foreach (SM64Mario mario in marios)
         {
             mario?.ContextFixedUpdateSynced();
@@ -298,12 +299,12 @@ public sealed partial class SM64Context : IDisposable
         bool success = EnsureInstanceExists(slot.World, out SM64Context instance);
         if (!success) return null;
 
-        if (!instance.Marios.ContainsKey(slot))
+        if (!instance.AllMarios.ContainsKey(slot))
         {
             slot.Parent = instance.MyMariosSlot;
 
             mario = new SM64Mario(slot, instance);
-            instance.Marios.Add(slot, mario);
+            instance.AllMarios.Add(slot, mario);
             if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
         }
 
@@ -311,11 +312,11 @@ public sealed partial class SM64Context : IDisposable
 
         slot.Parent.RunInUpdates(3, () =>
         {
-            slot.Parent.Children.Where(x => x.Tag == MarioTag && !instance.Marios.ContainsKey(x)).Do(root2 =>
+            slot.Parent.Children.Where(x => x.Tag == MarioTag && !instance.AllMarios.ContainsKey(x)).Do(root2 =>
             {
                 ResoniteMod.Msg("Adding existing Mario for SlotID: " + root2.ReferenceID);
                 var mario2 = new SM64Mario(root2, instance);
-                instance.Marios.Add(root2, mario2);
+                instance.AllMarios.Add(root2, mario2);
             });
         });
 
@@ -328,9 +329,9 @@ public sealed partial class SM64Context : IDisposable
     {
         Interop.MarioDelete(mario.MarioId);
 
-        mario.Context.Marios.Remove(mario.MarioSlot);
+        mario.Context.AllMarios.Remove(mario.MarioSlot);
 
-        if (mario.Context.Marios.Count == 0)
+        if (mario.Context.AllMarios.Count == 0)
         {
             Interop.StopMusic();
         }
@@ -387,13 +388,13 @@ public sealed partial class SM64Context : IDisposable
             ResoniteMod.Debug("Disposing SM64Context");
 
             // Explode Marios
-            List<SM64Mario> marios = Marios.Values.GetTempList();
+            List<SM64Mario> marios = AllMarios.Values.GetTempList();
             foreach (SM64Mario mario in marios)
             {
                 mario?.Dispose();
             }
 
-            Marios.Clear();
+            AllMarios.Clear();
 
             // Explode Colliders
             List<SM64DynamicCollider> dynamicColliders = DynamicColliders.Values.GetTempList();

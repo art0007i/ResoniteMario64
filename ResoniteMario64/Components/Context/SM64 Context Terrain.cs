@@ -144,14 +144,14 @@ public sealed partial class SM64Context
     // Dynamic Colliders
     private int RegisterDynamicCollider(Collider collider)
     {
-        if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider value))
+        if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
         {
-            if (value.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f))
+            if (dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f))
             {
                 return 20;
             }
 
-            value.Dispose();
+            dynamicCollider.Dispose();
         }
 
         SM64DynamicCollider col = new SM64DynamicCollider(collider, this);
@@ -208,7 +208,7 @@ public sealed partial class SM64Context
         {
             if (SM64Context.Instance == null) return;
 
-            __instance.RunInUpdates(1, () => SM64Context.Instance.HandleCollider(__instance));
+            __instance.RunInUpdates(1, () => SM64Context.Instance?.HandleCollider(__instance));
         }
 
         [HarmonyPatch("OnChanges"), HarmonyPostfix]
@@ -216,7 +216,7 @@ public sealed partial class SM64Context
         {
             if (SM64Context.Instance == null) return;
 
-            __instance.RunInUpdates(1, () => SM64Context.Instance.HandleCollider(__instance));
+            __instance.RunInUpdates(1, () => SM64Context.Instance?.HandleCollider(__instance));
         }
     }
 
@@ -246,7 +246,7 @@ public sealed partial class SM64Context
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
 
-        Utils.ParseTagParts(
+        Utils.TryParseTagParts(
             tagParts,
             out SM64Constants.SM64SurfaceType surfaceType,
             out SM64Constants.SM64TerrainType terrainType,
@@ -260,7 +260,7 @@ public sealed partial class SM64Context
                         ? "Added"
                         : "Already Added";
 
-        logDelegate($"{name} {state}: {collider.ReferenceID} | Name: {collider.Slot?.Name} | Tag: {tag ?? "No Tag"} | SurfaceType: {surfaceType} | TerrainType: {terrainType} | InteractableType: {interactableType} | InteractableId: {interactableId}");
+        logDelegate($"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType} ({interactableId})");
 #endif
     }
 }

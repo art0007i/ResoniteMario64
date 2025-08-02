@@ -131,7 +131,7 @@ public sealed class SM64Mario : IDisposable
 
         MarioSlot = slot;
         MarioSlot.Tag = MarioTag;
-        if (IsLocal) MarioSlot.Name += $" #{Context.Marios.Count(x => x.Value.IsLocal)}";
+        if (IsLocal) MarioSlot.Name += $" #{Context.AllMarios.Count(x => x.Value.IsLocal)}";
 
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
         MarioSpace.SpaceName.Value = MarioSpaceName;
@@ -491,7 +491,7 @@ public sealed class SM64Mario : IDisposable
             {
                 _isDying = true;
                 bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
-                if (IsLocal) MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
+                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
             }
 
@@ -507,7 +507,7 @@ public sealed class SM64Mario : IDisposable
             // if (currentStateFlags != syncedFlags) SetState(syncedAction);
             // if (currentStateAction != syncedAction) SetAction(syncedAction);
 
-            // Trigger the cap if the synced values have cap (if we already have the cape it will ignore)
+            // Trigger the cap if the synced values have cap (if we already have the cap it will ignore)
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
             {
                 WearCap(MarioCapType.VanishCap);
@@ -521,6 +521,11 @@ public sealed class SM64Mario : IDisposable
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap))
             {
                 WearCap(MarioCapType.WingCap, 40f);
+            }
+
+            if (Utils.HasCapType(SyncedStateFlags, MarioCapType.NormalCap))
+            {
+                WearCap(MarioCapType.NormalCap);
             }
 
             // Trigger teleport for remotes
@@ -550,7 +555,7 @@ public sealed class SM64Mario : IDisposable
         }
 
         // Just for now until Collider Shenanigans is implemented
-        List<SM64Mario> marios = Context.Marios.Values.GetTempList();
+        List<SM64Mario> marios = Context.AllMarios.Values.GetTempList();
         SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
         if (attackingMario != null)
         {
@@ -759,7 +764,7 @@ public sealed class SM64Mario : IDisposable
 
                 if (Utils.HasCapType(SyncedStateFlags, capType))
                 {
-                    Interop.MarioCapExtend(MarioId, duration);
+                    if (IsLocal) Interop.MarioCapExtend(MarioId, duration);
                 }
                 else
                 {
@@ -776,12 +781,9 @@ public sealed class SM64Mario : IDisposable
 
                 break;
             case MarioCapType.NormalCap:
-                SetState(CurrentState.StateFlags & ~(uint)(StateFlag.VanishCap | StateFlag.MetalCap | StateFlag.WingCap));
-                if (playMusic)
-                {
-                    Interop.StopMusic();
-                }
-
+                if (Utils.HasCapType(SyncedStateFlags, capType)) break;
+                
+                SetState(StateFlag.CapOnHead | StateFlag.NormalCap);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(capType), capType, null);
@@ -828,17 +830,26 @@ public sealed class SM64Mario : IDisposable
         float3 throwVelocityFlat = CurrentState.ScaledPosition - PreviousState.ScaledPosition;
         if (throwVelocityFlat.Magnitude > 0.01f)
         {
-            SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
+            if (IsLocal)
+            {
+                SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
+            }
             bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
             SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
-            SetVelocity(throwVelocityFlat);
-            SetForwardVelocity(throwVelocityFlat.Magnitude);
+            if (IsLocal)
+            {
+                SetVelocity(throwVelocityFlat);
+                SetForwardVelocity(throwVelocityFlat.Magnitude);
+            }
         }
         else
         {
-            SetFaceAngle(floatQ.LookRotation(MarioSlot.LocalRotation * float3.Forward));
-            SetVelocity(float3.Zero);
-            SetForwardVelocity(0f);
+            if (IsLocal)
+            {
+                SetFaceAngle(floatQ.LookRotation(MarioSlot.LocalRotation * float3.Forward));
+                SetVelocity(float3.Zero);
+                SetForwardVelocity(0f);
+            }
             SetAction(ActionFlag.Freefall);
         }
     }
@@ -857,16 +868,9 @@ public sealed class SM64Mario : IDisposable
 
     public void Heal(byte healthPoints)
     {
-        if (CurrentState.IsDead)
-        {
-            // Revive (not working)
-            Interop.MarioSetHealthPoints(MarioId, healthPoints + 1);
-            SetAction(ActionFlag.Idle);
-        }
-        else
-        {
-            Interop.MarioHeal(MarioId, healthPoints);
-        }
+        if (CurrentState.IsDead || !IsLocal) return;
+        
+        Interop.MarioHeal(MarioId, healthPoints);
     }
 
     public void HandleInteractable(SM64Interactable interactable)
@@ -881,11 +885,11 @@ public sealed class SM64Mario : IDisposable
         {
             case SM64InteractableType.GoldCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                if (IsLocal) Heal(1);
+                Heal(1);
                 break;
             case SM64InteractableType.BlueCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                if (IsLocal) Heal(5);
+                Heal(5);
                 break;
             case SM64InteractableType.RedCoin:
                 Sounds redCoinSound = typeId switch
@@ -901,23 +905,23 @@ public sealed class SM64Mario : IDisposable
                     _ => Sounds.SOUND_GENERAL_RED_COIN
                 };
                 Interop.PlaySoundGlobal(redCoinSound);
-                if (IsLocal) Heal(2);
+                Heal(2);
                 break;
             case SM64InteractableType.VanishCap:
-                if (IsLocal) WearCap(MarioCapType.VanishCap);
+                WearCap(MarioCapType.VanishCap);
                 break;
             case SM64InteractableType.MetalCap:
-                if (IsLocal) WearCap(MarioCapType.MetalCap);
+                WearCap(MarioCapType.MetalCap);
                 break;
             case SM64InteractableType.WingCap:
-                if (IsLocal) WearCap(MarioCapType.WingCap);
+                WearCap(MarioCapType.WingCap);
                 break;
             case SM64InteractableType.NormalCap:
-                if (IsLocal) WearCap(MarioCapType.NormalCap);
+                WearCap(MarioCapType.NormalCap);
                 break;
             case SM64InteractableType.Star:
                 Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
-                if (IsLocal) Heal(8);
+                Heal(8);
                 SetForwardVelocity(0f);
                 SetAction(ActionFlag.Freefall);
                 break;
@@ -937,15 +941,13 @@ public sealed class SM64Mario : IDisposable
                 disable = false;
                 break;
             case SM64InteractableType.None:
+                disable = false;
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
-
-        if (IsLocal)
-        {
-            interactable.Collider.Slot.ActiveSelf = !disable;
-        }
+        
+        interactable.Collider.Slot.ActiveSelf = !disable;
     }
 
     private enum Button
@@ -972,13 +974,13 @@ public sealed class SM64Mario : IDisposable
             {
                 if (MarioSlot is { IsRemoved: false })
                 {
-                    MarioSlot.Destroy();
+                    MarioSlot?.Destroy();
                 }
             }
 
             if (_marioRendererSlot is { IsRemoved: false })
             {
-                _marioRendererSlot.Destroy();
+                _marioRendererSlot?.Destroy();
             }
         }
 
