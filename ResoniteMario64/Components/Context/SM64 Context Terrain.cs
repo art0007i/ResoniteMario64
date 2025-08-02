@@ -123,12 +123,13 @@ public sealed partial class SM64Context
     // Static Colliders
     private int RegisterStaticCollider(Collider collider)
     {
+        QueueStaticSurfacesUpdate();
+        
         if (StaticColliders.Contains(collider))
         {
             return 10;
         }
-
-        QueueStaticSurfacesUpdate();
+        
         StaticColliders.Add(collider);
         return 1;
     }
@@ -136,6 +137,7 @@ public sealed partial class SM64Context
     private void UnregisterStaticCollider(Collider collider)
     {
         QueueStaticSurfacesUpdate();
+        
         StaticColliders.Remove(collider);
     }
 
