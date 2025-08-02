@@ -78,7 +78,7 @@ public sealed class SM64DynamicCollider : IDisposable
             return;
         }
         
-        col.Slot.OnPrepareDestroy += _ => { Dispose(); };
+        // col.Slot.OnPrepareDestroy += _ => { Dispose(); };
         
         List<SM64Surface> surfaces = Utils.GetScaledSurfaces(col, new List<SM64Surface>(), SurfaceType, TerrainType);
         ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());

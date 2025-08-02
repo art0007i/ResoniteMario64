@@ -96,7 +96,7 @@ public sealed partial class SM64Context : IDisposable
         // Update context's colliders
         Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
         ResoniteMario64.KeyMaxMeshColliderTris.OnChanged += _ => { _forceUpdate = true; };
-        world.RunInUpdates(3, () => { World.RootSlot.ForeachComponentInChildren<Collider>(AddCollider); });
+        world.RunInUpdates(3, () => World.RootSlot.ForeachComponentInChildren<Collider>(HandleCollider));
     }
 
     public void InitContextWorld(World world)
@@ -249,8 +249,8 @@ public sealed partial class SM64Context : IDisposable
 
         if (_forceUpdate)
         {
-            StaticTerrainUpdate();
             _forceUpdate = false;
+            Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
         }
 
         HandleInputs();

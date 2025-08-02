@@ -34,10 +34,10 @@ public sealed class SM64Interactable : IDisposable
         {
             if (Utils.CheckDebug()) ResoniteMod.Warn($"[InteractMeshCollider] {mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
             Dispose();
-            return;
+            // return;
         }
         
-        col.Slot.OnPrepareDestroy += _ => { Dispose(); };
+        // col.Slot.OnPrepareDestroy += _ => { Dispose(); };
     }
 
     public void Dispose()

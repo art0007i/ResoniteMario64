@@ -26,7 +26,7 @@ public sealed partial class SM64Context
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
-        if (inp.GetKeyUp(Key.Period) || inp.GetDevices<StandardGamepad>().Any(x => x.Menu.Pressed))
+        if (inp.GetKeyUp(Key.Period))
         {
             MovementBlocked = !MovementBlocked;
         }
@@ -38,7 +38,7 @@ public sealed partial class SM64Context
             InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
             InteractionHandler off = main.OtherTool;
 
-            Joystick = off.Inputs.Axis.CurrentValue;
+            Joystick = off.Controller is IndexController controller ? controller.Joystick.Value : off.Inputs.Axis.CurrentValue;
             Jump = main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held;
             Stomp = main.Inputs.Grab.Held;
             Kick = main.Inputs.Interact.Held;
@@ -57,7 +57,7 @@ public sealed partial class SM64Context
         }
         else if (shouldGamepad)
         {
-            float2 accum = float2.Zero;
+            float2 accum = Utils.Float2Zero;
             bool jump = false;
             bool stomp = false;
             bool kick = false;
@@ -67,17 +67,17 @@ public sealed partial class SM64Context
                 accum += d.LeftThumbstick.Value;
                 jump |= d.A.Held;
                 stomp |= d.LeftTrigger.Value > 0.1f;
-                kick |= d.B.Held;
+                kick |= d.X.Held;
             });
 
-            Joystick = MathX.Clamp(accum, -float2.One, float2.One);
+            Joystick = MathX.Clamp(accum, Utils.Float2NegOne, Utils.Float2One);
             Jump = jump;
             Stomp = stomp;
             Kick = kick;
         }
         else
         {
-            Joystick = float2.Zero;
+            Joystick = Utils.Float2Zero;
             Jump = false;
             Stomp = false;
             Kick = false;
@@ -85,12 +85,15 @@ public sealed partial class SM64Context
 
         if (InputBlock == null || InputBlock.IsRemoved)
         {
-            Comment block = World.LocalUser.Root.Slot.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
-            block.Text.Value = InputBlockTag;
-            InputBlock = block;
+            Comment block = World.LocalUser.Root?.Slot?.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
+            if (block != null)
+            {
+                block.Text.Value = InputBlockTag;
+                InputBlock = block;
+            }
         }
 
-        LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
+        LocomotionController loco = World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco != null)
         {
             if (AnyControlledMarios && !inp.VR_Active && MovementBlocked && !shouldGamepad)
@@ -110,12 +113,12 @@ public sealed partial class SM64Context
 
     private float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
-        float2 input = float2.Zero;
+        float2 input = Utils.Float2Zero;
         
-        if (up) input += new float2(0f, 1f);
-        if (down) input += new float2(0f, -1f);
-        if (left) input += new float2(1f);
-        if (right) input += new float2(-1f);
+        if (up) input += Utils.Float2Up;
+        if (down) input += Utils.Float2Down;
+        if (left) input += Utils.Float2Left;
+        if (right) input += Utils.Float2Right;
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
         return length > 1.0f
@@ -128,8 +131,7 @@ public sealed partial class SM64Context
            (Instance?.AnyControlledMarios ?? false) &&
            c.InputInterface.VR_Active &&
            c.Side.Value == hand &&
-           (Instance?.World?.LocalUser.HasActiveFocus() ?? false) &&
-           (Instance?.MovementBlocked ?? false);
+           (!Instance?.World?.LocalUser.HasActiveFocus() ?? false);
 
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker

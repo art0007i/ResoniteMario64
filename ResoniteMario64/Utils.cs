@@ -14,7 +14,15 @@ namespace ResoniteMario64;
 public static class Utils
 {
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
-    public static readonly colorX White = colorX.White;
+    public static readonly colorX ColorXWhite = colorX.White;
+    
+    public static readonly float2 Float2Zero = float2.Zero;
+    public static readonly float2 Float2One = float2.One;
+    public static readonly float2 Float2NegOne = -float2.One;
+    public static readonly float2 Float2Up = new float2(0, 1);
+    public static readonly float2 Float2Down = new float2(0, -1);
+    public static readonly float2 Float2Left = new float2(1);
+    public static readonly float2 Float2Right = new float2(-1);
     
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
     {
@@ -105,12 +113,12 @@ public static class Utils
         bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
     }
 
-    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx)
+    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;
         interactableType = SM64InteractableType.GoldCoin;
-        idx = -1;
+        interactableId = -1;
 
         if (tagParts == null) return;
 
@@ -153,7 +161,7 @@ public static class Utils
                     
                     if (int.TryParse(indexString, out int parsedIndex))
                     {
-                        idx = parsedIndex;
+                        interactableId = parsedIndex;
                     }
                 }
             }

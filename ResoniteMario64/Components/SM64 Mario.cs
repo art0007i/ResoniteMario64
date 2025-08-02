@@ -318,9 +318,13 @@ public sealed class SM64Mario : IDisposable
         ResoniteMod.Debug("buffers 👍");
 
         // Create Mario Slot
+#if DEBUG
         _marioRendererSlot = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal)
                 ? MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}")
                 : MarioSlot.World.AddSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}", false);
+#else
+        _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
+#endif
 
         _marioMeshRenderer = _marioRendererSlot.AttachComponent<MeshRenderer>();
         _marioMeshProvider = _marioRendererSlot.AttachComponent<LocalMeshProvider>();
@@ -611,9 +615,9 @@ public sealed class SM64Mario : IDisposable
         }
         else
         {
-            if (_marioMaterialClipped.AlbedoColor.Value != Utils.White)
+            if (_marioMaterialClipped.AlbedoColor.Value != Utils.ColorXWhite)
             {
-                _marioMaterialClipped.AlbedoColor.Value = Utils.White;
+                _marioMaterialClipped.AlbedoColor.Value = Utils.ColorXWhite;
             }
 
             if (_marioMaterialClipped.RenderQueue.Value != -1)
@@ -748,11 +752,11 @@ public sealed class SM64Mario : IDisposable
             case MarioCapType.MetalCap:
             case MarioCapType.WingCap:
                 // Prevent Vanish and Wing from being active at the same time - This prevents a crash
-                if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap   && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+                if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
                 {
                     break;
                 }
-                
+
                 if (Utils.HasCapType(SyncedStateFlags, capType))
                 {
                     Interop.MarioCapExtend(MarioId, duration);
@@ -919,15 +923,14 @@ public sealed class SM64Mario : IDisposable
                 break;
             case SM64InteractableType.Damage:
                 bool isMarioCollider = interactable.Collider.Slot.IsChildOf(MarioSlot);
-
-                uint damage = typeId switch
-                {
-                    -1 or >= 10 => 1,
-                    _           => (uint)typeId
-                };
-
                 if (!isMarioCollider)
                 {
+                    uint damage = typeId switch
+                    {
+                        -1 or >= 10 => 1,
+                        _           => (uint)typeId
+                    };
+
                     TakeDamage(interactable.Collider.Slot.GlobalPosition, damage);
                 }
 

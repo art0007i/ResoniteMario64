@@ -1,18 +1,108 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.libsm64;
+using ResoniteModLoader;
 
 namespace ResoniteMario64.Components.Context;
 
 public sealed partial class SM64Context
 {
+    internal readonly List<Collider> StaticColliders = new List<Collider>();
     internal readonly Dictionary<Collider, SM64DynamicCollider> DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
     internal readonly List<Collider> WaterBoxes = new List<Collider>();
-    
+
+    public void HandleCollider(Collider collider)
+    {
+        if (collider == null) return;
+        if (collider.IsDestroyed)
+        {
+            HandleColliderDestroyed(collider);
+            return;
+        }
+
+        int? added = TryAddCollider(collider);
+        if (added != null)
+        {
+            collider.Destroyed -= HandleColliderDestroyed;
+            collider.Destroyed += HandleColliderDestroyed;
+        }
+
+        LogCollider(collider, added, collider.IsDestroyed);
+    }
+
+    private void HandleColliderDestroyed(IDestroyable instance)
+    {
+        if (instance is not Collider collider) return;
+
+        int? removed = TryRemoveCollider(collider);
+        if (removed != null)
+        {
+            collider.Destroyed -= HandleColliderDestroyed;
+        }
+
+        LogCollider(collider, removed, true);
+    }
+
+    private int? TryAddCollider(Collider collider)
+    {
+        if (Utils.IsGoodStaticCollider(collider))
+        {
+            return RegisterStaticCollider(collider);
+        }
+
+        if (Utils.IsGoodDynamicCollider(collider))
+        {
+            return RegisterDynamicCollider(collider);
+        }
+
+        if (Utils.IsGoodInteractable(collider))
+        {
+            return RegisterInteractable(collider);
+        }
+
+        if (Utils.IsGoodWaterBox(collider))
+        {
+            return RegisterWaterBox(collider);
+        }
+
+        return null;
+    }
+
+    private int? TryRemoveCollider(Collider collider)
+    {
+        if (StaticColliders.Contains(collider))
+        {
+            UnregisterStaticCollider(collider);
+            return 1;
+        }
+
+        if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
+        {
+            dynamicCollider.Dispose();
+            return 2;
+        }
+
+        if (Interactables.TryGetValue(collider, out SM64Interactable interactable))
+        {
+            interactable.Dispose();
+            return 3;
+        }
+
+        if (WaterBoxes.Contains(collider))
+        {
+            UnregisterWaterBox(collider);
+            return 4;
+        }
+
+        return null;
+    }
+
     private static Timer _staticUpdateTimer;
+
     public void QueueStaticSurfacesUpdate()
     {
         if (_staticUpdateTimer != null) return;
@@ -23,113 +113,152 @@ public sealed partial class SM64Context
             _staticUpdateTimer.Stop();
             _staticUpdateTimer.Dispose();
             _staticUpdateTimer = null;
-            
+
             _forceUpdate = true;
         };
         _staticUpdateTimer.AutoReset = false;
         _staticUpdateTimer.Start();
     }
 
-    private void StaticTerrainUpdate()
+    // Static Colliders
+    private int RegisterStaticCollider(Collider collider)
     {
-        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
+        if (StaticColliders.Contains(collider))
+        {
+            return 10;
+        }
+
+        QueueStaticSurfacesUpdate();
+        StaticColliders.Add(collider);
+        return 1;
     }
 
-    public void AddCollider(Collider instance)
+    private void UnregisterStaticCollider(Collider collider)
     {
-        if (Utils.IsGoodStaticCollider(instance))
-        {
-            QueueStaticSurfacesUpdate();
+        QueueStaticSurfacesUpdate();
+        StaticColliders.Remove(collider);
+    }
 
-            instance.Slot.OnPrepareDestroy -= HandleStaticColliderDestroyed;
-            instance.Slot.OnPrepareDestroy += HandleStaticColliderDestroyed;
-        }
-
-        if (Utils.IsGoodDynamicCollider(instance))
+    // Dynamic Colliders
+    private int RegisterDynamicCollider(Collider collider)
+    {
+        if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider value))
         {
-            RegisterDynamicCollider(instance);
-        }
-        
-        if (Utils.IsGoodInteractable(instance))
-        {
-            RegisterInteractable(instance);
-        }
-        
-        if (Utils.IsGoodWaterBox(instance))
-        {
-            if (!WaterBoxes.Contains(instance))
+            if (value.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f))
             {
-                WaterBoxes.Add(instance);
-                
-                instance.Slot.OnPrepareDestroy -= HandleWaterBoxDestroyed;
-                instance.Slot.OnPrepareDestroy += HandleWaterBoxDestroyed;
-            }
-        }
-    }
-
-    private void HandleStaticColliderDestroyed(Slot slot)
-    {
-        _forceUpdate = true;
-    }
-    
-    private void HandleWaterBoxDestroyed(Slot slot)
-    {
-        slot.ForeachComponentInChildren<Collider>(col =>
-        {
-            WaterBoxes.Remove(col);
-        });
-    }
-
-    public void RegisterDynamicCollider(Collider surfaceObject)
-    {
-        if (DynamicColliders.TryGetValue(surfaceObject, out SM64DynamicCollider value))
-        {
-            if (value.InitScale.Approximately(surfaceObject.Slot.GlobalScale, 0.001f))
-            {
-                return;
+                return 20;
             }
 
             value.Dispose();
         }
 
-        SM64DynamicCollider col = new SM64DynamicCollider(surfaceObject, this);
-        DynamicColliders.Add(surfaceObject, col);
+        SM64DynamicCollider col = new SM64DynamicCollider(collider, this);
+        DynamicColliders.Add(collider, col);
+        return 2;
     }
 
-    public void UnregisterDynamicCollider(Collider surfaceObject)
+    internal void UnregisterDynamicCollider(Collider collider)
     {
-        DynamicColliders.Remove(surfaceObject);
+        DynamicColliders.Remove(collider);
     }
-    
-    public void RegisterInteractable(Collider surfaceObject)
+
+    // Interactables
+    private int RegisterInteractable(Collider collider)
     {
-        if (Interactables.ContainsKey(surfaceObject))
+        if (Interactables.ContainsKey(collider))
         {
-            return;
+            return 30;
         }
 
-        SM64Interactable col = new SM64Interactable(surfaceObject, this);
-        Interactables.Add(surfaceObject, col);
+        SM64Interactable col = new SM64Interactable(collider, this);
+        Interactables.Add(collider, col);
+        return 3;
     }
 
-    public void UnregisterInteractable(Collider surfaceObject)
+    internal void UnregisterInteractable(Collider collider)
     {
-        Interactables.Remove(surfaceObject);
+        Interactables.Remove(collider);
     }
 
+    // WaterBoxes
+    private int RegisterWaterBox(Collider collider)
+    {
+        if (WaterBoxes.Contains(collider))
+        {
+            return 40;
+        }
+
+        WaterBoxes.Add(collider);
+        return 4;
+    }
+
+    private void UnregisterWaterBox(Collider collider)
+    {
+        WaterBoxes.Remove(collider);
+    }
+
+    // Patches
     [HarmonyPatch(typeof(Collider))]
     public class ColliderPatch
     {
         [HarmonyPatch("OnAwake"), HarmonyPostfix]
         public static void OnAwakePatch(Collider __instance)
         {
-            __instance.RunInUpdates(1, () => { SM64Context.Instance?.AddCollider(__instance); });
+            if (SM64Context.Instance == null) return;
+
+            __instance.RunInUpdates(1, () => SM64Context.Instance.HandleCollider(__instance));
         }
 
         [HarmonyPatch("OnChanges"), HarmonyPostfix]
         public static void OnChangesPatch(Collider __instance)
         {
-            __instance.RunInUpdates(1, () => { SM64Context.Instance?.AddCollider(__instance); });
+            if (SM64Context.Instance == null) return;
+
+            __instance.RunInUpdates(1, () => SM64Context.Instance.HandleCollider(__instance));
         }
+    }
+
+    private static void LogCollider(object obj, int? added, bool destroyed)
+    {
+#if DEBUG
+        if (!ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLogColliderChanges)) return;
+        if (obj is not Collider collider) return;
+        if (added == null) return;
+
+        bool isNewlyAdded = added is 1 or 2 or 3 or 4;
+        string name = added switch
+        {
+            1 or 10 => "Static Collider",
+            2 or 20 => "Dynamic Collider",
+            3 or 30 => "Interactable",
+            4 or 40 => "WaterBox",
+            _       => "Collider"
+        };
+
+        Action<string> logDelegate = destroyed
+                ? ResoniteMod.Error
+                : isNewlyAdded
+                        ? ResoniteMod.Msg
+                        : ResoniteMod.Warn;
+
+        string tag = collider.Slot?.Tag;
+        string[] tagParts = tag?.Split(',');
+
+        Utils.ParseTagParts(
+            tagParts,
+            out SM64Constants.SM64SurfaceType surfaceType,
+            out SM64Constants.SM64TerrainType terrainType,
+            out SM64Constants.SM64InteractableType interactableType,
+            out int interactableId
+        );
+
+        string state = destroyed
+                ? "Destroyed"
+                : isNewlyAdded
+                        ? "Added"
+                        : "Already Added";
+
+        logDelegate($"{name} {state}: {collider.ReferenceID} | Name: {collider.Slot?.Name} | Tag: {tag ?? "No Tag"} | SurfaceType: {surfaceType} | TerrainType: {terrainType} | InteractableType: {interactableType} | InteractableId: {interactableId}");
+#endif
     }
 }
