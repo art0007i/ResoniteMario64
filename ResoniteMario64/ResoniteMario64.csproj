@@ -18,6 +18,7 @@
         <CopyLocal>false</CopyLocal>
 
         <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
+        <CopyPdbToMods Condition="'$(CopyPdbToMods)'==''">true</CopyPdbToMods>
         <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
         <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -44,12 +45,14 @@
     <ItemGroup Condition="'$(IsNet9)' == 'true'">
         <Reference Include="Renderite.Shared">
             <HintPath>$(GameLibs)Renderite.Shared.dll</HintPath>
+            <Private>False</Private>
         </Reference>
     </ItemGroup>
 
     <ItemGroup Condition="'$(IsNet9)' == 'false'">
         <Reference Include="System.Memory">
             <HintPath>$(GameLibs)System.Memory.dll</HintPath>
+            <Private>False</Private>
         </Reference>
     </ItemGroup>
 
@@ -58,28 +61,36 @@
             <HintPath>$(GamePath)rml_libs\0Harmony.dll</HintPath>
             <HintPath Condition="Exists('$(GamePath)0Harmony.dll')">$(GamePath)0Harmony.dll</HintPath>
             <HintPath Condition="Exists('$(GamePath)Libraries\0Harmony.dll')">$(GamePath)Libraries\0Harmony.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="Elements.Core">
             <HintPath>$(GameLibs)Elements.Core.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="Awwdio">
             <HintPath>$(GameLibs)Awwdio.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="SkyFrost.Base.Models">
             <HintPath>$(GameLibs)SkyFrost.Base.Models.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="Elements.Assets">
             <HintPath>$(GameLibs)Elements.Assets.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="BepuPhysics">
             <HintPath>$(GameLibs)BepuPhysics.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="FrooxEngine">
             <HintPath>$(GameLibs)FrooxEngine.dll</HintPath>
+            <Private>False</Private>
         </Reference>
         <Reference Include="ResoniteModLoader">
             <HintPath>$(GamePath)ResoniteModLoader.dll</HintPath>
             <HintPath>$(GamePath)Libraries\ResoniteModLoader.dll</HintPath>
+            <Private>False</Private>
         </Reference>
     </ItemGroup>
 
@@ -93,6 +104,11 @@
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)rml_mods"/>
         <Message Text="Copied $(TargetFileName) to $(GamePath)rml_mods" Importance="high"/>
     </Target>
-
-
+    <Target Name="PostBuild2" AfterTargets="PostBuild" Condition="'$(CopyPdbToMods)'=='true'">
+        <ItemGroup>
+            <PdbFile Include="$(TargetDir)$(TargetName).pdb" />
+        </ItemGroup>
+        <Copy SourceFiles="@(PdbFile)" DestinationFolder="$(GamePath)rml_mods" />
+        <Message Text="Copied $(TargetName).pdb to $(GamePath)rml_mods" Importance="high"/>
+    </Target>
 </Project>

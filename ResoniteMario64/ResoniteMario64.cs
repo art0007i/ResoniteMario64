@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Elements.Core;
@@ -102,6 +103,7 @@ public class ResoniteMario64 : ResoniteMod
 
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
+    internal static string AssemblyMD5Hash = "";
 
     // Internal
     internal static bool FilesLoaded;
@@ -151,7 +153,7 @@ public class ResoniteMario64 : ResoniteMod
             using MD5 md5 = MD5.Create();
             using FileStream smRomFileSteam = File.OpenRead(smRomPath);
             byte[] smRomFileMd5Hash = md5.ComputeHash(smRomFileSteam);
-            string smRomFileMd5HashHex = BitConverter.ToString(smRomFileMd5Hash).Replace("-", "").ToLowerInvariant();
+            string smRomFileMd5HashHex = Convert.ToHexStringLower(smRomFileMd5Hash);
 
             if (smRomFileMd5HashHex != SuperMario64UsZ64RomHashHex)
             {
@@ -167,6 +169,21 @@ public class ResoniteMario64 : ResoniteMod
             Error("Failed to Load the Super Mario 64 [US] z64 ROM");
             Error(ex);
             return;
+        }
+
+        try
+        {
+            using MD5 md5 = MD5.Create();
+            using FileStream assemblyHash = File.OpenRead(Assembly.GetExecutingAssembly().Location);
+            byte[] assemblyMD5Hash = md5.ComputeHash(assemblyHash);
+            AssemblyMD5Hash = Convert.ToHexStringLower(assemblyMD5Hash);
+
+            Msg($"Our Assembly MD5Hash - {AssemblyMD5Hash}");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
         }
 
         FilesLoaded = true;
@@ -198,29 +215,40 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    [HarmonyPatch(typeof(World), "StartRunning")]
+    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] {typeof(WorldManager), typeof(bool), typeof(bool)})]
     public class WorldStartRunningPatch
     {
         public static void Postfix(World __instance)
         {
+            Msg($"Assembly called Ctor - {AssemblyMD5Hash}");
+            
             if (__instance.IsUserspace()) return;
+            if (Engine.Current?.WorldManager == null) return;
 
-            __instance.RunInUpdates(1, () =>
+            Engine.Current.WorldManager.WorldFocused += Sub;
+            return;
+            
+            void Sub(World world)
             {
-                Slot contextSlot = SM64Context.GetTempSlot(__instance).FindChild(x => x.Tag == ContextTag);
-                if (contextSlot == null) return;
-
-                if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
+                if (world == __instance && world.Focus == World.WorldFocus.Focused)
                 {
-                    context.MarioContainersSlot.ForeachChild(slot =>
+                    Slot contextSlot = SM64Context.GetTempSlot(__instance).FindChild(x => x.Tag == ContextTag);
+                    if (contextSlot == null) return;
+
+                    if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
                     {
-                        if (slot.Tag == MarioTag)
+                        context?.MarioContainersSlot.ForeachChild(slot =>
                         {
-                            SM64Context.TryAddMario(slot);
-                        }
-                    });
+                            if (slot.Tag == MarioTag)
+                            {
+                                SM64Context.TryAddMario(slot);
+                            }
+                        });
+                    }
+                
+                    Engine.Current.WorldManager.WorldFocused -= Sub;
                 }
-            });
+            }
         }
     }
 

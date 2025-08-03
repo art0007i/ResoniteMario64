@@ -61,27 +61,34 @@ public sealed partial class SM64Context
                 _marioAudioOutput = localAudio;
             }
 
-            Slot globalSlot = ContextSlot.FindChildOrAdd(AudioSlotName, false);
-            globalSlot.Tag = AudioTag;
-
-            AudioOutput globalAudio = globalSlot.GetComponentOrAttach<AudioOutput>(out bool globalAttached);
-            if (globalAttached || globalAudio.Source.Target == null)
+            Slot globalSlot = ContextSlot?.FindChildOrAdd(AudioSlotName, false);
+            AudioOutput globalAudio = null;
+            if (globalSlot != null)
             {
-                globalAudio.Source.Target = _marioAudioStream;
-                globalAudio.Volume.Value = defaultVolume;
-                globalAudio.SpatialBlend.Value = 0;
-                globalAudio.Spatialize.Value = false;
-                globalAudio.DopplerLevel.Value = 0;
-                globalAudio.IgnoreAudioEffects.Value = true;
-                globalAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+                globalSlot.Tag = AudioTag;
+
+                globalAudio = globalSlot.GetComponentOrAttach<AudioOutput>(out bool globalAttached);
+                if (globalAttached || globalAudio.Source.Target == null)
+                {
+                    globalAudio.Source.Target = _marioAudioStream;
+                    globalAudio.Volume.Value = defaultVolume;
+                    globalAudio.SpatialBlend.Value = 0;
+                    globalAudio.Spatialize.Value = false;
+                    globalAudio.DopplerLevel.Value = 0;
+                    globalAudio.IgnoreAudioEffects.Value = true;
+                    globalAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
+                }
             }
 
             userSlot.RunInUpdates(userSlot.LocalUser.AllocationID + 1, () =>
             {
                 float volume = useLocalAudio ? 0f : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
 
-                ValueUserOverride<float> overrideForUser = globalAudio.Volume.OverrideForUser(userSlot.LocalUser, volume);
-                overrideForUser.Default.Value = defaultVolume;
+                ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(userSlot.LocalUser, volume);
+                if (overrideForUser != null)
+                {
+                    overrideForUser.Default.Value = defaultVolume;
+                }
             });
 
             if (!useLocalAudio)
@@ -90,8 +97,11 @@ public sealed partial class SM64Context
                 _marioAudioOutput = globalAudio;
             }
 
-            AudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
-            AudioSlot.OnPrepareDestroy += HandleAudioDestroy;
+            if (AudioSlot != null)
+            {
+                AudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+                AudioSlot.OnPrepareDestroy += HandleAudioDestroy;
+            }
 
             ResoniteMario64.KeyLocalAudio.OnChanged -= HandleLocalAudioChange;
             ResoniteMario64.KeyLocalAudio.OnChanged += HandleLocalAudioChange;
