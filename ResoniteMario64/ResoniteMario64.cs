@@ -28,10 +28,10 @@ public class ResoniteMario64 : ResoniteMod
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<bool> KeyUseGamepad = new ModConfigurationKey<bool>("use_gamepad", "Whether to use gamepads for input or not.", () => false);
 
+    // AUDIO
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> Spacer1 = new ModConfigurationKey<dummy>(" ", " ", () => new dummy());
 
-    // AUDIO
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> AudioSeparator = new ModConfigurationKey<dummy>("----------- Audio Settings -----------", "----------- Audio Settings -----------", () => new dummy());
 
@@ -50,10 +50,10 @@ public class ResoniteMario64 : ResoniteMod
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<bool> KeyLocalAudio = new ModConfigurationKey<bool>("local_audio", "Whether to play the Audio Locally or not.", () => true);
 
+    // PERFORMANCE
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> Spacer2 = new ModConfigurationKey<dummy>("  ", "  ", () => new dummy());
 
-    // PERFORMANCE
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> PerformanceSeparator = new ModConfigurationKey<dummy>("----------- Performance Settings -----------", "----------- Performance Settings -----------", () => new dummy());
 
@@ -61,18 +61,18 @@ public class ResoniteMario64 : ResoniteMod
     public static readonly ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
 
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios. -- UNUSED", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
+    public static readonly ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios. -- UNUSED", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
 
     [AutoRegisterConfigKey]
-    public static ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine. -- UNUSED", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
+    public static readonly ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine. -- UNUSED", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
 
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<int> KeyMaxMeshColliderTris = new ModConfigurationKey<int>("max_mesh_collider_tris", "Maximum total number of triangles of automatically generated from mesh colliders allowed.", () => 50000); // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
 
+    // ENGINE
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> Spacer3 = new ModConfigurationKey<dummy>("   ", "   ", () => new dummy());
 
-    // ENGINE
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> EngineSeparator = new ModConfigurationKey<dummy>("----------- Engine Settings -----------", "----------- Engine Settings -----------", () => new dummy());
 
@@ -86,6 +86,7 @@ public class ResoniteMario64 : ResoniteMod
     public static readonly ModConfigurationKey<Uri> KeyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
 
 #if DEBUG
+    // DEBUG
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<dummy> Spacer4 = new ModConfigurationKey<dummy>("    ", "    ", () => new dummy());
 
@@ -113,8 +114,12 @@ public class ResoniteMario64 : ResoniteMod
     {
         Config = GetConfiguration();
 
-        // Extract the native binary to the root Resonite folder
+        // Extract the native binary to the correct Resonite folder
+#if IsNet9
         const string dllName = "sm64.dll";
+#else
+        const string dllName = @"Resonite_Data\Plugins\x86_64\sm64.dll";
+#endif
         try
         {
             Msg($"Copying the sm64.dll to Resonite/{dllName}");
@@ -194,7 +199,7 @@ public class ResoniteMario64 : ResoniteMod
     }
 
     [HarmonyPatch(typeof(World), "StartRunning")]
-    private class WorldStartRunningPatch
+    public class WorldStartRunningPatch
     {
         public static void Postfix(World __instance)
         {
@@ -202,23 +207,18 @@ public class ResoniteMario64 : ResoniteMod
 
             __instance.RunInUpdates(1, () =>
             {
-                Slot tempSlot = __instance.RootSlot.FindChild(TempSlotName);
-                if (tempSlot != null)
+                Slot contextSlot = SM64Context.GetTempSlot(__instance).FindChild(x => x.Tag == ContextTag);
+                if (contextSlot == null) return;
+
+                if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
                 {
-                    Slot contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
-                    if (contextSlot != null)
+                    context.MarioContainersSlot.ForeachChild(slot =>
                     {
-                        if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
+                        if (slot.Tag == MarioTag)
                         {
-                            context.MarioContainersSlot.ForeachChild(slot =>
-                            {
-                                if (slot.Tag == MarioTag)
-                                {
-                                    SM64Context.TryAddMario(slot);
-                                }
-                            });
+                            SM64Context.TryAddMario(slot);
                         }
-                    }
+                    });
                 }
             });
         }
@@ -308,13 +308,13 @@ public class ResoniteMario64 : ResoniteMod
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
-            ui.Button("Rebuild Static Surfaces").LocalPressed += (b, e) =>
+            ui.Button("Reload All Colliders").LocalPressed += (b, e) =>
             {
                 b.RunSynchronously(() =>
                 {
                     if (SM64Context.Instance != null)
                     {
-                        SM64Context.Instance.QueueStaticSurfacesUpdate();
+                        SM64Context.Instance.ReloadAllColliders();
                     }
                 });
             };
@@ -376,11 +376,12 @@ public class ResoniteMario64 : ResoniteMod
     }
 
 #if IsNet9
+    // This is just here because fuck these logs for now, until Pre-release actually Releases
     [HarmonyPatch(typeof(UniLog))]
     public class UniLogPatch
     {
-        private static readonly Regex SuppressRegex = new Regex(@"((?:Uploading|Unloading).*Texture\w*|Failed\s+gather|Failed\s+Load|State:\s*Failed|Received\s+status\s+update\s+that's\s+already\s+expired:)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace );
-        
+        private static readonly Regex SuppressRegex = new Regex(@"((?:Uploading|Unloading).*Texture\w*|Failed\s+gather|Failed\s+Load|State:\s*Failed|Received\s+status\s+update\s+that's\s+already\s+expired:)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
+
         private static bool ShouldLog(string message) => !SuppressRegex.IsMatch(message);
 
         [HarmonyPatch(nameof(UniLog.Log), new Type[] { typeof(string), typeof(bool) })]

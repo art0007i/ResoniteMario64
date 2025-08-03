@@ -20,7 +20,6 @@ public sealed class SM64DynamicCollider : IDisposable
     public SM64Context Context { get; }
 
     public Collider Collider { get; }
-    
 
     private float3 LastPosition { get; set; }
     private floatQ LastRotation { get; set; }
@@ -40,6 +39,7 @@ public sealed class SM64DynamicCollider : IDisposable
             }
         }
     }
+
     public floatQ GlobalRotation
     {
         get
@@ -55,19 +55,18 @@ public sealed class SM64DynamicCollider : IDisposable
         }
     }
 
-    private bool _enabled;
     private bool _disposed;
 
     public SM64DynamicCollider(Collider col, SM64Context instance)
     {
         World = col.World;
         Context = instance;
-        
+
         Collider = col;
         LastPosition = col.Slot.GlobalPosition;
         LastRotation = col.Slot.GlobalRotation;
         InitScale = col.Slot.GlobalScale;
-        
+
         string[] tagParts = col.Slot.Tag?.Split(',');
         Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out _);
 
@@ -77,18 +76,16 @@ public sealed class SM64DynamicCollider : IDisposable
             Dispose();
             return;
         }
-        
+
         // col.Slot.OnPrepareDestroy += _ => { Dispose(); };
-        
+
         List<SM64Surface> surfaces = Utils.GetScaledSurfaces(col, new List<SM64Surface>(), SurfaceType, TerrainType);
         ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
-
-        _enabled = true;
     }
 
     private bool UpdateCurrentPositionData()
     {
-        if (!_enabled || _disposed || Collider?.Slot == null) return false;
+        if (_disposed || Collider?.Slot == null) return false;
 
         if (GlobalPosition == LastPosition && GlobalRotation == LastRotation) return false;
 
@@ -122,7 +119,5 @@ public sealed class SM64DynamicCollider : IDisposable
             Context.UnregisterDynamicCollider(Collider);
             Interop.SurfaceObjectDelete(ObjectId);
         }
-
-        _enabled = false;
     }
 }

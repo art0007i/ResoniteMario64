@@ -18,7 +18,7 @@ public sealed class SM64Interactable : IDisposable
     public SM64Context Context { get; }
 
     public Collider Collider { get; }
-    
+
     private bool _disposed;
 
     public SM64Interactable(Collider col, SM64Context instance)
@@ -26,7 +26,7 @@ public sealed class SM64Interactable : IDisposable
         World = col.World;
         Context = instance;
         Collider = col;
-        
+
         string[] tagParts = col.Slot.Tag?.Split(',');
         Utils.TryParseTagParts(tagParts, out _, out _, out Type, out TypeId);
 
@@ -36,7 +36,7 @@ public sealed class SM64Interactable : IDisposable
             Dispose();
             // return;
         }
-        
+
         // col.Slot.OnPrepareDestroy += _ => { Dispose(); };
     }
 

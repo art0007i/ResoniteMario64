@@ -15,7 +15,7 @@ public static class Utils
 {
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
     public static readonly colorX ColorXWhite = colorX.White;
-    
+
     public static readonly float2 Float2Zero = float2.Zero;
     public static readonly float2 Float2One = float2.One;
     public static readonly float2 Float2NegOne = -float2.One;
@@ -23,7 +23,7 @@ public static class Utils
     public static readonly float2 Float2Down = new float2(0, -1);
     public static readonly float2 Float2Left = new float2(1);
     public static readonly float2 Float2Right = new float2(-1);
-    
+
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
@@ -154,11 +154,11 @@ public static class Utils
 
                 string enumName = enumSuffix.Substring(0, splitIndex);
                 string indexString = enumSuffix.Substring(splitIndex);
-                
+
                 if (Enum.TryParse(enumName, true, out SM64InteractableType parsedInteractable))
                 {
                     interactableType = parsedInteractable;
-                    
+
                     if (int.TryParse(indexString, out int parsedIndex))
                     {
                         interactableId = parsedIndex;

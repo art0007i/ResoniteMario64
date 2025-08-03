@@ -9,12 +9,12 @@
         <LangVersion>latest</LangVersion>
         <FileAlignment>512</FileAlignment>
         <Deterministic>true</Deterministic>
-        
+
         <GamePath>$(MSBuildThisFileDirectory)Resonite</GamePath>
         <GamePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</GamePath>
         <GamePath Condition="Exists('E:\Programs\Steam\steamapps\common\Resonite\')">E:\Programs\Steam\steamapps\common\Resonite\</GamePath>
         <GamePath Condition="Exists('C:\Users\colac\AppData\Local\RESO Launcher\profiles\prerelease\Game\')">C:\Users\colac\AppData\Local\RESO Launcher\profiles\prerelease\Game\</GamePath>
-        
+
         <CopyLocal>false</CopyLocal>
 
         <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
@@ -22,7 +22,7 @@
         <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
-    
+
     <PropertyGroup>
         <IsNet9 Condition="Exists('$(GamePath)\Resonite.dll')">true</IsNet9>
         <IsNet9 Condition="!Exists('$(GamePath)\Resonite.dll')">false</IsNet9>
@@ -36,7 +36,7 @@
 
     <PropertyGroup Condition="'$(IsNet9)' == 'true'">
         <TargetFramework>net9.0</TargetFramework>
-        
+
         <DefineConstants>IsNet9</DefineConstants>
         <GameLibs>$(GamePath)</GameLibs>
     </PropertyGroup>

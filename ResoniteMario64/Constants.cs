@@ -8,7 +8,7 @@ public static class Constants
     public const string ConfigSlotName = "Config";
     public const string AudioSlotName = "Audio";
     public const string MarioContainersSlotName = "Mario Containers";
-    
+
     // DynamicVariableSpaceTags
     public const string ContextSpaceName = "SM64Context";
     public const string MarioSpaceName = "Mario";
@@ -19,6 +19,7 @@ public static class Constants
     public const string ScaleVarName = "Scale";
     public const string WaterVarName = "WaterLevel";
     public const string GasVarName = "GasLevel";
+
     // Tags for Mario Instances
     public const string JoystickVarName = "Joystick";
     public const string JumpVarName = "Jump";
@@ -27,7 +28,7 @@ public static class Constants
     public const string HealthPointsVarName = "HealthPoints";
     public const string ActionFlagsVarName = "ActionFlags";
     public const string StateFlagsVarName = "StateFlags";
-    
+
     // Actual Tags
     public const string ContextTag = "SM64 Context";
     public const string MarioTag = "SM64 Mario";

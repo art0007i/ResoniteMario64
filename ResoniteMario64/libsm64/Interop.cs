@@ -19,10 +19,10 @@ public static class MarioExtensions
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
     public static float3 FromMarioPosition(this float3 pos) => pos / Interop.ScaleFactor * new float3(-1, 1, 1);
-    
+
     public static float ToMarioFloat(this float value) => Interop.ScaleFactor * value;
     public static float FromMarioFloat(this float value) => value / Interop.ScaleFactor;
-    
+
     private static float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
     private static float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
 }
@@ -49,7 +49,6 @@ public static class Interop
 
     public static Bitmap2D MarioTexture { get; private set; }
     public static bool IsGlobalInit;
-    
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void SM64DebugPrintFunctionPtr(string message);
@@ -140,7 +139,7 @@ public static class Interop
 
     [DllImport("sm64")]
     private static extern void sm64_mario_extend_cap(uint marioId, ushort capTime);
-    
+
     [DllImport("sm64")]
     private static extern void sm64_set_mario_animation(uint marioId, ushort animId);
 
@@ -220,7 +219,7 @@ public static class Interop
 
         sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
         sm64_audio_init(romHandle.AddrOfPinnedObject());
-        
+
         /*MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
         for (int ix = 0; ix < SM64TextureWidth; ix++)
         for (int iy = 0; iy < SM64TextureHeight; iy++)
@@ -236,10 +235,10 @@ public static class Interop
             {
                 color = new color32(255, 255, 255, 0);
             }
-        
+
             MarioTexture.SetPixel32(ix, iy, color);
         }
-        
+
         // MarioTexture.Save("mario.png");*/
 
         romHandle.Free();
@@ -399,12 +398,12 @@ public static class Interop
     {
         sm64_set_mario_water_level(marioId, (int)waterLevel.ToMarioFloat());
     }
-    
+
     public static void SetGasLevel(uint marioId, float gasLevel)
     {
         sm64_set_mario_gas_level(marioId, (int)gasLevel.ToMarioFloat());
     }
-    
+
     public static float FindFloor(float3 pos, out SM64SurfaceCollisionData data)
     {
         float3 marioPos = pos.ToMarioPosition();
@@ -413,7 +412,7 @@ public static class Interop
         data = floorPtr == IntPtr.Zero ? new SM64SurfaceCollisionData() : Marshal.PtrToStructure<SM64SurfaceCollisionData>(floorPtr);
         return floorHeightMario / Interop.ScaleFactor;
     }
-    
+
     public static float FindFloorHeight(float3 pos)
     {
         float3 marioPos = pos.ToMarioPosition();
@@ -512,7 +511,7 @@ public static class Interop
     {
         sm64_set_mario_action(marioId, actionFlags);
     }
-    
+
     public static void MarioSetState(uint marioId, StateFlag stateFlag)
     {
         sm64_set_mario_state(marioId, (uint)stateFlag);

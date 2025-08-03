@@ -114,7 +114,7 @@ public sealed partial class SM64Context
     private float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
         float2 input = Utils.Float2Zero;
-        
+
         if (up) input += Utils.Float2Up;
         if (down) input += Utils.Float2Down;
         if (left) input += Utils.Float2Left;
@@ -126,12 +126,11 @@ public sealed partial class SM64Context
                 : input;
     }
 
-    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand)
-        => Instance?.World == c.World &&
-           (Instance?.AnyControlledMarios ?? false) &&
-           c.InputInterface.VR_Active &&
-           c.Side.Value == hand &&
-           (!Instance?.World?.LocalUser.HasActiveFocus() ?? false);
+    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World &&
+                                                                                   (Instance?.AnyControlledMarios ?? false) &&
+                                                                                   c.InputInterface.VR_Active &&
+                                                                                   c.Side.Value == hand &&
+                                                                                   (!Instance?.World?.LocalUser.HasActiveFocus() ?? false);
 
     [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
     public class JumpInputBlocker
@@ -170,7 +169,7 @@ public sealed partial class SM64Context
             }*/
         }
     }
-    
+
     [HarmonyPatch(typeof(StandardGamepad), nameof(StandardGamepad.Bind))]
     public class GamepadInputBlocker
     {

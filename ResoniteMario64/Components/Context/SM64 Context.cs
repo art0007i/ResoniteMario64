@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FrooxEngine;
-using HarmonyLib;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.Constants;
@@ -15,19 +14,19 @@ namespace ResoniteMario64.Components.Context;
 public sealed partial class SM64Context : IDisposable
 {
     public static SM64Context Instance { get; private set; }
-    
-    public DynamicVariableSpace ContextVariableSpace { get; set; }
 
-    private Slot TempSlot => World.RootSlot?.FindChildOrAdd(TempSlotName, false);
+    public DynamicVariableSpace ContextVariableSpace { get; private set; }
 
     private Slot _contextSlot;
+
     private Slot ContextSlot
     {
         get
         {
-            if (_contextSlot == null || _contextSlot.IsDestroyed && TempSlot is { IsDestroyed: false })
+            Slot tempSlot = GetTempSlot(World); 
+            if (_contextSlot == null || _contextSlot.IsDestroyed && tempSlot is { IsDestroyed: false })
             {
-                _contextSlot = TempSlot.FindChild(x => x.Tag == ContextTag);
+                _contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
                 if (_contextSlot != null)
                 {
                     _contextSlot.OnPrepareDestroy -= HandleInstanceRemoved;
@@ -64,7 +63,6 @@ public sealed partial class SM64Context : IDisposable
     public Slot MarioContainersSlot { get; private set; }
     public Slot MyMariosSlot { get; private set; }
 
-    
     public readonly Dictionary<Slot, SM64Mario> AllMarios = new Dictionary<Slot, SM64Mario>();
     public List<SM64Mario> MyMarios => AllMarios.Values.Where(x => x.IsLocal).GetTempList();
 
@@ -74,9 +72,10 @@ public sealed partial class SM64Context : IDisposable
 
     internal double LastTick;
 
-    private bool _forceUpdate;
+    private bool _staticColliderUpdate;
 
     private bool _disposed;
+    // private int _maxMariosAnimatedPerPerson;
 
     private SM64Context(World world)
     {
@@ -96,15 +95,22 @@ public sealed partial class SM64Context : IDisposable
 
         // Update context's colliders
         Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
-        ResoniteMario64.KeyMaxMeshColliderTris.OnChanged += _ => { _forceUpdate = true; };
-        world.RunInUpdates(3, () => World.RootSlot.ForeachComponentInChildren<Collider>(HandleCollider));
+        ResoniteMario64.KeyMaxMeshColliderTris.OnChanged += _ => ReloadAllColliders();
+        world.RunInUpdates(3, () => World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c)));
+
+        // _maxMariosAnimatedPerPerson = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMariosPerPerson);
+        // ResoniteMario64.KeyMaxMariosPerPerson.OnChanged += newValue =>
+        // {
+        //     _maxMariosAnimatedPerPerson = (int)(newValue ?? 0);
+        //     UpdatePlayerMariosState();
+        // };
     }
 
     public void InitContextWorld(World world)
     {
         if (ContextSlot == null)
         {
-            Slot contextSlot = TempSlot.AddSlot(ContextSlotName, false);
+            Slot contextSlot = GetTempSlot(world).AddSlot(ContextSlotName, false);
             contextSlot.OrderOffset = -1000;
             contextSlot.Tag = ContextTag;
 
@@ -128,17 +134,10 @@ public sealed partial class SM64Context : IDisposable
 
         contextHost.Reference.OnTargetChange += reference =>
         {
-            if (reference.Target == null)
-            {
-                ResoniteMod.Error("SM64Context host reference was set to null, resetting to the next local user.");
-                ContextSlot.RunInUpdates(ContextSlot.LocalUser.AllocationID * 3, () =>
-                {
-                    if (contextHost.Reference.Target == null)
-                    {
-                        contextHost.Reference.Target = world.LocalUser;
-                    }
-                });
-            }
+            if (reference.Target != null) return;
+            
+            ResoniteMod.Error("SM64Context host reference was set to null, resetting to the next local user.");
+            ContextSlot.RunInUpdates(ContextSlot.LocalUser.AllocationID * 3, () => { contextHost.Reference.Target ??= world.LocalUser; });
         };
 
         Slot configSlot = ContextSlot.FindChildOrAdd(ConfigSlotName, false);
@@ -209,12 +208,11 @@ public sealed partial class SM64Context : IDisposable
 
         MarioContainersSlot.ForeachChild(child =>
         {
-            if (child.Tag == MarioContainerTag)
+            if (child.Tag == MarioContainerTag && child != MyMariosSlot)
             {
                 child.ChildAdded -= HandleMarioAdded;
                 child.ChildAdded += HandleMarioAdded;
             }
-            HandleMarioAdded(null, child);
         });
 
         MyMariosSlot.DestroyWhenUserLeaves(world.LocalUser);
@@ -224,8 +222,8 @@ public sealed partial class SM64Context : IDisposable
     {
         if (child.Tag == MarioTag && !AllMarios.ContainsKey(child))
         {
-            ResoniteMod.Msg("Adding existing Mario for SlotID: " + child.ReferenceID);
-            var mario = new SM64Mario(child, this);
+            ResoniteMod.Msg($"[HandleMarioAdded] Adding Mario for Slot: {slot.Name} ({slot.ReferenceID})");
+            SM64Mario mario = new SM64Mario(child, this);
             AllMarios.Add(child, mario);
         }
     }
@@ -238,6 +236,38 @@ public sealed partial class SM64Context : IDisposable
             child.ChildAdded += HandleMarioAdded;
         }
     }
+    
+    // ReSharper disable ConditionIsAlwaysTrueOrFalse
+    public static Slot GetTempSlot(World world)
+    {
+        Slot temp = (Instance == null ? Engine.Current.WorldManager.FocusedWorld : Instance.World)?.RootSlot?.FindChildOrAdd(TempSlotName, false);
+        if (temp == null) return null;
+        if (temp.Tag != null) return temp;
+
+        temp.ChildAdded -= HandleSlotAdded;
+        temp.ChildAdded += HandleSlotAdded;
+        temp.Tag = string.Empty;
+
+        return temp;
+    }
+    // ReSharper restore ConditionIsAlwaysTrueOrFalse
+
+    public static void HandleSlotAdded(Slot slot, Slot child)
+    {
+        if (child.Tag == ContextTag)
+        {
+            if (SM64Context.EnsureInstanceExists(child.World, out SM64Context context))
+            {
+                context.MarioContainersSlot.ForeachChild(marioSlot =>
+                {
+                    if (marioSlot.Tag == MarioTag)
+                    {
+                        SM64Context.TryAddMario(marioSlot);
+                    }
+                });
+            }
+        }
+    }
 
     public void OnCommonUpdate()
     {
@@ -245,12 +275,17 @@ public sealed partial class SM64Context : IDisposable
 
         if (World.InputInterface.GetKeyDown(Key.Semicolon))
         {
-            _forceUpdate = true;
+            ReloadAllColliders();
         }
 
-        if (_forceUpdate)
+        if (World.InputInterface.GetKeyDown(Key.Backslash))
         {
-            _forceUpdate = false;
+            GetAllColliders(true, out _);
+        }
+
+        if (_staticColliderUpdate)
+        {
+            _staticColliderUpdate = false;
             Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
         }
 
@@ -288,39 +323,65 @@ public sealed partial class SM64Context : IDisposable
         }
     }
 
+    // public static void UpdatePlayerMariosState()
+    // {
+    //     if (Instance == null) return;
+    // 
+    //     int maxMarios = Instance._maxMariosAnimatedPerPerson;
+    //     foreach (SM64Mario mario in Instance.AllMarios.Values)
+    //     {
+    //         if (mario.IsLocal) continue;
+    // 
+    //         bool isOverLimit = maxMarios-- <= 0;
+    //         mario.SetIsOverMaxCount(isOverLimit);
+    //     }
+    // }
+
     public static bool TryAddMario(Slot slot) => AddMario(slot) != null;
 
     public static SM64Mario AddMario(Slot slot)
     {
-        ResoniteMod.Msg($"Adding Mario for SlotID: {slot.ReferenceID}");
-
-        SM64Mario mario = null;
-
         bool success = EnsureInstanceExists(slot.World, out SM64Context instance);
         if (!success) return null;
 
+        SM64Mario mario = null;
         if (!instance.AllMarios.ContainsKey(slot))
         {
             slot.Parent = instance.MyMariosSlot;
 
+            ResoniteMod.Msg($"[AddMario] Adding Mario for Slot: {slot.Name} ({slot.ReferenceID})");
+
             mario = new SM64Mario(slot, instance);
             instance.AllMarios.Add(slot, mario);
             if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic)) Interop.PlayRandomMusic();
+
+            ResoniteMod.Msg($"[AddMario] Added mario for Slot: {slot.Name} ({slot.ReferenceID})");
         }
 
-        ResoniteMod.Msg("Added mario for SlotID: " + slot.ReferenceID);
-
-        slot.Parent.RunInUpdates(3, () =>
+        Slot containerSlot = instance.MarioContainersSlot;
+        if (containerSlot != null)
         {
-            slot.Parent.Children.Where(x => x.Tag == MarioTag && !instance.AllMarios.ContainsKey(x)).Do(root2 =>
+            containerSlot.RunInUpdates(3, () =>
             {
-                ResoniteMod.Msg("Adding existing Mario for SlotID: " + root2.ReferenceID);
-                var mario2 = new SM64Mario(root2, instance);
-                instance.AllMarios.Add(root2, mario2);
-            });
-        });
+                foreach (Slot child1 in containerSlot.Children.GetTempList())
+                {
+                    foreach (Slot child2 in child1.Children.GetTempList())
+                    {
+                        if (child2.Tag != MarioTag) continue;
+                        if (instance.AllMarios.ContainsKey(child2)) continue;
 
-        instance._forceUpdate = true;
+                        ResoniteMod.Msg($"[AddMario] Adding existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
+                        
+                        SM64Mario mario2 = new SM64Mario(child2, instance);
+                        instance.AllMarios.Add(child2, mario2);
+                        
+                        ResoniteMod.Msg($"[AddMario] Added existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
+                    }
+                }
+
+                instance.ReloadAllColliders(false);
+            });
+        }
 
         return mario;
     }
@@ -330,6 +391,7 @@ public sealed partial class SM64Context : IDisposable
         Interop.MarioDelete(mario.MarioId);
 
         mario.Context.AllMarios.Remove(mario.MarioSlot);
+        // UpdatePlayerMariosState();
 
         if (mario.Context.AllMarios.Count == 0)
         {
@@ -416,7 +478,7 @@ public sealed partial class SM64Context : IDisposable
                 AudioSlot = null;
             }
 
-            // Explode out Mario Container
+            // Explode our Mario Container
             if (MyMariosSlot is { IsRemoved: false })
             {
                 MyMariosSlot?.Destroy();

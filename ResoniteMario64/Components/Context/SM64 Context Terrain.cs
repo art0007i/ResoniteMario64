@@ -15,7 +15,7 @@ public sealed partial class SM64Context
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
     internal readonly List<Collider> WaterBoxes = new List<Collider>();
 
-    public void HandleCollider(Collider collider)
+    public void HandleCollider(Collider collider, bool log = true)
     {
         if (collider == null) return;
         if (collider.IsDestroyed)
@@ -31,7 +31,7 @@ public sealed partial class SM64Context
             collider.Destroyed += HandleColliderDestroyed;
         }
 
-        LogCollider(collider, added, collider.IsDestroyed);
+        if (log) LogCollider(collider, added, collider.IsDestroyed);
     }
 
     private void HandleColliderDestroyed(IDestroyable instance)
@@ -103,7 +103,7 @@ public sealed partial class SM64Context
 
     private static Timer _staticUpdateTimer;
 
-    public void QueueStaticSurfacesUpdate()
+    public void QueueStaticCollidersUpdate()
     {
         if (_staticUpdateTimer != null) return;
 
@@ -114,7 +114,7 @@ public sealed partial class SM64Context
             _staticUpdateTimer.Dispose();
             _staticUpdateTimer = null;
 
-            _forceUpdate = true;
+            _staticColliderUpdate = true;
         };
         _staticUpdateTimer.AutoReset = false;
         _staticUpdateTimer.Start();
@@ -123,21 +123,21 @@ public sealed partial class SM64Context
     // Static Colliders
     private int RegisterStaticCollider(Collider collider)
     {
-        QueueStaticSurfacesUpdate();
-        
+        QueueStaticCollidersUpdate();
+
         if (StaticColliders.Contains(collider))
         {
             return 10;
         }
-        
+
         StaticColliders.Add(collider);
         return 1;
     }
 
     private void UnregisterStaticCollider(Collider collider)
     {
-        QueueStaticSurfacesUpdate();
-        
+        QueueStaticCollidersUpdate();
+
         StaticColliders.Remove(collider);
     }
 
@@ -262,5 +262,35 @@ public sealed partial class SM64Context
 
         logDelegate($"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType} ({interactableId})");
 #endif
+    }
+
+    public void GetAllColliders(bool log, out Dictionary<int, List<Collider>> colliders)
+    {
+        colliders = new Dictionary<int, List<Collider>>
+        {
+            [10] = StaticColliders.GetTempList(),
+            [20] = DynamicColliders.Keys.GetTempList(),
+            [30] = Interactables.Keys.GetTempList(),
+            [40] = WaterBoxes.GetTempList()
+        };
+
+        if (!log) return;
+
+        foreach (KeyValuePair<int, List<Collider>> kvp in colliders)
+        {
+            foreach (Collider collider in kvp.Value)
+            {
+                LogCollider(collider, kvp.Key, collider.IsDestroyed);
+            }
+        }
+    }
+
+    public void ReloadAllColliders(bool log = true)
+    {
+        World.RootSlot.ForeachComponentInChildren<Collider>(c =>
+        {
+            TryRemoveCollider(c);
+            HandleCollider(c, log);
+        });
     }
 }

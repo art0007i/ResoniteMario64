@@ -119,6 +119,22 @@ public sealed class SM64Mario : IDisposable
     private bool _wasPickedUp;
 
     private float _waterLevel;
+    
+    // private static float _skipFarMarioDistance;
+    // private bool _isOverMaxCount;
+    // private bool _isOverMaxDistance;
+    // private bool _wasBypassed;
+    private readonly bool _initialized;
+
+
+    // static SM64Mario()
+    // {
+    //     _skipFarMarioDistance = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioCullDistance);
+    //     ResoniteMario64.KeyMarioCullDistance.OnChanged += newValue =>
+    //     {
+    //         _skipFarMarioDistance = (float)(newValue ?? 0f);
+    //     };
+    // }
 
     public SM64Mario(Slot slot, SM64Context instance)
     {
@@ -153,6 +169,12 @@ public sealed class SM64Mario : IDisposable
 
         ResoniteMod.Debug("adding interop");
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
+        if (MarioId == int.MaxValue)
+        {
+            ResoniteMod.Error("Failed to create Mario, Interop returned int.MaxValue !!!!!!!!!!");
+            return;
+        }
+        
         _waterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float waterLevel) ? waterLevel : -100f;
         Interop.SetWaterLevel(MarioId, _waterLevel);
 
@@ -160,36 +182,41 @@ public sealed class SM64Mario : IDisposable
         CreateMarioRenderer();
         MarioSlot.RunInUpdates(3, CreateNonModdedRenderer);
 
-        if (!IsLocal) return;
+        if (IsLocal)
+        {
+            ResoniteMod.Debug("setting up streams");
+            Slot vars = MarioSlot.AddSlot("Inputs");
+            vars.Tag = null;
 
-        ResoniteMod.Debug("setting up streams");
-        Slot vars = MarioSlot.AddSlot("Inputs");
+            DynamicReferenceVariable<IValue<float2>> joystick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
+            joystick1.VariableName.Value = JoystickVarName;
+            joystick1.Reference.Target = JoystickStream;
 
-        DynamicReferenceVariable<IValue<float2>> joystick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
-        joystick1.VariableName.Value = JoystickVarName;
-        joystick1.Reference.Target = JoystickStream;
+            DynamicReferenceVariable<IValue<bool>> jump1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            jump1.VariableName.Value = JumpVarName;
+            jump1.Reference.Target = JumpStream;
 
-        DynamicReferenceVariable<IValue<bool>> jump1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        jump1.VariableName.Value = JumpVarName;
-        jump1.Reference.Target = JumpStream;
+            DynamicReferenceVariable<IValue<bool>> kick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            kick1.VariableName.Value = PunchVarName;
+            kick1.Reference.Target = PunchStream;
 
-        DynamicReferenceVariable<IValue<bool>> kick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        kick1.VariableName.Value = PunchVarName;
-        kick1.Reference.Target = PunchStream;
+            DynamicReferenceVariable<IValue<bool>> stomp1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            stomp1.VariableName.Value = CrouchVarName;
+            stomp1.Reference.Target = CrouchStream;
 
-        DynamicReferenceVariable<IValue<bool>> stomp1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
-        stomp1.VariableName.Value = CrouchVarName;
-        stomp1.Reference.Target = CrouchStream;
+            DynamicValueVariable<float> healthPoints = vars.AttachComponent<DynamicValueVariable<float>>();
+            healthPoints.VariableName.Value = HealthPointsVarName;
 
-        DynamicValueVariable<float> healthPoints = vars.AttachComponent<DynamicValueVariable<float>>();
-        healthPoints.VariableName.Value = HealthPointsVarName;
+            DynamicValueVariable<uint> actionFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
+            actionFlags.VariableName.Value = ActionFlagsVarName;
 
-        DynamicValueVariable<uint> actionFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
-        actionFlags.VariableName.Value = ActionFlagsVarName;
+            DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
+            stateFlags.VariableName.Value = StateFlagsVarName;
+        }
+        
+        // SM64Context.UpdatePlayerMariosState();
 
-        DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
-        stateFlags.VariableName.Value = StateFlagsVarName;
-
+        _initialized = true;
         ResoniteMod.Debug("huge success");
     }
 
@@ -268,7 +295,7 @@ public sealed class SM64Mario : IDisposable
 
     private bool Crouch => MarioSpace.TryReadValue(CrouchVarName, out IValue<bool> stomp) && stomp?.Value is true;
     private ValueStream<bool> _crouchStream;
-
+    
     private ValueStream<bool> CrouchStream
     {
         get
@@ -434,7 +461,11 @@ public sealed class SM64Mario : IDisposable
     // Game Tick
     internal void ContextFixedUpdateSynced()
     {
-        if (!_enabled || _isNuked || _disposed) return;
+        if (!_enabled || !_initialized || _isNuked || _disposed) return;
+        
+        // UpdateIsOverMaxDistance();
+        //
+        // if (_wasBypassed) return;
 
         SM64MarioInputs inputs = new SM64MarioInputs();
         float3 look = GetCameraLookDirection();
@@ -670,7 +701,7 @@ public sealed class SM64Mario : IDisposable
     // Engine Tick
     internal void ContextUpdateSynced()
     {
-        if (!_enabled || _isNuked || _disposed) return;
+        if (!_enabled || !_initialized || _isNuked || _disposed) return;
 
         // lerp from previous state to current (this means when you make an input it's delayed by one frame, but it means we can have nice interpolation)
         float t = (float)((MarioSlot.Time.WorldTime - Context.LastTick) / (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f));
@@ -716,6 +747,31 @@ public sealed class SM64Mario : IDisposable
             _marioMeshProvider.Update();
         }
     }
+    
+    // public void SetIsOverMaxCount(bool isOverTheMaxCount)
+    // {
+    //     _isOverMaxCount = isOverTheMaxCount;
+    //     UpdateIsBypassed();
+    // }
+    //
+    // private void UpdateIsOverMaxDistance()
+    // {
+    //     // Check the distance to see if we should ignore the updates
+    //     _isOverMaxDistance = !IsLocal && MathX.Distance(MarioSlot.GlobalPosition, MarioSlot.LocalUser.Root.HeadSlot.GlobalPosition) > _skipFarMarioDistance;
+    //     UpdateIsBypassed();
+    // }
+    //
+    // private void UpdateIsBypassed()
+    // {
+    //     if (!_initialized) return;
+    //
+    //     bool isBypassed = _isOverMaxDistance || _isOverMaxCount;
+    //     if (isBypassed == _wasBypassed) return;
+    //     _wasBypassed = isBypassed;
+    //
+    //     // Enable/Disable the mario's mesh renderer
+    //     _marioMeshRenderer.Enabled = !isBypassed;
+    // }
 
     private float3 GetCameraLookDirection() => (MarioUser?.Root?.ViewRotation ?? floatQ.Identity) * float3.Forward;
 
@@ -782,7 +838,7 @@ public sealed class SM64Mario : IDisposable
                 break;
             case MarioCapType.NormalCap:
                 if (Utils.HasCapType(SyncedStateFlags, capType)) break;
-                
+
                 SetState(StateFlag.CapOnHead | StateFlag.NormalCap);
                 break;
             default:
@@ -834,6 +890,7 @@ public sealed class SM64Mario : IDisposable
             {
                 SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
             }
+
             bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
             SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
             if (IsLocal)
@@ -850,6 +907,7 @@ public sealed class SM64Mario : IDisposable
                 SetVelocity(float3.Zero);
                 SetForwardVelocity(0f);
             }
+
             SetAction(ActionFlag.Freefall);
         }
     }
@@ -869,13 +927,13 @@ public sealed class SM64Mario : IDisposable
     public void Heal(byte healthPoints)
     {
         if (CurrentState.IsDead || !IsLocal) return;
-        
+
         Interop.MarioHeal(MarioId, healthPoints);
     }
 
     public void HandleInteractable(SM64Interactable interactable)
     {
-        if (!_enabled || !interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
+        if (!interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
 
         int typeId = interactable.TypeId;
         bool hasValue = interactable.HasValue;
@@ -946,7 +1004,7 @@ public sealed class SM64Mario : IDisposable
             default:
                 throw new ArgumentOutOfRangeException();
         }
-        
+
         interactable.Collider.Slot.ActiveSelf = !disable;
     }
 
