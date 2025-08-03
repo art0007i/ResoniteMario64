@@ -27,13 +27,13 @@ public sealed class SM64Mario : IDisposable
 
     private static float MarioScale => 1000.0f / Interop.ScaleFactor;
 
-    public Slot MarioSlot { get; }
-    public User MarioUser { get; }
-    public DynamicVariableSpace MarioSpace { get; }
+    public Slot MarioSlot { get; private set; }
+    public User MarioUser { get; private set; }
+    public DynamicVariableSpace MarioSpace { get; private set; }
     public bool IsLocal => MarioUser.IsLocalUser;
 
-    public World World { get; }
-    public SM64Context Context { get; }
+    public World World { get; private set; }
+    public SM64Context Context { get; private set; }
 
 #region Renderer
 
@@ -119,40 +119,49 @@ public sealed class SM64Mario : IDisposable
     private bool _wasPickedUp;
 
     private float _waterLevel;
-    
-    // private static float _skipFarMarioDistance;
-    // private bool _isOverMaxCount;
-    // private bool _isOverMaxDistance;
-    // private bool _wasBypassed;
-    private readonly bool _initialized;
+    private float _gasLevel;
 
+    private static float _skipFarMarioDistance;
+    private bool _isOverMaxCount;
+    private bool _isOverMaxDistance;
+    private bool _wasBypassed;
+    private bool _initialized;
 
-    // static SM64Mario()
-    // {
-    //     _skipFarMarioDistance = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioCullDistance);
-    //     ResoniteMario64.KeyMarioCullDistance.OnChanged += newValue =>
-    //     {
-    //         _skipFarMarioDistance = (float)(newValue ?? 0f);
-    //     };
-    // }
+    static SM64Mario()
+    {
+        _skipFarMarioDistance = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioCullDistance);
+        ResoniteMario64.KeyMarioCullDistance.OnChanged += newValue => { _skipFarMarioDistance = (float)(newValue ?? 0f); };
+    }
 
     public SM64Mario(Slot slot, SM64Context instance)
     {
-        ResoniteMod.Debug("Constructing mario");
+        const string method = nameof(SM64Mario);
+
+        ResoniteMod.Msg($"[{method}] Constructor started for slot: {slot.Name}");
+
         MarioUser = slot.GetAllocatingUser();
-        ResoniteMod.Debug("is local " + IsLocal);
+        ResoniteMod.Msg($"[{method}] User: {MarioUser?.UserName ?? "null"}, IsLocal: {IsLocal}");
 
-        World = slot.World;
+        World = instance.World;
         Context = instance;
-
         MarioSlot = slot;
         MarioSlot.Tag = MarioTag;
-        if (IsLocal) MarioSlot.Name += $" #{Context.AllMarios.Count(x => x.Value.IsLocal)}";
+
+        MarioSlot.GetComponentOrAttach<ObjectRoot>();
+
+        if (IsLocal)
+        {
+            int count = Context.AllMarios.Count(x => x.Value.IsLocal);
+            MarioSlot.Name += $" #{count}";
+            ResoniteMod.Msg($"[{method}] Renamed slot for local Mario: {MarioSlot.Name}");
+        }
 
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
         MarioSpace.SpaceName.Value = MarioSpaceName;
+        ResoniteMod.Msg($"[{method}] Attached DynamicVariableSpace with name: {MarioSpaceName}");
 
         _marioGrabbable = MarioSlot.GetComponentOrAttach<Grabbable>();
+        ResoniteMod.Msg($"[{method}] Attached Grabbable");
 
         _marioCollider = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
         if (IsLocal)
@@ -160,64 +169,102 @@ public sealed class SM64Mario : IDisposable
             _marioCollider.Offset.Value = new float3(0, 0.075f * MarioScale);
             _marioCollider.Radius.Value = 0.05f * MarioScale;
             _marioCollider.Height.Value = 0.15f * MarioScale;
+            ResoniteMod.Msg($"[{method}] Configured CapsuleCollider for local Mario");
         }
 
-        ResoniteMod.Debug("got comp refs");
+        ResoniteMod.Msg($"[{method}] Component references obtained");
 
-        MarioSlot.OnPrepareDestroy += _ => Dispose();
+        MarioSlot.OnPrepareDestroy += HandleSlotDestroyed;
+
         float3 initPos = MarioSlot.GlobalPosition;
+        ResoniteMod.Msg($"[{method}] Initial position: {initPos}");
 
-        ResoniteMod.Debug("adding interop");
+        ResoniteMod.Msg($"[{method}] Creating native Mario");
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
+
         if (MarioId == int.MaxValue)
         {
-            ResoniteMod.Error("Failed to create Mario, Interop returned int.MaxValue !!!!!!!!!!");
+            ResoniteMod.Error($"[{method}] Failed to create Mario, Interop returned int.MaxValue");
             return;
         }
-        
+
         _waterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float waterLevel) ? waterLevel : -100f;
         Interop.SetWaterLevel(MarioId, _waterLevel);
+        ResoniteMod.Msg($"[{method}] Water level set to {_waterLevel}");
 
-        ResoniteMod.Debug("adding renderer");
+        _gasLevel = Context.ContextVariableSpace.TryReadValue(GasVarName, out float gasLevel) ? gasLevel : -200f;
+        Interop.SetGasLevel(MarioId, _gasLevel);
+        ResoniteMod.Msg($"[{method}] Gas level set to {_gasLevel}");
+
+        ResoniteMod.Msg($"[{method}] Creating renderer");
         CreateMarioRenderer();
+
+        ResoniteMod.Msg($"[{method}] Scheduling non-modded renderer");
         MarioSlot.RunInUpdates(3, CreateNonModdedRenderer);
 
         if (IsLocal)
         {
-            ResoniteMod.Debug("setting up streams");
-            Slot vars = MarioSlot.AddSlot("Inputs");
-            vars.Tag = null;
+            DynamicValueVariable<bool> isShown = MarioSlot.AttachComponent<DynamicValueVariable<bool>>();
+            isShown.VariableName.Value = IsShownVarName;
+            ValueUserOverride<bool> @override = isShown.Value.OverrideForUser(MarioUser, true);
+            @override.CreateOverrideOnWrite.Value = true;
+            ResoniteMod.Msg($"[{method}] Created IsShown variable");
+            
+            ResoniteMod.Msg($"[{method}] Setting up input streams");
+            Slot inputsSlot = MarioSlot.AddSlot("Inputs");
+            inputsSlot.Tag = null;
 
-            DynamicReferenceVariable<IValue<float2>> joystick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
+            DynamicReferenceVariable<IValue<float2>> joystick1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
             joystick1.VariableName.Value = JoystickVarName;
             joystick1.Reference.Target = JoystickStream;
+            ResoniteMod.Msg($"[{method}] Mapped Joystick stream");
 
-            DynamicReferenceVariable<IValue<bool>> jump1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            DynamicReferenceVariable<IValue<bool>> jump1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             jump1.VariableName.Value = JumpVarName;
             jump1.Reference.Target = JumpStream;
+            ResoniteMod.Msg($"[{method}] Mapped Jump stream");
 
-            DynamicReferenceVariable<IValue<bool>> kick1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            DynamicReferenceVariable<IValue<bool>> kick1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             kick1.VariableName.Value = PunchVarName;
             kick1.Reference.Target = PunchStream;
+            ResoniteMod.Msg($"[{method}] Mapped Punch stream");
 
-            DynamicReferenceVariable<IValue<bool>> stomp1 = vars.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
+            DynamicReferenceVariable<IValue<bool>> stomp1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             stomp1.VariableName.Value = CrouchVarName;
             stomp1.Reference.Target = CrouchStream;
+            ResoniteMod.Msg($"[{method}] Mapped Crouch stream");
 
-            DynamicValueVariable<float> healthPoints = vars.AttachComponent<DynamicValueVariable<float>>();
+            ResoniteMod.Msg($"[{method}] Setting up SyncedVars");
+            Slot varsSlot = MarioSlot.AddSlot("Vars");
+            varsSlot.Tag = null;
+            
+            DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
+            ResoniteMod.Msg($"[{method}] Created health points variable");
 
-            DynamicValueVariable<uint> actionFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
+            DynamicValueVariable<uint> actionFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             actionFlags.VariableName.Value = ActionFlagsVarName;
+            ResoniteMod.Msg($"[{method}] Created action flags variable");
 
-            DynamicValueVariable<uint> stateFlags = vars.AttachComponent<DynamicValueVariable<uint>>();
+            DynamicValueVariable<uint> stateFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             stateFlags.VariableName.Value = StateFlagsVarName;
+            ResoniteMod.Msg($"[{method}] Created state flags variable");
+
+            slot.RunInUpdates(1, () => slot.SetParent(instance.MyMariosSlot));
         }
-        
-        // SM64Context.UpdatePlayerMariosState();
+
+        SM64Context.UpdatePlayerMariosState();
 
         _initialized = true;
-        ResoniteMod.Debug("huge success");
+        ResoniteMod.Msg($"[{method}] Mario construction complete. ID: {MarioId}");
+    }
+
+    private void HandleSlotDestroyed(Slot slot)
+    {
+        if (!_disposed)
+        {
+            Dispose();
+        }
     }
 
     // Inputs
@@ -295,7 +342,7 @@ public sealed class SM64Mario : IDisposable
 
     private bool Crouch => MarioSpace.TryReadValue(CrouchVarName, out IValue<bool> stomp) && stomp?.Value is true;
     private ValueStream<bool> _crouchStream;
-    
+
     private ValueStream<bool> CrouchStream
     {
         get
@@ -317,9 +364,29 @@ public sealed class SM64Mario : IDisposable
         set => _crouchStream = value;
     }
 
-    public float SyncedHealthPoints => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
-    public uint SyncedActionFlags => MarioSpace.TryReadValue(ActionFlagsVarName, out uint actionFlags) ? actionFlags : 0;
-    public uint SyncedStateFlags => MarioSpace.TryReadValue(StateFlagsVarName, out uint stateFlags) ? stateFlags : 0;
+    public bool SyncedIsShown
+    {
+        get => MarioSpace.TryReadValue(IsShownVarName, out bool isShown) && isShown;
+        set => MarioSpace.TryWriteValue(IsShownVarName, value);
+    }
+
+    public float SyncedHealthPoints
+    {
+        get => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
+        set => MarioSpace.TryWriteValue(HealthPointsVarName, value);
+    }
+
+    public uint SyncedActionFlags
+    {
+        get => MarioSpace.TryReadValue(ActionFlagsVarName, out uint actionFlags) ? actionFlags : 0;
+        set => MarioSpace.TryWriteValue(ActionFlagsVarName, value);
+    }
+
+    public uint SyncedStateFlags
+    {
+        get => MarioSpace.TryReadValue(StateFlagsVarName, out uint stateFlags) ? stateFlags : 0;
+        set => MarioSpace.TryWriteValue(StateFlagsVarName, value);
+    }
 
     public uint CurrentActionFlags => CurrentState.ActionFlags;
     public uint CurrentStateFlags => CurrentState.StateFlags;
@@ -328,42 +395,59 @@ public sealed class SM64Mario : IDisposable
 
     private void CreateMarioRenderer()
     {
-        // Initialize Buffers
+        const string method = nameof(CreateMarioRenderer);
+
+        ResoniteMod.Msg($"[{method}] Starting Mario renderer creation.");
+
         _states = new SM64MarioState[]
         {
             new SM64MarioState(),
             new SM64MarioState()
         };
+        ResoniteMod.Msg($"[{method}] Initialized Mario states.");
 
         _lerpPositionBuffer = new float3[3 * Interop.SM64GeoMaxTriangles];
         _lerpNormalBuffer = new float3[3 * Interop.SM64GeoMaxTriangles];
-        _positionBuffers = new[] { new float3[3 * Interop.SM64GeoMaxTriangles], new float3[3 * Interop.SM64GeoMaxTriangles] };
-        _normalBuffers = new[] { new float3[3 * Interop.SM64GeoMaxTriangles], new float3[3 * Interop.SM64GeoMaxTriangles] };
+        _positionBuffers = new[]
+        {
+            new float3[3 * Interop.SM64GeoMaxTriangles],
+            new float3[3 * Interop.SM64GeoMaxTriangles]
+        };
+        _normalBuffers = new[]
+        {
+            new float3[3 * Interop.SM64GeoMaxTriangles],
+            new float3[3 * Interop.SM64GeoMaxTriangles]
+        };
         _colorBuffer = new float3[3 * Interop.SM64GeoMaxTriangles];
         _colorBufferColors = new color[3 * Interop.SM64GeoMaxTriangles];
         _uvBuffer = new float2[3 * Interop.SM64GeoMaxTriangles];
-        ResoniteMod.Debug("buffers 👍");
+        ResoniteMod.Msg($"[{method}] Buffers initialized.");
 
-        // Create Mario Slot
 #if DEBUG
-        _marioRendererSlot = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal)
-                ? MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}")
-                : MarioSlot.World.AddSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}", false);
+        bool useLocalSlot = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal);
+        if (useLocalSlot)
+        {
+            _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
+            ResoniteMod.Msg($"[{method}] Added local Mario renderer slot.");
+        }
+        else
+        {
+            _marioRendererSlot = MarioSlot.World.AddSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}", false);
+            ResoniteMod.Msg($"[{method}] Added global Mario renderer slot.");
+        }
 #else
         _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
+        ResoniteMod.Msg($"[{method}] Added local Mario renderer slot (release mode).");
 #endif
 
         _marioMeshRenderer = _marioRendererSlot.AttachComponent<MeshRenderer>();
         _marioMeshProvider = _marioRendererSlot.AttachComponent<LocalMeshProvider>();
-
         _marioMaterial = _marioRendererSlot.AttachComponent<PBS_DualSidedMetallic>();
         _marioMaterialClipped = _marioRendererSlot.AttachComponent<PBS_VertexColorMetallic>();
         _marioMaterialMetal = _marioRendererSlot.AttachComponent<XiexeToonMaterial>();
         _marioMaterialVanish = _marioRendererSlot.AttachComponent<PBS_Metallic>();
-        ResoniteMod.Debug("materials 👍");
+        ResoniteMod.Msg($"[{method}] Attached mesh renderer and materials.");
 
-        // I generated this texture inside Interop.cs (look for 'mario.png')
-        // then uploaded it and saved it to my inventory. I think it's better this way, because it gets cached
         StaticTexture2D marioTextureClipped = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTextureClipped.DirectLoad.Value = true;
         marioTextureClipped.URL.Value = new Uri("resdb:///52c6ac7b3c623bc46b380a6655c0bd20988b4937918b428093ec04e8240316ba.png");
@@ -373,12 +457,14 @@ public sealed class SM64Mario : IDisposable
         _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
         _marioMaterialClipped.AlphaClip.Value = 0.25f;
         _marioMaterialClipped.Culling.Value = Culling.Off;
+        ResoniteMod.Msg($"[{method}] Loaded clipped Mario texture.");
 
         StaticTexture2D marioTexture = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTexture.DirectLoad.Value = true;
         marioTexture.URL.Value = new Uri("resdb:///f05ee58da859926aa5652bb92a07ad0d5ce5fb33979fd7ead9bc5ed78eb5b7d7.webp");
         marioTexture.WrapModeU.Value = TextureWrapMode.Clamp;
         marioTexture.WrapModeV.Value = TextureWrapMode.Clamp;
+        ResoniteMod.Msg($"[{method}] Loaded primary Mario texture.");
 
         _marioMaterial.AlbedoTexture.Target = marioTexture;
         _marioMaterial.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
@@ -391,6 +477,7 @@ public sealed class SM64Mario : IDisposable
         _marioMaterialVanish.BlendMode.Value = BlendMode.Alpha;
         _marioMaterialVanish.AlphaCutoff.Value = 1f;
         _marioMaterialVanish.OffsetUnits.Value = -1f;
+        ResoniteMod.Msg($"[{method}] Configured vanish material.");
 
         StaticTexture2D marioTextureMetal = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTextureMetal.DirectLoad.Value = true;
@@ -401,19 +488,19 @@ public sealed class SM64Mario : IDisposable
         _marioMaterialMetal.Color.Value = colorX.Black;
         _marioMaterialMetal.MatcapTint.Value = colorX.White * 1.5f;
         _marioMaterialMetal.OffsetUnits.Value = -2f;
-
-        ResoniteMod.Debug("textures 👍");
+        ResoniteMod.Msg($"[{method}] Loaded metallic material texture.");
 
         _marioMeshRenderer.Materials.Add();
         _marioMeshRenderer.Materials.Add(_marioMaterial);
+        ResoniteMod.Msg($"[{method}] Added materials to mesh renderer.");
 
         _marioMeshRenderer.Mesh.Target = _marioMeshProvider;
         _marioMesh = new MeshX();
-
-        ResoniteMod.Debug("meshx 👍");
+        ResoniteMod.Msg($"[{method}] Created MeshX and assigned to mesh provider.");
 
         _marioRendererSlot.LocalScale = new float3(-1, 1, 1) / Interop.ScaleFactor;
         _marioRendererSlot.LocalPosition = float3.Zero;
+        ResoniteMod.Msg($"[{method}] Set renderer slot scale and position.");
 
         _marioMesh.AddVertices(_lerpPositionBuffer.Length);
         TriangleSubmesh marioTris = _marioMesh.AddSubmesh<TriangleSubmesh>();
@@ -422,22 +509,30 @@ public sealed class SM64Mario : IDisposable
             marioTris.AddTriangle(i * 3, i * 3 + 1, i * 3 + 2);
         }
 
-        ResoniteMod.Debug("tris 👍");
+        ResoniteMod.Msg($"[{method}] Added vertices and triangles to mesh.");
 
         _marioMeshProvider.Mesh = _marioMesh;
         _marioMeshProvider.LocalManualUpdate = true;
         _marioMeshProvider.HighPriorityIntegration.Value = true;
 
         _enabled = true;
-        ResoniteMod.Debug("done 👍 " + _marioMeshProvider.Mesh.VertexCount);
+        ResoniteMod.Msg($"[{method}] Mario renderer creation complete. Vertex count: {_marioMeshProvider.Mesh.VertexCount}");
     }
 
     private void CreateNonModdedRenderer()
     {
+        const string method = nameof(CreateNonModdedRenderer);
+        ResoniteMod.Msg($"[{method}] Starting creation of non-modded renderer.");
+
         Uri uri = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioUrl);
         if (uri == null)
         {
             uri = new Uri("resdb:///d85c309f7aa0c909f6b1518c4a74dacc383760c516425bec6617e8ebe8dd50da.brson");
+            ResoniteMod.Msg($"[{method}] Config MarioUrl not set, using default URI.");
+        }
+        else
+        {
+            ResoniteMod.Msg($"[{method}] Loaded MarioUrl from config: {uri}");
         }
 
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
@@ -446,26 +541,33 @@ public sealed class SM64Mario : IDisposable
             _marioNonModdedRendererSlot = MarioSlot.AddSlot("Non-Modded Renderer", false);
             _marioNonModdedRendererSlot.Tag = MarioNonMRendererTag;
             _marioNonModdedRendererSlot.LocalScale *= MarioScale;
+            ResoniteMod.Msg($"[{method}] Created new non-modded renderer slot.");
+
             Slot tempSlot = _marioNonModdedRendererSlot.AddSlot("TempSlot", false);
             tempSlot.StartTask(async () =>
             {
+                ResoniteMod.Msg($"[{method}] Starting async load of non-modded renderer object.");
                 await tempSlot.LoadObjectAsync(uri);
                 tempSlot.GetComponent<InventoryItem>()?.Unpack();
-                ResoniteMod.Debug("Setup Non-Modded Renderer");
+                ResoniteMod.Msg($"[{method}] Non-modded renderer object loaded and unpacked.");
             });
         }
+        else
+        {
+            ResoniteMod.Msg($"[{method}] Non-modded renderer slot already exists or not local user.");
+        }
 
-        ResoniteMod.Debug("non-modded finish");
+        ResoniteMod.Msg($"[{method}] Finished non-modded renderer setup.");
     }
 
     // Game Tick
     internal void ContextFixedUpdateSynced()
     {
         if (!_enabled || !_initialized || _isNuked || _disposed) return;
-        
-        // UpdateIsOverMaxDistance();
-        //
-        // if (_wasBypassed) return;
+
+        UpdateIsOverMaxDistance();
+
+        if (_wasBypassed) return;
 
         SM64MarioInputs inputs = new SM64MarioInputs();
         float3 look = GetCameraLookDirection();
@@ -512,31 +614,37 @@ public sealed class SM64Mario : IDisposable
 
         if (IsLocal)
         {
-            MarioSpace.TryWriteValue(ActionFlagsVarName, CurrentActionFlags);
-            MarioSpace.TryWriteValue(StateFlagsVarName, CurrentStateFlags);
-
-            // Check for deaths, so we delete mario
-            float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
-            bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
-            if (!_isDying && CurrentState.IsDead || !_isDying && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 50 && isDeathPlane) /* Find a better value for the distance check */
-            {
-                _isDying = true;
-                bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
-                MarioSlot.RunInSeconds(isQuickSand ? 1f : isDeathPlane ? 0.5f : 3f, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
-                MarioSlot.RunInSeconds(isQuickSand ? 3f : isDeathPlane ? 2f : 15f, () => SetMarioAsNuked(true));
-            }
+            SyncedStateFlags = CurrentStateFlags;
+            SyncedActionFlags = CurrentActionFlags;
 
             List<SM64Interactable> interactables = Context.Interactables.Values.GetTempList();
             foreach (SM64Interactable interactable in interactables)
             {
                 HandleInteractable(interactable);
             }
+
+            // Check for deaths, so we delete mario
+            float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
+            bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
+            bool isNearDeathPlane = MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 15;
+            
+            if (!_isDying && (CurrentState.IsDead || isNearDeathPlane && isDeathPlane))
+            {
+                _isDying = true;
+
+                bool isQuickSand = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
+
+                float laughDelay = isQuickSand ? 0.8f : isDeathPlane ? 0.4f : 2.5f;
+                float nukeDelay = isQuickSand ? 2.2f : isDeathPlane ? 1.8f : 12f;
+
+                MarioSlot.RunInSeconds(laughDelay, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
+                MarioSlot.RunInSeconds(nukeDelay, () => SetMarioAsNuked(true));
+            }
         }
         else
         {
             // This seems to be kinda broken, maybe revisit syncing the WHOLE state instead
-            // if (currentStateFlags != syncedFlags) SetState(syncedAction);
-            // if (currentStateAction != syncedAction) SetAction(syncedAction);
+            UpdateFlagsIfChanged();
 
             // Trigger the cap if the synced values have cap (if we already have the cap it will ignore)
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
@@ -565,7 +673,7 @@ public sealed class SM64Mario : IDisposable
             //     _startedTeleporting = Time.time;
             // }
         }
-
+        
         if (_marioGrabbable is { IsRemoved: false })
         {
             bool pickup = IsBeingGrabbed;
@@ -583,14 +691,6 @@ public sealed class SM64Mario : IDisposable
             }
 
             _wasPickedUp = pickup;
-        }
-
-        // Just for now until Collider Shenanigans is implemented
-        List<SM64Mario> marios = Context.AllMarios.Values.GetTempList();
-        SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
-        if (attackingMario != null)
-        {
-            TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
         }
 
         List<Collider> waterBoxes = Context.WaterBoxes.GetTempList();
@@ -677,15 +777,17 @@ public sealed class SM64Mario : IDisposable
             }
         }
 
+        // Just for now until Collider Shenanigans is implemented
+        List<SM64Mario> marios = Context.AllMarios.Values.GetTempList();
+        SM64Mario attackingMario = marios.FirstOrDefault(mario => mario != this && mario.CurrentState.IsAttacking && MathX.Distance(mario.MarioSlot.GlobalPosition, MarioSlot.GlobalPosition) <= 0.1f * MarioScale);
+        if (attackingMario != null)
+        {
+            TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
+        }
+
         for (int i = 0; i < _colorBuffer.Length; ++i)
         {
             _colorBufferColors[i] = new color(_colorBuffer[i].x, _colorBuffer[i].y, _colorBuffer[i].z);
-        }
-
-        if (!_marioMeshProvider.Enabled)
-        {
-            ResoniteMod.Error("!!!!!!!!!! Shit fucked :(");
-            _marioMeshProvider.Enabled = true;
         }
 
         if (_marioMesh != null)
@@ -728,7 +830,7 @@ public sealed class SM64Mario : IDisposable
 
         if (IsLocal)
         {
-            MarioSlot.WriteDynamicVariable(HealthPointsVarName, CurrentState.HealthPoints);
+            SyncedHealthPoints = CurrentState.HealthPoints;
         }
         else
         {
@@ -747,31 +849,52 @@ public sealed class SM64Mario : IDisposable
             _marioMeshProvider.Update();
         }
     }
+
+    private uint _lastActionFlags;
+    // private uint _lastStateFlags;
+    public void UpdateFlagsIfChanged()
+    {
+        uint currentActionFlags = SyncedActionFlags;
+        // uint currentStateFlags = SyncedStateFlags;
+        
+        // if (currentStateFlags != _lastStateFlags)
+        // {
+        //     _lastStateFlags = currentStateFlags;
+        //     if (currentStateFlags != 0) SetState(currentStateFlags);
+        // }
     
-    // public void SetIsOverMaxCount(bool isOverTheMaxCount)
-    // {
-    //     _isOverMaxCount = isOverTheMaxCount;
-    //     UpdateIsBypassed();
-    // }
-    //
-    // private void UpdateIsOverMaxDistance()
-    // {
-    //     // Check the distance to see if we should ignore the updates
-    //     _isOverMaxDistance = !IsLocal && MathX.Distance(MarioSlot.GlobalPosition, MarioSlot.LocalUser.Root.HeadSlot.GlobalPosition) > _skipFarMarioDistance;
-    //     UpdateIsBypassed();
-    // }
-    //
-    // private void UpdateIsBypassed()
-    // {
-    //     if (!_initialized) return;
-    //
-    //     bool isBypassed = _isOverMaxDistance || _isOverMaxCount;
-    //     if (isBypassed == _wasBypassed) return;
-    //     _wasBypassed = isBypassed;
-    //
-    //     // Enable/Disable the mario's mesh renderer
-    //     _marioMeshRenderer.Enabled = !isBypassed;
-    // }
+        if (currentActionFlags != _lastActionFlags)
+        {
+            _lastActionFlags = currentActionFlags;
+            if (currentActionFlags != 0) SetAction(currentActionFlags);
+        }
+    }
+
+    public void SetIsOverMaxCount(bool isOverTheMaxCount)
+    {
+        _isOverMaxCount = isOverTheMaxCount;
+        UpdateIsBypassed();
+    }
+
+    private void UpdateIsOverMaxDistance()
+    {
+        // Check the distance to see if we should ignore the updates
+        _isOverMaxDistance = !IsLocal && MarioSlot.DistanceFromUserHead() > _skipFarMarioDistance;
+        UpdateIsBypassed();
+    }
+
+    private void UpdateIsBypassed()
+    {
+        if (!_initialized) return;
+
+        bool isBypassed = _isOverMaxDistance || _isOverMaxCount;
+        if (isBypassed == _wasBypassed) return;
+        _wasBypassed = isBypassed;
+
+        // Enable/Disable the mario's mesh renderer
+        _marioMeshRenderer.Enabled = !isBypassed;
+        SyncedIsShown = !isBypassed;
+    }
 
     private float3 GetCameraLookDirection() => (MarioUser?.Root?.ViewRotation ?? floatQ.Identity) * float3.Forward;
 
@@ -813,12 +936,12 @@ public sealed class SM64Mario : IDisposable
             case MarioCapType.MetalCap:
             case MarioCapType.WingCap:
                 // Prevent Vanish and Wing from being active at the same time - This prevents a crash
-                if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+                if (capType == MarioCapType.VanishCap && Utils.HasCapType(CurrentStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap && Utils.HasCapType(CurrentStateFlags, MarioCapType.VanishCap))
                 {
                     break;
                 }
 
-                if (Utils.HasCapType(SyncedStateFlags, capType))
+                if (Utils.HasCapType(CurrentStateFlags, capType))
                 {
                     if (IsLocal) Interop.MarioCapExtend(MarioId, duration);
                 }
@@ -837,7 +960,7 @@ public sealed class SM64Mario : IDisposable
 
                 break;
             case MarioCapType.NormalCap:
-                if (Utils.HasCapType(SyncedStateFlags, capType)) break;
+                if (Utils.HasCapType(CurrentStateFlags, capType)) break;
 
                 SetState(StateFlag.CapOnHead | StateFlag.NormalCap);
                 break;
@@ -883,14 +1006,11 @@ public sealed class SM64Mario : IDisposable
     private void Throw()
     {
         if (CurrentState.IsDead) return;
+
         float3 throwVelocityFlat = CurrentState.ScaledPosition - PreviousState.ScaledPosition;
         if (throwVelocityFlat.Magnitude > 0.01f)
         {
-            if (IsLocal)
-            {
-                SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
-            }
-
+            if (IsLocal) SetFaceAngle(floatQ.LookRotation(throwVelocityFlat));
             bool hasWingCap = Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap);
             SetAction(hasWingCap ? ActionFlag.Flying : ActionFlag.ThrownForward);
             if (IsLocal)
@@ -907,7 +1027,6 @@ public sealed class SM64Mario : IDisposable
                 SetVelocity(float3.Zero);
                 SetForwardVelocity(0f);
             }
-
             SetAction(ActionFlag.Freefall);
         }
     }
@@ -936,7 +1055,6 @@ public sealed class SM64Mario : IDisposable
         if (!interactable.Collider.Slot.IsActive || !Utils.Overlaps(interactable.Collider.GlobalBoundingBox, _marioCollider.GlobalBoundingBox)) return;
 
         int typeId = interactable.TypeId;
-        bool hasValue = interactable.HasValue;
 
         bool disable = true;
         switch (interactable.Type)
@@ -1015,6 +1133,11 @@ public sealed class SM64Mario : IDisposable
         Stomp
     }
 
+    ~SM64Mario()
+    {
+        Dispose(false);
+    }
+
     public void Dispose()
     {
         Dispose(true);
@@ -1024,29 +1147,63 @@ public sealed class SM64Mario : IDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed) return;
-        _disposed = true;
 
         if (disposing)
         {
-            if (IsLocal)
+            SM64Context.RemoveMario(this);
+
+            if (MarioSlot is { IsDestroyed: false })
             {
-                if (MarioSlot is { IsRemoved: false })
-                {
-                    MarioSlot?.Destroy();
-                }
+                MarioSlot.OnPrepareDestroy -= HandleSlotDestroyed;
             }
 
-            if (_marioRendererSlot is { IsRemoved: false })
+            if (_marioRendererSlot is { IsDestroyed: false })
             {
-                _marioRendererSlot?.Destroy();
+                _marioRendererSlot.Destroy();
             }
+
+            if (IsLocal && _marioNonModdedRendererSlot is { IsDestroyed: false })
+            {
+                _marioNonModdedRendererSlot.Destroy();
+            }
+
+            if (IsLocal && MarioSlot is { IsDestroyed: false })
+            {
+                MarioSlot.Destroy();
+            }
+
+            World = null;
+            Context = null;
+            MarioSlot = null;
+            MarioUser = null;
+            MarioSpace = null;
+
+            _marioRendererSlot = null;
+            _marioNonModdedRendererSlot = null;
+            _marioMeshRenderer = null;
+            _marioMesh = null;
+            _marioMeshProvider = null;
+            _marioMaterial = null;
+            _marioMaterialClipped = null;
+            _marioMaterialMetal = null;
+            _marioMaterialVanish = null;
+
+            _positionBuffers = null;
+            _normalBuffers = null;
+            _lerpPositionBuffer = null;
+            _lerpNormalBuffer = null;
+            _uvBuffer = null;
+            _colorBuffer = null;
+            _colorBufferColors = null;
         }
 
         if (Interop.IsGlobalInit)
         {
-            SM64Context.RemoveMario(this);
+            Interop.MarioDelete(MarioId);
         }
 
         _enabled = false;
+        _initialized = false;
+        _disposed = true;
     }
 }

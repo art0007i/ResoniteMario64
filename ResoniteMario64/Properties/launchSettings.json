@@ -5,6 +5,12 @@
       "executablePath": "$(GamePath)Resonite.exe",
       "commandLineArgs": "-SkipIntroTutorial -Screen -Invisible -DoNotAutoLoadHome -DataPath \"C:\\Resonite Data\\Mods\\Pre-Release\\DataPath\" -CachePath \"C:\\Resonite Data\\Mods\\Pre-Release\\CachePath\" -LoadAssembly Libraries\\ResoniteModLoader.dll -LoadAssembly Libraries\\SussyLoader.dll",
       "workingDirectory": "$(GamePath)"
+    },
+    "Launch Multi": {
+      "commandName": "Executable",
+      "executablePath": "$(GamePath)Resonite.exe",
+      "commandLineArgs": "-SkipIntroTutorial -Screen -Invisible -DoNotAutoLoadHome -DataPath \"C:\\Resonite Data\\Mods\\Pre-Release\\DataPath\" -CachePath \"C:\\Resonite Data\\Mods\\Pre-Release\\CachePath\" -LoadAssembly Libraries\\ResoniteModLoader.dll -LoadAssembly Libraries\\SussyLoader.dll",
+      "workingDirectory": "$(GamePath)"
     }
   }
 }

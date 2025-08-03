@@ -16,44 +16,13 @@ public sealed class SM64DynamicCollider : IDisposable
 
     public readonly uint ObjectId;
 
-    public World World { get; }
-    public SM64Context Context { get; }
-
-    public Collider Collider { get; }
+    public World World { get; private set; }
+    public SM64Context Context { get; private set; }
+    public Collider Collider { get; private set; }
 
     private float3 LastPosition { get; set; }
     private floatQ LastRotation { get; set; }
     public float3 InitScale { get; }
-
-    public float3 GlobalPosition
-    {
-        get
-        {
-            try
-            {
-                return Collider?.Slot?.GlobalPosition ?? float3.Zero;
-            }
-            catch
-            {
-                return float3.Zero;
-            }
-        }
-    }
-
-    public floatQ GlobalRotation
-    {
-        get
-        {
-            try
-            {
-                return Collider?.Slot?.GlobalRotation ?? floatQ.Identity;
-            }
-            catch
-            {
-                return floatQ.Identity;
-            }
-        }
-    }
 
     private bool _disposed;
 
@@ -61,8 +30,8 @@ public sealed class SM64DynamicCollider : IDisposable
     {
         World = col.World;
         Context = instance;
-
         Collider = col;
+        
         LastPosition = col.Slot.GlobalPosition;
         LastRotation = col.Slot.GlobalRotation;
         InitScale = col.Slot.GlobalScale;
@@ -76,9 +45,7 @@ public sealed class SM64DynamicCollider : IDisposable
             Dispose();
             return;
         }
-
-        // col.Slot.OnPrepareDestroy += _ => { Dispose(); };
-
+        
         List<SM64Surface> surfaces = Utils.GetScaledSurfaces(col, new List<SM64Surface>(), SurfaceType, TerrainType);
         ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
     }
@@ -87,10 +54,13 @@ public sealed class SM64DynamicCollider : IDisposable
     {
         if (_disposed || Collider?.Slot == null) return false;
 
-        if (GlobalPosition == LastPosition && GlobalRotation == LastRotation) return false;
+        float3 currentPosition = Collider.Slot.GlobalPosition;
+        floatQ currentRotation = Collider.Slot.GlobalRotation;
+        
+        if (currentPosition == LastPosition && currentRotation == LastRotation) return false;
 
-        LastPosition = GlobalPosition;
-        LastRotation = GlobalRotation;
+        LastPosition = currentPosition;
+        LastRotation = currentRotation;
 
         return true;
     }
@@ -99,10 +69,15 @@ public sealed class SM64DynamicCollider : IDisposable
     {
         if (UpdateCurrentPositionData())
         {
-            Interop.SurfaceObjectMove(ObjectId, GlobalPosition, GlobalRotation);
+            Interop.SurfaceObjectMove(ObjectId, LastPosition, LastRotation);
         }
     }
 
+    ~SM64DynamicCollider()
+    {
+        Dispose(false);
+    }
+    
     public void Dispose()
     {
         Dispose(true);
@@ -112,12 +87,21 @@ public sealed class SM64DynamicCollider : IDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed) return;
-        _disposed = true;
+
+        if (disposing)
+        {
+            Context?.UnregisterDynamicCollider(Collider);
+            
+            Context = null;
+            Collider = null;
+            World = null;
+        }
 
         if (Interop.IsGlobalInit)
         {
-            Context.UnregisterDynamicCollider(Collider);
             Interop.SurfaceObjectDelete(ObjectId);
         }
+        
+        _disposed = true;
     }
 }

@@ -62,7 +62,7 @@ public class ResoniteMario64 : ResoniteMod
     public static readonly ModConfigurationKey<bool> KeyDeleteAfterDeath = new ModConfigurationKey<bool>("delete_after_death", "Whether to automatically delete our marios after 15 seconds of being dead or not.", () => true);
 
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios. -- UNUSED", () => 5f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
+    public static readonly ModConfigurationKey<float> KeyMarioCullDistance = new ModConfigurationKey<float>("mario_cull_distance", "The distance where it should stop using the Super Mario 64 Engine to handle other players Marios. -- UNUSED", () => 50f); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
 
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<int> KeyMaxMariosPerPerson = new ModConfigurationKey<int>("max_marios_per_person", "Max number of Marios per player that will be animated using the Super Mario 64 Engine. -- UNUSED", () => 5); // slider 0, 20, 0 (still dk what the last arg means)
@@ -180,9 +180,9 @@ public class ResoniteMario64 : ResoniteMod
 
             Msg($"Our Assembly MD5Hash - {AssemblyMD5Hash}");
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            Console.WriteLine(e);
+            Error(ex);
             throw;
         }
 
@@ -215,78 +215,83 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
-    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] {typeof(WorldManager), typeof(bool), typeof(bool)})]
+    [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] { typeof(WorldManager), typeof(bool), typeof(bool) })]
     public class WorldStartRunningPatch
     {
         public static void Postfix(World __instance)
         {
-            Msg($"Assembly called Ctor - {AssemblyMD5Hash}");
-            
+            const string method = nameof(Postfix);
+            Msg($"[{method}] World constructor called with AssemblyHash: {AssemblyMD5Hash}");
+
             if (__instance.IsUserspace()) return;
             if (Engine.Current?.WorldManager == null) return;
 
             Engine.Current.WorldManager.WorldFocused += Sub;
+            Msg($"[{method}] Subscribed to WorldFocused event");
+
+            __instance.RootSlot.ChildAdded += (slot, child) =>
+            {
+                if (child.Name == TempSlotName)
+                {
+                    SM64Context.TempSlot = child;
+                    Msg($"[{method} - RootSlot.ChildAdded] Found Existing TempSlot");
+                }
+            };
+
+            __instance.RootSlot.ChildRemoved += (slot, child) =>
+            {
+                if (child.Name == TempSlotName)
+                {
+                    slot.RunInUpdates(slot.LocalUser.AllocationID, () =>
+                    {
+                        SM64Context.TempSlot = slot.FindChildOrAdd(TempSlotName, false);
+                        Msg($"[{method} - RootSlot.ChildRemoved] Remade TempSlot");
+                    });
+                }
+            };
+
             return;
-            
+
             void Sub(World world)
             {
-                if (world == __instance && world.Focus == World.WorldFocus.Focused)
+                Msg($"[{method}] WorldFocused event triggered for world: {world.Name}");
+                if (world != __instance) return;
+                if (world.Focus != World.WorldFocus.Focused) return;
+
+                world.RunInUpdates(3, () =>
                 {
+                    Msg($"[{method}] Trying to find TempSlot with ContextSlot");
                     Slot contextSlot = SM64Context.GetTempSlot(__instance).FindChild(x => x.Tag == ContextTag);
-                    if (contextSlot == null) return;
+                    if (contextSlot == null)
+                    {
+                        Msg($"[{method}] ContextSlot not found in TempSlot");
+                        return;
+                    }
 
                     if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
                     {
-                        context?.MarioContainersSlot.ForeachChild(slot =>
+                        Msg($"[{method}] Ensured SM64Context instance exists");
+                        context.World.RunInUpdates(3, () =>
                         {
-                            if (slot.Tag == MarioTag)
+                            context?.MarioContainersSlot?.ForeachChild(slot =>
                             {
-                                SM64Context.TryAddMario(slot);
-                            }
+                                if (slot.Tag == MarioTag)
+                                {
+                                    Msg($"[{method}] Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
+                                    SM64Context.TryAddMario(slot, false);
+                                }
+                            });
                         });
                     }
-                
-                    Engine.Current.WorldManager.WorldFocused -= Sub;
-                }
-            }
-        }
-    }
-
-    // TODO: Add more buttons here, and figure out a way to sync some of them
-    [HarmonyPatch(typeof(Button), "RunPressed")]
-    private class RunButtonPressed
-    {
-        public static bool Prefix(Button __instance)
-        {
-            if (__instance.Slot.Tag == "SpawnMario")
-            {
-                __instance.RunSynchronously(() =>
-                {
-                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == TempSlotName) ?? __instance.World.RootSlot.AddSlot(TempSlotName, false);
-
-                    Slot mario = root.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
-                    mario.GlobalPosition = __instance.Slot.GlobalPosition;
-
-                    SM64Context.TryAddMario(mario);
-                });
-
-                return false;
-            }
-
-            if (__instance.Slot.Tag == "KillInstance")
-            {
-                __instance.RunSynchronously(() =>
-                {
-                    if (SM64Context.Instance != null)
+                    else
                     {
-                        SM64Context.Instance.Dispose();
+                        Msg($"[{method}] Failed to ensure SM64Context instance");
                     }
+                    
+                    Engine.Current.WorldManager.WorldFocused -= Sub;
+                    Msg($"[{method}] Unsubscribed from WorldFocused event");
                 });
-
-                return false;
             }
-
-            return true;
         }
     }
 
@@ -316,12 +321,49 @@ public class ResoniteMario64 : ResoniteMod
         }
     }
 
+    // TODO: Add more buttons here, and figure out a way to sync some of them
+    [HarmonyPatch(typeof(Button), "RunPressed")]
+    private class RunButtonPressed
+    {
+        public static bool Prefix(Button __instance)
+        {
+            if (__instance.Slot.Tag == "SpawnMario")
+            {
+                __instance.RunSynchronously(() =>
+                {
+                    Slot root = __instance.World.RootSlot.FindChild(x => x.Name == TempSlotName) ?? __instance.World.RootSlot.AddSlot(TempSlotName, false);
+
+                    Slot mario = root.AddSlot($"{__instance.LocalUser.UserName}'s Mario", false);
+                    mario.GlobalPosition = __instance.Slot.GlobalPosition;
+
+                    SM64Context.TryAddMario(mario);
+                });
+
+                return false;
+            }
+
+            if (__instance.Slot.Tag == "KillInstance")
+            {
+                __instance.RunSynchronously(() => SM64Context.Instance?.Dispose());
+
+                return false;
+            }
+
+            return true;
+        }
+    }
+
     // TODO: Either add a config to make these debug only, or remove them entirely for physical buttons
     [HarmonyPatch(typeof(Slot), nameof(Slot.BuildInspectorUI))]
     private class SlotUiAddon
     {
         public static void Postfix(Slot __instance, UIBuilder ui)
         {
+            SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
+            if (inspector?.ComponentView?.Target.FindParent(x => x.Tag == ContextTag) == null) return;
+
+            // ui.Button("Button Label").LocalPressed += (b, e) => { b.RunSynchronously(() => { /* Do things here */ }) };
+
             ui.Button("Spawn Mario").LocalPressed += (b, e) =>
             {
                 b.RunSynchronously(() =>
@@ -336,32 +378,14 @@ public class ResoniteMario64 : ResoniteMod
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
-            ui.Button("Reload All Colliders").LocalPressed += (b, e) =>
-            {
-                b.RunSynchronously(() =>
-                {
-                    if (SM64Context.Instance != null)
-                    {
-                        SM64Context.Instance.ReloadAllColliders();
-                    }
-                });
-            };
-            ui.Button("Destroy Mario64 Context").LocalPressed += (b, e) =>
-            {
-                b.RunSynchronously(() =>
-                {
-                    if (SM64Context.Instance != null)
-                    {
-                        SM64Context.Instance.Dispose();
-                    }
-                });
-            };
+            if (Interop.IsGlobalInit) ui.Button("Reload All Colliders").LocalPressed += (b, e) => b.RunSynchronously(() => SM64Context.Instance?.ReloadAllColliders());
+            ;
+            ui.Button("Destroy Mario64 Context").LocalPressed += (b, e) => b.RunSynchronously(() => SM64Context.Instance?.Dispose());
 
-            if (SM64Context.Instance == null) return;
+            if (SM64Context.Instance == null || !Interop.IsGlobalInit) return;
 
             try
             {
-                SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
                 if (inspector?.ComponentView?.Target?.Tag == MarioTag && SM64Context.Instance?.AllMarios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
                 {
                     if (mario.IsLocal)
@@ -370,18 +394,18 @@ public class ResoniteMario64 : ResoniteMod
 
                         foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
                         {
-                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => { mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.GetValue(KeyDisableAudio)); };
+                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.GetValue(KeyDisableAudio));
                         }
 
                         ui.Spacer(8);
 
-                        ui.Button("Heal Mario").LocalPressed += (b, e) => { mario.Heal(1); };
+                        ui.Button("Heal Mario").LocalPressed += (b, e) => mario.Heal(1);
 
                         ui.Spacer(8);
 
-                        ui.Button("Damage Mario").LocalPressed += (b, e) => { mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1); };
-                        ui.Button("Kill Mario").LocalPressed += (b, e) => { mario.SetHealthPoints(0); };
-                        ui.Button("Nuke Mario").LocalPressed += (b, e) => { mario.SetMarioAsNuked(true); };
+                        ui.Button("Damage Mario").LocalPressed += (b, e) => mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1);
+                        ui.Button("Kill Mario").LocalPressed += (b, e) => mario.SetHealthPoints(0);
+                        ui.Button("Nuke Mario").LocalPressed += (b, e) => mario.SetMarioAsNuked(true);
 
                         ui.Spacer(8);
                     }
@@ -390,8 +414,8 @@ public class ResoniteMario64 : ResoniteMod
                 {
                     ui.Spacer(8);
 
-                    ui.Button("Play Random Music").LocalPressed += (b, e) => { Interop.PlayRandomMusic(); };
-                    ui.Button("Stop Music").LocalPressed += (b, e) => { Interop.StopMusic(); };
+                    ui.Button("Play Random Music").LocalPressed += (b, e) => Interop.PlayRandomMusic();
+                    ui.Button("Stop Music").LocalPressed += (b, e) => Interop.StopMusic();
 
                     ui.Spacer(8);
                 }

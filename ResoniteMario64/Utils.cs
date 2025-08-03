@@ -203,10 +203,10 @@ public static class Utils
     {
         return capType switch
         {
-            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
-            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
-            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
-            MarioCapType.NormalCap => (flags & (uint)StateFlag.NormalCap) != 0 && (flags & (uint)StateFlag.CapOnHead) != 0,
+            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0,
+            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0,
+            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0,
+            MarioCapType.NormalCap => (flags & (uint)StateFlag.NormalCap) != 0,
             _                      => throw new ArgumentOutOfRangeException(nameof(capType), capType, null)
         };
     }
