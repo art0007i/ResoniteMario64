@@ -237,8 +237,7 @@ public static class SM64Constants
     /// <param name="priority">Bits 15–8. Priority of the sound (higher = more important)</param>
     /// <param name="flags2">Bits 7–4. Additional flags (custom usage)</param>
     /// <returns>A 32-bit unsigned integer encoding the sound parameters</returns>
-    private static uint SoundArgLoad(uint bank, uint playFlags, uint soundID, uint priority, uint flags2)
-        => bank << 28 | playFlags << 24 | soundID << 16 | priority << 8 | flags2 << 4 | (uint)SoundPlaybackStatus.Starting;
+    private static uint SoundArgLoad(uint bank, uint playFlags, uint soundID, uint priority, uint flags2) => bank << 28 | playFlags << 24 | soundID << 16 | priority << 8 | flags2 << 4 | (uint)SoundPlaybackStatus.Starting;
 
 #endregion
 

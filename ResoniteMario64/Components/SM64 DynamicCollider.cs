@@ -13,6 +13,7 @@ public sealed class SM64DynamicCollider : IDisposable
 {
     public readonly SM64SurfaceType SurfaceType;
     public readonly SM64TerrainType TerrainType;
+    public readonly int Force;
 
     public readonly uint ObjectId;
 
@@ -31,22 +32,22 @@ public sealed class SM64DynamicCollider : IDisposable
         World = col.World;
         Context = instance;
         Collider = col;
-        
+
         LastPosition = col.Slot.GlobalPosition;
         LastRotation = col.Slot.GlobalRotation;
         InitScale = col.Slot.GlobalScale;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out _);
+        Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out Force);
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {
-            if (Utils.CheckDebug()) ResoniteMod.Warn($"[DynamicMeshCollider] {mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
+            if (Utils.CheckDebug()) Logger.Warn($"{mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
             Dispose();
             return;
         }
-        
-        List<SM64Surface> surfaces = Utils.GetScaledSurfaces(col, new List<SM64Surface>(), SurfaceType, TerrainType);
+
+        List<SM64Surface> surfaces = Utils.GetScaledSurfaces(col, new List<SM64Surface>(), SurfaceType, TerrainType, Force);
         ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
     }
 
@@ -56,7 +57,7 @@ public sealed class SM64DynamicCollider : IDisposable
 
         float3 currentPosition = Collider.Slot.GlobalPosition;
         floatQ currentRotation = Collider.Slot.GlobalRotation;
-        
+
         if (currentPosition == LastPosition && currentRotation == LastRotation) return false;
 
         LastPosition = currentPosition;
@@ -77,7 +78,7 @@ public sealed class SM64DynamicCollider : IDisposable
     {
         Dispose(false);
     }
-    
+
     public void Dispose()
     {
         Dispose(true);
@@ -91,7 +92,7 @@ public sealed class SM64DynamicCollider : IDisposable
         if (disposing)
         {
             Context?.UnregisterDynamicCollider(Collider);
-            
+
             Context = null;
             Collider = null;
             World = null;
@@ -101,7 +102,7 @@ public sealed class SM64DynamicCollider : IDisposable
         {
             Interop.SurfaceObjectDelete(ObjectId);
         }
-        
+
         _disposed = true;
     }
 }

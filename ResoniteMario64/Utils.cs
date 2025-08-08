@@ -5,6 +5,7 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
+using ResoniteMario64.Components;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
@@ -24,64 +25,71 @@ public static class Utils
     public static readonly float2 Float2Left = new float2(1);
     public static readonly float2 Float2Right = new float2(-1);
 
-    public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, Func<float3, float3> transformFunc)
+    public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
         {
             Submesh submesh = mesh.GetSubmesh(subMeshIndex);
             float3[] vertices = mesh.Vertices.Select(v => transformFunc(v.Position)).ToArray();
-            Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType);
+            Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType, force);
         }
     }
 
     public static bool IsGoodStaticCollider(Collider col)
     {
-        return col.Enabled && col.Slot.IsActive && CollidesWithCharacters(col) || (col.Slot.Tag?.Contains("SM64 StaticCollider") is true || col.Slot.Tag?.Contains("SM64 Collider") is true) && col.Slot.Tag?.Contains("SM64 DynamicCollider") is not true;
+        if (!IsActive(col)) return false;
+
+        bool hasStaticTag = HasTag(col, "SM64 StaticCollider") || HasTag(col, "SM64 Collider");
+        bool hasDynamicTag = HasTag(col, "SM64 DynamicCollider");
+
+        return CollidesWithCharacters(col) || hasStaticTag && !hasDynamicTag;
     }
 
     public static bool IsGoodDynamicCollider(Collider col)
     {
-        return col.Enabled && col.Slot.IsActive && col.Type.Value != ColliderType.Trigger && col.Slot.Tag?.Contains("SM64 DynamicCollider") is true && col.Slot.Tag?.Contains("SM64 StaticCollider") is not true;
+        if (!IsActive(col)) return false;
+
+        bool hasDynamicTag = HasTag(col, "SM64 DynamicCollider");
+        bool hasStaticTag = HasTag(col, "SM64 StaticCollider") || HasTag(col, "SM64 Collider");
+
+        return col.Type.Value != ColliderType.Trigger && hasDynamicTag && !hasStaticTag;
     }
 
-    public static bool IsGoodWaterBox(Collider col)
-    {
-        return col.Enabled && col.Slot.IsActive && col.Slot.Tag?.Contains("SM64 WaterBox") is true;
-    }
+    public static bool IsGoodWaterBox(Collider col) => IsActive(col) && HasTag(col, "SM64 WaterBox");
 
-    public static bool IsGoodInteractable(Collider col)
-    {
-        return col.Enabled && col.Slot.IsActive && col.Slot.Tag?.Contains("SM64 Interactable") is true;
-    }
+    public static bool IsGoodInteractable(Collider col) => col.Enabled && HasTag(col, "SM64 Interactable");
+
+    private static bool IsActive(Collider col) => col.Enabled && col.Slot.IsActive;
+    private static bool HasTag(Collider col, string tag) => col.Slot.Tag?.Contains(tag) == true;
 
     private static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
         List<SM64Surface> surfaces = new List<SM64Surface>();
-        List<(MeshCollider collider, SM64SurfaceType, SM64TerrainType)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType)>();
+        List<(MeshCollider collider, SM64SurfaceType, SM64TerrainType, int)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType, int)>();
 
         foreach (Collider obj in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
             if (!IsGoodStaticCollider(obj)) continue;
 
             string[] tagParts = obj.Slot.Tag?.Split(',');
-            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out _);
+            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force);
 
             if (obj is MeshCollider meshCollider)
             {
-                meshColliders.Add((meshCollider, surfaceType, terrainType));
+                meshColliders.Add((meshCollider, surfaceType, terrainType, force));
             }
             else
             {
-                GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType);
+                GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType, force);
             }
         }
 
         // Print all MeshColliders that are Null or Non-Readable
         if (Utils.CheckDebug())
         {
-            meshColliders.Where(InvalidCollider).Do(invalid => { ResoniteMod.Warn($"[MeshCollider] {invalid.collider.Slot.Name} Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :("); });
+            meshColliders.Where(InvalidCollider).Do(invalid => Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}"));
         }
 
         // Remove all MeshColliders that are Null or Non-Readable
@@ -94,23 +102,39 @@ public static class Utils
         int maxTris = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMeshColliderTris);
         int totalMeshColliderTris = 0;
 
-        foreach ((MeshCollider meshCollider, SM64SurfaceType surfaceType, SM64TerrainType terrainType) in meshColliders)
+        foreach ((MeshCollider meshCollider, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force) in meshColliders)
         {
             int meshTrisCount = meshCollider.Mesh.Asset.Data.TotalTriangleCount;
             int newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
             if (newTotalMeshColliderTris > maxTris)
             {
-                if (Utils.CheckDebug()) ResoniteMod.Warn("[MeshCollider] Collider has too many triangles. " + meshCollider);
+                if (Utils.CheckDebug()) Logger.Warn($"[{meshCollider.GetType()}] {meshCollider.Slot.Name} ({meshCollider.ReferenceID}) Mesh has too many triangles.");
                 continue;
             }
 
-            GetTransformedSurfaces(meshCollider, surfaces, surfaceType, terrainType);
+            GetTransformedSurfaces(meshCollider, surfaces, surfaceType, terrainType, force);
             totalMeshColliderTris = newTotalMeshColliderTris;
         }
 
         return surfaces.ToArray();
 
-        bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
+        bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType, int) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
+    }
+
+    // Function used for static colliders. Returns correct global positions, rotations and scales.
+    public static List<SM64Surface> GetTransformedSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    {
+        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
+
+        return surfaces;
+    }
+
+    // Function used for dynamic colliders. Returns correct scales. (rotation and position is set dynamically)
+    internal static List<SM64Surface> GetScaledSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    {
+        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
+
+        return surfaces;
     }
 
     public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
@@ -165,32 +189,17 @@ public static class Utils
                     }
                 }
             }
+            else if (trimmed.StartsWith("Force_", StringComparison.OrdinalIgnoreCase))
+            {
+                string idxString = trimmed.Substring("Force_".Length);
+                if (int.TryParse(idxString, out int parsedIdx))
+                {
+                    interactableId = parsedIdx;
+                }
+            }
         }
     }
-
-    // Function used for static colliders. Returns correct global positions, rotations and scales.
-    public static List<SM64Surface> GetTransformedSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
-    {
-        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
-
-        return surfaces;
-    }
-
-    // Function used for dynamic colliders. Returns correct scales. (rotation and position is set dynamically)
-    internal static List<SM64Surface> GetScaledSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
-    {
-        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, x => collider.Slot.GlobalScale * (x + collider.Offset));
-
-        return surfaces;
-    }
-
-    public static bool Overlaps(BoundingBox a, BoundingBox b)
-    {
-        return (a.min.X <= b.max.X && a.max.X >= b.min.X) &&
-               (a.min.Y <= b.max.Y && a.max.Y >= b.min.Y) &&
-               (a.min.Z <= b.max.Z && a.max.Z >= b.min.Z);
-    }
-
+    
     public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
 
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
@@ -198,6 +207,30 @@ public static class Utils
     public static List<T> GetTempList<T>(this List<T> source) => new List<T>(source);
 
     public static List<T> GetTempList<T>(this IEnumerable<T> source) => new List<T>(source);
+    
+    public static List<TValue> GetFilteredSortedList<TKey, TValue, TSortKey>(this Dictionary<TKey, TValue> source, Func<TValue, bool> filter = null, Func<TValue, TSortKey> sortKeySelector = null, bool ascending = true)
+    {
+        IEnumerable<TValue> query = source.Values;
+
+        if (filter != null)
+        {
+            query = query.Where(filter);
+        }
+
+        if (sortKeySelector != null)
+        {
+            query = ascending
+                    ? query.OrderBy(sortKeySelector)
+                    : query.OrderByDescending(sortKeySelector);
+        }
+
+        return query.ToList();
+    }
+
+    public static floatQ LookAt(this Slot target, float3 targetPoint)
+    {
+        return floatQ.LookRotation(target.Parent.GlobalPointToLocal(in targetPoint) - target.LocalPosition, float3.Up);
+    }
 
     public static bool HasCapType(uint flags, MarioCapType capType)
     {
@@ -211,9 +244,5 @@ public static class Utils
         };
     }
 
-    public static User GetAllocatingUser(this Slot slot)
-    {
-        slot.ReferenceID.ExtractIDs(out _, out byte userByte);
-        return slot.World.GetUserByAllocationID(userByte);
-    }
+    public static User GetAllocatingUser(this Slot slot) => slot.World.GetUserByAllocationID(slot.ReferenceID.User);
 }

@@ -23,46 +23,45 @@ public sealed partial class SM64Context
     private readonly StereoSample[] _convertedBuffer = new StereoSample[(int)(NativeBufferSize * (TargetSampleRate / (float)NativeSampleRate))];
     private double _audioAccumulator;
     private AudioOutput _marioAudioOutput;
-    private Slot AudioSlot;
+    private Slot _audioSlot;
     private OpusStream<StereoSample> _marioAudioStream;
 
     private CircularBufferWriteState<StereoSample> _writeState;
 
     private void SetAudioSource()
     {
-        const string method = nameof(SetAudioSource);
         try
         {
             World.RunSynchronously(() =>
             {
-                ResoniteMod.Msg($"[{method}] Starting AudioSource setup at {DateTime.Now:HH:mm:ss}");
-                
+                Logger.Msg($"Starting AudioSource setup at {DateTime.Now:HH:mm:ss}");
+
                 _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(
                     World.LocalUser,
                     $"{AudioTag} - {World.LocalUser.UserID}",
                     out bool created);
 
-                ResoniteMod.Msg($"[{method}] AudioStream {(created ? "created" : "reused")} for user {World.LocalUser.UserID}");
+                Logger.Msg($"AudioStream {(created ? "created" : "reused")} for user {World.LocalUser.UserID}");
 
                 if (created)
                 {
                     _marioAudioStream.Group = "SM64";
-                    ResoniteMod.Msg($"[{method}] AudioStream group set to SM64");
+                    Logger.Msg("AudioStream group set to SM64");
                 }
-            
-            
+
+
                 bool useLocalAudio = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLocalAudio);
                 float defaultVolume = ResoniteMario64.KeyAudioVolume.TryComputeDefaultTyped(out float defaultValue) ? defaultValue : 0f;
 
-                ResoniteMod.Msg($"[{method}] useLocalAudio={useLocalAudio}, defaultVolume={defaultVolume}");
+                Logger.Msg($"useLocalAudio={useLocalAudio}, defaultVolume={defaultVolume}");
 
                 if (useLocalAudio)
                 {
-                    ResoniteMod.Msg($"[{method}] Creating LocalAudioSlot");
+                    Logger.Msg("Creating LocalAudioSlot");
                     Slot localSlot = World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
                     localSlot.Tag = AudioTag;
 
-                    ResoniteMod.Msg($"[{method}] Attaching or getting LocalAudioOutput component");
+                    Logger.Msg("Attaching or getting LocalAudioOutput component");
                     AudioOutput localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
                     if (localAttached || localAudio.Source.Target == null)
                     {
@@ -74,16 +73,16 @@ public sealed partial class SM64Context
                         localAudio.IgnoreAudioEffects.Value = true;
                         localAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
 
-                        ResoniteMod.Msg($"[{method}] LocalAudioOutput configured");
+                        Logger.Msg("LocalAudioOutput configured");
                     }
 
-                    AudioSlot = localSlot;
+                    _audioSlot = localSlot;
                     _marioAudioOutput = localAudio;
 
-                    ResoniteMod.Msg($"[{method}] LocalAudioSlot and AudioOutput set");
+                    Logger.Msg("LocalAudioSlot and AudioOutput set");
                 }
 
-                ResoniteMod.Msg($"[{method}] Creating GlobalAudioSlot");
+                Logger.Msg("Creating GlobalAudioSlot");
                 Slot globalSlot = ContextSlot?.FindChildOrAdd(AudioSlotName, false);
                 AudioOutput globalAudio = null;
 
@@ -91,7 +90,7 @@ public sealed partial class SM64Context
                 {
                     globalSlot.Tag = AudioTag;
 
-                    ResoniteMod.Msg($"[{method}] Attaching or getting GlobalAudioOutput component");
+                    Logger.Msg("Attaching or getting GlobalAudioOutput component");
                     globalAudio = globalSlot.GetComponentOrAttach<AudioOutput>(out bool globalAttached);
                     if (globalAttached || globalAudio.Source.Target == null)
                     {
@@ -103,51 +102,51 @@ public sealed partial class SM64Context
                         globalAudio.IgnoreAudioEffects.Value = true;
                         globalAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
 
-                        ResoniteMod.Msg($"[{method}] GlobalAudioOutput configured");
+                        Logger.Msg("GlobalAudioOutput configured");
                     }
 
-                    ResoniteMod.Msg($"[{method}] GlobalAudioSlot ready");
+                    Logger.Msg("GlobalAudioSlot ready");
                 }
                 else
                 {
-                    ResoniteMod.Msg($"[{method}] GlobalAudioSlot not found or ContextSlot is null");
+                    Logger.Msg("GlobalAudioSlot not found or ContextSlot is null");
                 }
 
                 if (!useLocalAudio)
                 {
-                    AudioSlot = globalSlot;
+                    _audioSlot = globalSlot;
                     _marioAudioOutput = globalAudio;
-                    ResoniteMod.Msg($"[{method}] Using GlobalAudioSlot and AudioOutput");
+                    Logger.Msg("Using GlobalAudioSlot and AudioOutput");
                 }
 
                 World.RunInUpdates(World.LocalUser.AllocationID + 1, () =>
                 {
                     float volume = useLocalAudio ? 0f : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
-                    ResoniteMod.Msg($"[{method}] Overriding volume for user: {World.LocalUser.UserID} to {volume}");
+                    Logger.Msg($"Overriding volume for user: {World.LocalUser.UserID} to {volume}");
 
                     ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(World.LocalUser, volume);
                     if (overrideForUser != null)
                     {
                         overrideForUser.Default.Value = defaultVolume;
-                        ResoniteMod.Msg($"[{method}] Override default volume set to {defaultVolume}");
+                        Logger.Msg($"Override default volume set to {defaultVolume}");
                     }
                     else
                     {
-                        ResoniteMod.Msg($"[{method}] No override created for volume");
+                        Logger.Msg("No override created for volume");
                     }
                 });
 
-                ResoniteMod.Msg($"[{method}] Subscribing event handlers");
+                Logger.Msg("Subscribing event handlers");
 
-                if (AudioSlot != null)
+                if (_audioSlot != null)
                 {
-                    AudioSlot.OnPrepareDestroy -= HandleAudioDestroy;
-                    AudioSlot.OnPrepareDestroy += HandleAudioDestroy;
-                    ResoniteMod.Msg($"[{method}] Subscribed to AudioSlot.OnPrepareDestroy");
+                    _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+                    _audioSlot.OnPrepareDestroy += HandleAudioDestroy;
+                    Logger.Msg("Subscribed to AudioSlot.OnPrepareDestroy");
                 }
                 else
                 {
-                    ResoniteMod.Msg($"[{method}] AudioSlot is null, skipping OnPrepareDestroy subscription");
+                    Logger.Msg("AudioSlot is null, skipping OnPrepareDestroy subscription");
                 }
 
                 ResoniteMario64.KeyLocalAudio.OnChanged -= HandleLocalAudioChange;
@@ -159,95 +158,88 @@ public sealed partial class SM64Context
                 ResoniteMario64.KeyAudioVolume.OnChanged -= HandleVolumeChange;
                 ResoniteMario64.KeyAudioVolume.OnChanged += HandleVolumeChange;
 
-                ResoniteMod.Msg($"[{method}] Event handlers subscribed");
-                ResoniteMod.Msg($"[{method}] AudioSource setup finished at {DateTime.Now:HH:mm:ss.fff}");
+                Logger.Msg("Event handlers subscribed");
+                Logger.Msg($"AudioSource setup finished at {DateTime.Now:HH:mm:ss.fff}");
             });
         }
         catch (Exception ex)
         {
-            ResoniteMod.Msg($"[{method}] ERROR during SetAudioSource: {ex}");
+            Logger.Msg($"ERROR during SetAudioSource: {ex}");
         }
     }
 
     private void HandleAudioDestroy(Slot slot)
     {
-        const string method = nameof(HandleAudioDestroy);
-        ResoniteMod.Msg($"[{method}] AudioSlot is being destroyed, checking if global init");
+        Logger.Msg("AudioSlot is being destroyed, checking if global init");
 
         if (Interop.IsGlobalInit)
         {
-            ResoniteMod.Msg($"[{method}] GlobalInit is true, scheduling SetAudioSource");
+            Logger.Msg("GlobalInit is true, scheduling SetAudioSource");
             slot.RunInUpdates(slot.LocalUser.AllocationID * 3, SetAudioSource);
         }
         else
         {
-            ResoniteMod.Msg($"[{method}] GlobalInit is false, skipping SetAudioSource");
+            Logger.Msg("GlobalInit is false, skipping SetAudioSource");
         }
     }
 
     private void HandleVolumeChange(object value)
     {
-        const string method = nameof(HandleVolumeChange);
-
-        if (AudioSlot == null || _marioAudioOutput == null)
+        if (_audioSlot == null || _marioAudioOutput == null)
         {
-            ResoniteMod.Msg($"[{method}] AudioSlot or _marioAudioOutput is null, ignoring volume change");
+            Logger.Msg("AudioSlot or _marioAudioOutput is null, ignoring volume change");
             return;
         }
 
         float volume = (float)value;
-        ResoniteMod.Msg($"[{method}] Volume change requested: {volume}");
+        Logger.Msg($"Volume change requested: {volume}");
 
-        if (AudioSlot.IsLocalElement)
+        if (_audioSlot.IsLocalElement)
         {
             _marioAudioOutput.Volume.Value = volume;
-            ResoniteMod.Msg($"[{method}] Volume set directly on local AudioOutput");
+            Logger.Msg("Volume set directly on local AudioOutput");
         }
         else
         {
             _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, volume);
-            ResoniteMod.Msg($"[{method}] Volume overridden for user {World.LocalUser.UserID}");
+            Logger.Msg($"Volume overridden for user {World.LocalUser.UserID}");
         }
     }
 
     private void HandleDisableChange(object value)
     {
-        const string method = nameof(HandleDisableChange);
-
-        if (AudioSlot == null)
+        if (_audioSlot == null)
         {
-            ResoniteMod.Msg($"[{method}] AudioSlot is null, ignoring disable change");
+            Logger.Msg("AudioSlot is null, ignoring disable change");
             return;
         }
 
-        if (AudioSlot.GetAllocatingUser() == World.LocalUser)
+        if (_audioSlot.GetAllocatingUser() == World.LocalUser)
         {
-            ResoniteMod.Msg($"[{method}] Disabling audio, destroying AudioSlot");
-            AudioSlot.Destroy();
+            Logger.Msg("Disabling audio, destroying AudioSlot");
+            _audioSlot.Destroy();
         }
         else
         {
-            ResoniteMod.Msg($"[{method}] Allocating user is not local user, no action taken");
+            Logger.Msg("Allocating user is not local user, no action taken");
         }
     }
 
     private void HandleLocalAudioChange(object value)
     {
-        const string method = nameof(HandleLocalAudioChange);
-
-        if (AudioSlot == null)
+        if (_audioSlot == null)
         {
-            ResoniteMod.Msg($"[{method}] AudioSlot is null, cannot change local audio");
+            Logger.Msg("AudioSlot is null, cannot change local audio");
             return;
         }
 
-        if (AudioSlot.IsLocalElement)
+        if (_audioSlot.IsLocalElement)
         {
-            ResoniteMod.Msg($"[{method}] Local audio slot detected, destroying it");
-            AudioSlot.Destroy();
+            Logger.Msg("Local audio slot detected, destroying it");
+            _audioSlot.Destroy();
         }
 
-        ResoniteMod.Msg($"[{method}] Reinitializing audio source after local audio change");
+        Logger.Msg("Reinitializing audio source after local audio change");
         SetAudioSource();
     }
 
@@ -268,7 +260,6 @@ public sealed partial class SM64Context
         }
 
         if (_audioAccumulator < AudioTickInterval) return;
-
         _audioAccumulator -= AudioTickInterval;
 
         Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.FrameSize);
@@ -282,14 +273,14 @@ public sealed partial class SM64Context
 
         if (written <= 0) return;
         if (written > _marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode) return;
-        
+
         const double rate = (double)TargetSampleRate / NativeSampleRate;
         int available = _marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode;
 
         int estimatedPutCount = (int)Math.Ceiling(_convertedBuffer.Length / rate);
         if (estimatedPutCount > available)
         {
-            ResoniteMod.Debug($"[Audio] Skipping write. Needed {estimatedPutCount}, available {available}");
+            Logger.Debug($"[Audio] Skipping write. Needed {estimatedPutCount}, available {available}");
             return;
         }
 

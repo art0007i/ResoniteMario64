@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
@@ -220,7 +221,7 @@ public sealed partial class SM64Context
         }
     }
 
-    private static void LogCollider(object obj, int? added, bool destroyed)
+    private static void LogCollider(object obj, int? added, bool destroyed, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
 #if DEBUG
         if (!ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLogColliderChanges)) return;
@@ -236,12 +237,6 @@ public sealed partial class SM64Context
             4 or 40 => "WaterBox",
             _       => "Collider"
         };
-
-        Action<string> logDelegate = destroyed
-                ? ResoniteMod.Error
-                : isNewlyAdded
-                        ? ResoniteMod.Msg
-                        : ResoniteMod.Warn;
 
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
@@ -260,7 +255,14 @@ public sealed partial class SM64Context
                         ? "Added"
                         : "Already Added";
 
-        logDelegate($"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType} ({interactableId})");
+        string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}";
+
+        if (destroyed)
+            Logger.Error(message, caller, line);
+        else if (isNewlyAdded)
+            Logger.Msg(message, caller, line);
+        else
+            Logger.Warn(message, caller, line);
 #endif
     }
 

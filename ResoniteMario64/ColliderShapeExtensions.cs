@@ -68,7 +68,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 
-                if (Utils.CheckDebug()) ResoniteMod.Warn($"[MeshCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
+                if (Utils.CheckDebug()) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
 
                 break;
             case ConvexHullCollider col:
@@ -77,7 +77,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 
-                if (Utils.CheckDebug()) ResoniteMod.Warn($"[ConvexHullCollider] {col.Slot.Name} Mesh is null or not readable, so we won't be able to use this as a collider for Mario :(");
+                if (Utils.CheckDebug()) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
 
                 break;
         }

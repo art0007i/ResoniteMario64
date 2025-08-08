@@ -31,11 +31,11 @@ public sealed class SM64Interactable : IDisposable
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {
-            if (Utils.CheckDebug()) ResoniteMod.Warn($"[InteractMeshCollider] {mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
+            if (Utils.CheckDebug()) Logger.Warn($"[Interactable{mc.GetType()}] {mc.Slot.Name} ({mc.ReferenceID}) Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}");
             Dispose();
         }
     }
-    
+
     ~SM64Interactable()
     {
         Dispose(false);
@@ -50,7 +50,7 @@ public sealed class SM64Interactable : IDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed) return;
-        
+
         if (disposing)
         {
             Context.UnregisterInteractable(Collider);
@@ -59,7 +59,7 @@ public sealed class SM64Interactable : IDisposable
             Context = null;
             Collider = null;
         }
-        
+
         _disposed = true;
     }
 }

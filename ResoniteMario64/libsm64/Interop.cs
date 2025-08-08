@@ -15,21 +15,27 @@ namespace ResoniteMario64.libsm64;
 public static class MarioExtensions
 {
     public static float3 ToMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
+
     public static float3 FromMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
+
     public static float3 FromMarioPosition(this float3 pos) => pos / Interop.ScaleFactor * new float3(-1, 1, 1);
 
     public static float ToMarioFloat(this float value) => Interop.ScaleFactor * value;
+    public static float3 ToMarioFloat(this float3 value) => Interop.ScaleFactor * value;
+
     public static float FromMarioFloat(this float value) => value / Interop.ScaleFactor;
+    public static float3 FromMarioFloat(this float3 value) => value / Interop.ScaleFactor;
 
     private static float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
+
     private static float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
 }
 
 public static class Interop
 {
-    public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) is true ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
+    public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) ?? false ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
 
     public const int SM64TextureWidth = 64 * 11;
     public const int SM64TextureHeight = 64;
@@ -43,9 +49,11 @@ public static class Interop
 
     // It seems a collider can't be too big, otherwise it will be ignored
     // This seems like too much of a pain to fix rn, let the future me worry about it
-    public static int SM64MaxVertexDistance = 250000 * (int)ScaleFactor;
+    public static int SM64MaxVertexDistance => 250000 * (int)ScaleFactor;
 
     public const float SM64Deg2Angle = 182.04459f;
+    
+    private const byte HealPointMultiplier = 4;
 
     public static Bitmap2D MarioTexture { get; private set; }
     public static bool IsGlobalInit;
@@ -113,8 +121,8 @@ public static class Interop
     [DllImport("sm64")]
     private static extern void sm64_set_mario_action(uint marioId, uint action);
 
-    [DllImport("sm64")]
-    private static extern void sm64_set_mario_action(uint marioId, uint action, uint actionArg);
+    [DllImport("sm64", EntryPoint = "sm64_set_mario_action")]
+    private static extern void sm64_set_mario_action_with_arg(uint marioId, uint action, uint actionArg);
 
     [DllImport("sm64")]
     private static extern void sm64_set_mario_state(uint marioId, uint flags);
@@ -217,32 +225,37 @@ public static class Interop
         byte[] textureData = new byte[4 * SM64TextureWidth * SM64TextureHeight];
         GCHandle textureDataHandle = GCHandle.Alloc(textureData, GCHandleType.Pinned);
 
-        sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
-        sm64_audio_init(romHandle.AddrOfPinnedObject());
-
-        /*MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
-        for (int ix = 0; ix < SM64TextureWidth; ix++)
-        for (int iy = 0; iy < SM64TextureHeight; iy++)
+        try
         {
-            color32 color = new color32(
-                textureData[4 * (ix + SM64TextureWidth * iy) + 0],
-                textureData[4 * (ix + SM64TextureWidth * iy) + 1],
-                textureData[4 * (ix + SM64TextureWidth * iy) + 2],
-                textureData[4 * (ix + SM64TextureWidth * iy) + 3]
-            );
-            // Make the 100% transparent colors white. So we can multiply with the vertex colors.
-            if (color.a == 0)
+            sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
+            sm64_audio_init(romHandle.AddrOfPinnedObject());
+
+            /*MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
+            for (int ix = 0; ix < SM64TextureWidth; ix++)
+            for (int iy = 0; iy < SM64TextureHeight; iy++)
             {
-                color = new color32(255, 255, 255, 0);
+                color32 color = new color32(
+                    textureData[4 * (ix + SM64TextureWidth * iy) + 0],
+                    textureData[4 * (ix + SM64TextureWidth * iy) + 1],
+                    textureData[4 * (ix + SM64TextureWidth * iy) + 2],
+                    textureData[4 * (ix + SM64TextureWidth * iy) + 3]
+                );
+                // Make the 100% transparent colors white. So we can multiply with the vertex colors.
+                if (color.a == 0)
+                {
+                    color = new color32(255, 255, 255, 0);
+                }
+    
+                MarioTexture.SetPixel32(ix, iy, color);
             }
-
-            MarioTexture.SetPixel32(ix, iy, color);
+    
+            // MarioTexture.Save("mario.png");*/
         }
-
-        // MarioTexture.Save("mario.png");*/
-
-        romHandle.Free();
-        textureDataHandle.Free();
+        finally
+        {
+            romHandle.Free();
+            textureDataHandle.Free();
+        }
 
         IsGlobalInit = true;
     }
@@ -260,6 +273,11 @@ public static class Interop
         StopMusic();
         sm64_play_music(0, (ushort)music, 0);
     }
+    
+    public static void PlayMusic(byte player, ushort seqArgs, ushort fadeTimer)
+    {
+        sm64_play_music(player, seqArgs, fadeTimer);
+    }
 
     public static void PlayRandomMusic()
     {
@@ -275,10 +293,19 @@ public static class Interop
             sm64_stop_background_music(currentMusic);
         }
     }
+    
+    public static void FadeoutBackgroundMusic(ushort fadeOut)
+    {
+        ushort currentMusic = sm64_get_current_background_music();
+        if (currentMusic != (ushort)MusicSequence.None)
+        {
+            sm64_fadeout_background_music(currentMusic, fadeOut);
+        }
+    }
 
     public static void StaticSurfacesLoad(SM64Surface[] surfaces)
     {
-        ResoniteMod.Debug($"Reloading all static collider surfaces - Total Polygons: {surfaces.Length}");
+        Logger.Debug($"Reloading all static collider surfaces - Total Polygons: {surfaces.Length}");
         sm64_static_surfaces_load(surfaces, (ulong)surfaces.Length);
     }
 
@@ -292,25 +319,28 @@ public static class Interop
         GCHandle normHandle = GCHandle.Alloc(normalBuffer, GCHandleType.Pinned);
         GCHandle colorHandle = GCHandle.Alloc(colorBuffer, GCHandleType.Pinned);
         GCHandle uvHandle = GCHandle.Alloc(uvBuffer, GCHandleType.Pinned);
-
-        SM64MarioGeometryBuffers buff = new SM64MarioGeometryBuffers
+        
+        try
         {
-            position = posHandle.AddrOfPinnedObject(),
-            normal = normHandle.AddrOfPinnedObject(),
-            color = colorHandle.AddrOfPinnedObject(),
-            uv = uvHandle.AddrOfPinnedObject()
-        };
+            SM64MarioGeometryBuffers buff = new SM64MarioGeometryBuffers
+            {
+                position = posHandle.AddrOfPinnedObject(),
+                normal = normHandle.AddrOfPinnedObject(),
+                color = colorHandle.AddrOfPinnedObject(),
+                uv = uvHandle.AddrOfPinnedObject()
+            };
 
+            sm64_mario_tick(marioId, ref inputs, ref outState, ref buff);
 
-        sm64_mario_tick(marioId, ref inputs, ref outState, ref buff);
-
-
-        numTrianglesUsed = buff.numTrianglesUsed;
-
-        posHandle.Free();
-        normHandle.Free();
-        colorHandle.Free();
-        uvHandle.Free();
+            numTrianglesUsed = buff.numTrianglesUsed;
+        }
+        finally
+        {
+            posHandle.Free();
+            normHandle.Free();
+            colorHandle.Free();
+            uvHandle.Free();
+        }
 
         return outState;
     }
@@ -318,9 +348,14 @@ public static class Interop
     public static uint AudioTick(short[] audioBuffer, uint numDesiredSamples, uint numQueuedSamples = 0)
     {
         GCHandle audioBufferPointer = GCHandle.Alloc(audioBuffer, GCHandleType.Pinned);
-        uint numSamples = sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
-        audioBufferPointer.Free();
-        return numSamples;
+        try
+        {
+            return sm64_audio_tick(numQueuedSamples, numDesiredSamples, audioBufferPointer.AddrOfPinnedObject());
+        }
+        finally
+        {
+            audioBufferPointer.Free();
+        }
     }
 
     public static void PlaySoundGlobal(Sounds soundKey)
@@ -333,10 +368,15 @@ public static class Interop
         float3 marioPos = frooxPosition.ToMarioPosition();
         float[] position = { marioPos.x, marioPos.y, marioPos.z };
         GCHandle posPointer = GCHandle.Alloc(position, GCHandleType.Pinned);
-
-        sm64_play_sound((int)SoundBank[soundKey], posPointer.AddrOfPinnedObject());
-
-        posPointer.Free();
+        
+        try
+        {
+            sm64_play_sound((int)SoundBank[soundKey], posPointer.AddrOfPinnedObject());
+        }
+        finally
+        {
+            posPointer.Free();
+        }
     }
 
     public static void MarioDelete(uint marioId)
@@ -344,10 +384,16 @@ public static class Interop
         sm64_mario_delete(marioId);
     }
 
-    public static void MarioTakeDamage(uint marioId, float3 frooxPosition, uint damage)
+    public static bool MarioAttack(uint marioId, float3 frooxPosition, float hitboxHeight)
     {
         float3 marioPos = frooxPosition.ToMarioPosition();
-        sm64_mario_take_damage(marioId, damage, 0, marioPos.x, marioPos.y, marioPos.z);
+        return sm64_mario_attack(marioId, marioPos.x, marioPos.y, marioPos.z, hitboxHeight.ToMarioFloat());
+    }
+
+    public static void MarioTakeDamage(uint marioId, float3 frooxPosition, uint damage, uint subtype = 0)
+    {
+        float3 marioPos = frooxPosition.ToMarioPosition();
+        sm64_mario_take_damage(marioId, damage, subtype, marioPos.x, marioPos.y, marioPos.z);
     }
 
     public static unsafe void MarioSetVelocity(uint marioId, SM64MarioState previousState, SM64MarioState currentState)
@@ -369,13 +415,13 @@ public static class Interop
         sm64_set_mario_forward_velocity(marioId, frooxVelocity * ScaleFactor);
     }
 
-    public static void CreateAndAppendSurfaces(List<SM64Surface> outSurfaces, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType)
+    public static void CreateAndAppendSurfaces(List<SM64Surface> outSurfaces, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
     {
         for (int i = 0; i < triangles.Length; i += 3)
         {
             outSurfaces.Add(new SM64Surface
             {
-                Force = 0,
+                Force = (short)(force == -1 ? 0 : force),
                 Type = (short)surfaceType,
                 Terrain = (ushort)terrainType,
 
@@ -407,17 +453,16 @@ public static class Interop
     public static float FindFloor(float3 pos, out SM64SurfaceCollisionData data)
     {
         float3 marioPos = pos.ToMarioPosition();
-        IntPtr floorPtr;
-        float floorHeightMario = sm64_surface_find_floor(marioPos.x, marioPos.y, marioPos.z, out floorPtr);
+        float floorHeightMario = sm64_surface_find_floor(marioPos.x, marioPos.y, marioPos.z, out IntPtr floorPtr);
         data = floorPtr == IntPtr.Zero ? new SM64SurfaceCollisionData() : Marshal.PtrToStructure<SM64SurfaceCollisionData>(floorPtr);
-        return floorHeightMario / Interop.ScaleFactor;
+        return floorHeightMario.FromMarioFloat();
     }
 
     public static float FindFloorHeight(float3 pos)
     {
         float3 marioPos = pos.ToMarioPosition();
         float floorHeightMario = sm64_surface_find_floor_height(marioPos.x, marioPos.y, marioPos.z);
-        return floorHeightMario / Interop.ScaleFactor;
+        return floorHeightMario.FromMarioFloat();
     }
 
     public static float FindFloorHeightAndData(float3 pos, out SM64FloorCollisionData data)
@@ -425,26 +470,49 @@ public static class Interop
         float3 marioPos = pos.ToMarioPosition();
         float floorHeightMario = sm64_surface_find_floor_height_and_data(marioPos.x, marioPos.y, marioPos.z, out IntPtr floorGeo);
         data = floorGeo == IntPtr.Zero ? new SM64FloorCollisionData() : Marshal.PtrToStructure<SM64FloorCollisionData>(floorGeo);
-        return floorHeightMario / Interop.ScaleFactor;
+        return floorHeightMario.FromMarioFloat();
+    }
+    
+    public static float FindCeil(float3 pos, out SM64SurfaceCollisionData data)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        float ceilHeightMario = sm64_surface_find_ceil(marioPos.x, marioPos.y, marioPos.z, out IntPtr ceilPtr);
+        data = ceilPtr == IntPtr.Zero ? new SM64SurfaceCollisionData() : Marshal.PtrToStructure<SM64SurfaceCollisionData>(ceilPtr);
+        return ceilHeightMario.FromMarioFloat();
+    }
+    
+    public static float FindWaterLevel(float3 pos)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        return sm64_surface_find_water_level(marioPos.x, marioPos.z).FromMarioFloat();
+    }
+
+    public static float FindPoisonGasLevel(float3 pos)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        return sm64_surface_find_poison_gas_level(marioPos.x, marioPos.z).FromMarioFloat();
     }
 
     public static uint SurfaceObjectCreate(float3 position, floatQ rotation, SM64Surface[] surfaces)
     {
         GCHandle surfListHandle = GCHandle.Alloc(surfaces, GCHandleType.Pinned);
-        SM64ObjectTransform t = SM64ObjectTransform.FromFrooxWorld(position, rotation);
-
-        SM64SurfaceObject surfObj = new SM64SurfaceObject
+        try
         {
-            transform = t,
-            surfaceCount = (uint)surfaces.Length,
-            surfaces = surfListHandle.AddrOfPinnedObject()
-        };
+            SM64ObjectTransform transform = SM64ObjectTransform.FromFrooxWorld(position, rotation);
 
-        uint result = sm64_surface_object_create(ref surfObj);
+            SM64SurfaceObject surfObj = new SM64SurfaceObject
+            {
+                transform = transform,
+                surfaceCount = (uint)surfaces.Length,
+                surfaces = surfListHandle.AddrOfPinnedObject()
+            };
 
-        surfListHandle.Free();
-
-        return result;
+            return sm64_surface_object_create(ref surfObj);
+        }
+        finally
+        {
+            surfListHandle.Free();
+        }
     }
 
     public static void SurfaceObjectMove(uint id, float3 position, floatQ rotation)
@@ -460,7 +528,12 @@ public static class Interop
 
     public static void MarioCap(uint marioId, StateFlag stateFlag, float durationSeconds, bool playCapMusic)
     {
-        sm64_mario_interact_cap(marioId, (uint)stateFlag, (ushort)(durationSeconds * SecondsMultiplier), playCapMusic ? (byte)1 : (byte)0);
+        sm64_mario_interact_cap(marioId, (uint)stateFlag, (ushort)(durationSeconds * SecondsMultiplier), (byte)(playCapMusic ? 1 : 0));
+    }
+    
+    public static void MarioCap(uint marioId, uint flag, float durationSeconds, bool playCapMusic)
+    {
+        sm64_mario_interact_cap(marioId, flag, (ushort)(durationSeconds * SecondsMultiplier), (byte)(playCapMusic ? 1 : 0));
     }
 
     public static void MarioCapExtend(uint marioId, float durationSeconds)
@@ -495,11 +568,21 @@ public static class Interop
     {
         sm64_set_mario_health(marioId, (ushort)(healthPoints * SM64HealthPerHealthPoint));
     }
+    
+    public static void MarioSetInvincibility(uint marioId, short timer)
+    {
+        sm64_set_mario_invincibility(marioId, timer);
+    }
 
     public static void MarioHeal(uint marioId, byte healthPoints)
     {
         // It was healing 0.25 with 1, so we multiplied by 4 EZ FIX
-        sm64_mario_heal(marioId, (byte)(healthPoints * 4));
+        sm64_mario_heal(marioId, (byte)(healthPoints * HealPointMultiplier));
+    }
+    
+    public static void MarioKill(uint marioId)
+    {
+        sm64_mario_kill(marioId);
     }
 
     public static void MarioSetAction(uint marioId, ActionFlag actionFlag)
@@ -511,6 +594,11 @@ public static class Interop
     {
         sm64_set_mario_action(marioId, actionFlags);
     }
+    
+    public static void MarioSetAction(uint marioId, ActionFlag actionFlag, uint actionArg)
+    {
+        sm64_set_mario_action_with_arg(marioId, (uint)actionFlag, actionArg);
+    }
 
     public static void MarioSetState(uint marioId, StateFlag stateFlag)
     {
@@ -520,6 +608,16 @@ public static class Interop
     public static void MarioSetState(uint marioId, uint stateFlags)
     {
         sm64_set_mario_state(marioId, stateFlags);
+    }
+    
+    public static void MarioSetAnimation(uint marioId, ushort animId)
+    {
+        sm64_set_mario_animation(marioId, animId);
+    }
+    
+    public static void MarioSetAnimFrame(uint marioId, short frame)
+    {
+        sm64_set_mario_anim_frame(marioId, frame);
     }
 }
 
@@ -557,7 +655,7 @@ public unsafe struct SM64MarioState
     public uint ParticleFlags;
     public short InvincibleTimer;
 
-    public float3 ScaledPosition => new float3(-Position[0], Position[1], Position[2]) / Interop.ScaleFactor;
+    public float3 ScaledPosition => new float3(-Position[0], Position[1], Position[2]).FromMarioFloat();
     public floatQ ScaledRotation => floatQ.Euler(0f, MathX.Repeat(-MathX.Rad2Deg * FacingAngle + 180f, 360f) - 180f, 0f);
 
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;

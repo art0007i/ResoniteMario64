@@ -94,24 +94,23 @@ public sealed partial class SM64Context
         }
 
         LocomotionController loco = World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
-        if (loco != null)
+        if (loco == null) return;
+        
+        if (AnyControlledMarios && !inp.VR_Active && MovementBlocked && !shouldGamepad)
         {
-            if (AnyControlledMarios && !inp.VR_Active && MovementBlocked && !shouldGamepad)
+            Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
+            if (currentBlock == null)
             {
-                Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
-                if (currentBlock == null)
-                {
-                    loco.SupressSources.Add(InputBlock);
-                }
+                loco.SupressSources.Add(InputBlock);
             }
-            else
-            {
-                loco.SupressSources.RemoveAll(InputBlock);
-            }
+        }
+        else
+        {
+            loco.SupressSources.RemoveAll(InputBlock);
         }
     }
 
-    private float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
+    private static float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
         float2 input = Utils.Float2Zero;
 
@@ -126,7 +125,7 @@ public sealed partial class SM64Context
                 : input;
     }
 
-    private static bool ShouldblockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World &&
+    private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World &&
                                                                                    (Instance?.AnyControlledMarios ?? false) &&
                                                                                    c.InputInterface.VR_Active &&
                                                                                    c.Side.Value == hand &&
@@ -141,15 +140,14 @@ public sealed partial class SM64Context
             foreach (CodeInstruction code in codes)
             {
                 yield return code;
-                if (code.LoadsField(lookFor))
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
-                }
+                if (!code.LoadsField(lookFor)) continue;
+                
+                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
             }
         }
 
-        public static bool Injection(bool b, InteractionHandler c) => ShouldblockInputs(c, c.LocalUser.Primaryhand) || b;
+        public static bool Injection(bool b, InteractionHandler c) => ShouldBlockInputs(c, c.LocalUser.Primaryhand) || b;
     }
 
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
@@ -157,7 +155,7 @@ public sealed partial class SM64Context
     {
         public static void Postfix(InteractionHandler __instance)
         {
-            if (ShouldblockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
+            if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
             {
                 __instance.Inputs.Axis.RegisterBlocks = true;
             }

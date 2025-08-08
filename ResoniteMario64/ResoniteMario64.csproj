@@ -106,9 +106,9 @@
     </Target>
     <Target Name="PostBuild2" AfterTargets="PostBuild" Condition="'$(CopyPdbToMods)'=='true'">
         <ItemGroup>
-            <PdbFile Include="$(TargetDir)$(TargetName).pdb" />
+            <PdbFile Include="$(TargetDir)$(TargetName).pdb"/>
         </ItemGroup>
-        <Copy SourceFiles="@(PdbFile)" DestinationFolder="$(GamePath)rml_mods" />
+        <Copy SourceFiles="@(PdbFile)" DestinationFolder="$(GamePath)rml_mods"/>
         <Message Text="Copied $(TargetName).pdb to $(GamePath)rml_mods" Importance="high"/>
     </Target>
 </Project>
