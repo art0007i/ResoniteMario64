@@ -249,11 +249,9 @@ public sealed partial class SM64Context
             out int interactableId
         );
 
-        string state = destroyed
-                ? "Destroyed"
-                : isNewlyAdded
-                        ? "Added"
-                        : "Already Added";
+        string state = "Already Added";
+        if (isNewlyAdded) state = "Added";
+        if (destroyed) state = "Destroyed";
 
         string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}";
 
