@@ -1,13 +1,12 @@
 ﻿using System;
 using FrooxEngine;
 using ResoniteMario64.Components.Context;
-using ResoniteMario64.libsm64;
-using ResoniteModLoader;
+using ResoniteMario64.Components.Interfaces;
 using static ResoniteMario64.libsm64.SM64Constants;
 
-namespace ResoniteMario64.Components;
+namespace ResoniteMario64.Components.Objects;
 
-public sealed class SM64Interactable : IDisposable
+public sealed class SM64Interactable : ISM64Object
 {
     public readonly SM64InteractableType Type;
 
@@ -18,7 +17,7 @@ public sealed class SM64Interactable : IDisposable
     public SM64Context Context { get; private set; }
     public Collider Collider { get; private set; }
 
-    private bool _disposed;
+    public bool IsDisposed { get; private set; }
 
     public SM64Interactable(Collider col, SM64Context instance)
     {
@@ -49,7 +48,7 @@ public sealed class SM64Interactable : IDisposable
 
     private void Dispose(bool disposing)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         if (disposing)
         {
@@ -60,6 +59,6 @@ public sealed class SM64Interactable : IDisposable
             Collider = null;
         }
 
-        _disposed = true;
+        IsDisposed = true;
     }
 }

@@ -1,20 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
+using ResoniteMario64.Components.Objects;
 using ResoniteMario64.libsm64;
-using ResoniteModLoader;
 
 namespace ResoniteMario64.Components.Context;
 
 public sealed partial class SM64Context
 {
-    internal readonly List<Collider> StaticColliders = new List<Collider>();
+    internal readonly Dictionary<Collider, SM64StaticCollider> StaticColliders = new Dictionary<Collider, SM64StaticCollider>();
     internal readonly Dictionary<Collider, SM64DynamicCollider> DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
-    internal readonly List<Collider> WaterBoxes = new List<Collider>();
+    internal readonly Dictionary<Collider, SM64WaterBox> WaterBoxes = new Dictionary<Collider, SM64WaterBox>();
 
     public void HandleCollider(Collider collider, bool log = true)
     {
@@ -75,9 +74,9 @@ public sealed partial class SM64Context
 
     private int? TryRemoveCollider(Collider collider)
     {
-        if (StaticColliders.Contains(collider))
+        if (StaticColliders.TryGetValue(collider, out SM64StaticCollider staticCollider))
         {
-            UnregisterStaticCollider(collider);
+            staticCollider.Dispose();
             return 1;
         }
 
@@ -93,9 +92,9 @@ public sealed partial class SM64Context
             return 3;
         }
 
-        if (WaterBoxes.Contains(collider))
+        if (WaterBoxes.TryGetValue(collider, out SM64WaterBox waterBox))
         {
-            UnregisterWaterBox(collider);
+            waterBox.Dispose();
             return 4;
         }
 
@@ -104,7 +103,7 @@ public sealed partial class SM64Context
 
     private static Timer _staticUpdateTimer;
 
-    public void QueueStaticCollidersUpdate()
+    private void QueueStaticCollidersUpdate()
     {
         if (_staticUpdateTimer != null) return;
 
@@ -126,22 +125,23 @@ public sealed partial class SM64Context
     {
         QueueStaticCollidersUpdate();
 
-        if (StaticColliders.Contains(collider))
+        if (StaticColliders.ContainsKey(collider))
         {
             return 10;
         }
 
-        StaticColliders.Add(collider);
+        SM64StaticCollider col = new SM64StaticCollider(collider, this);
+        StaticColliders.Add(collider, col);
         return 1;
     }
 
-    private void UnregisterStaticCollider(Collider collider)
+    internal void UnregisterStaticCollider(Collider collider)
     {
         QueueStaticCollidersUpdate();
 
         StaticColliders.Remove(collider);
     }
-
+    
     // Dynamic Colliders
     private int RegisterDynamicCollider(Collider collider)
     {
@@ -186,16 +186,17 @@ public sealed partial class SM64Context
     // WaterBoxes
     private int RegisterWaterBox(Collider collider)
     {
-        if (WaterBoxes.Contains(collider))
+        if (WaterBoxes.ContainsKey(collider))
         {
             return 40;
         }
 
-        WaterBoxes.Add(collider);
+        SM64WaterBox col = new SM64WaterBox(collider, this);
+        WaterBoxes.Add(collider, col);
         return 4;
     }
 
-    private void UnregisterWaterBox(Collider collider)
+    internal void UnregisterWaterBox(Collider collider)
     {
         WaterBoxes.Remove(collider);
     }
@@ -223,11 +224,10 @@ public sealed partial class SM64Context
 
     private static void LogCollider(object obj, int? added, bool destroyed, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
-#if DEBUG
-        if (!ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLogColliderChanges)) return;
-        if (obj is not Collider collider) return;
         if (added == null) return;
-
+        if (obj is not Collider collider) return;
+        if (!ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLogColliderChanges) || !Utils.CheckDebug()) return;
+        
         bool isNewlyAdded = added is 1 or 2 or 3 or 4;
         string name = added switch
         {
@@ -261,17 +261,16 @@ public sealed partial class SM64Context
             Logger.Msg(message, caller, line);
         else
             Logger.Warn(message, caller, line);
-#endif
     }
 
     public void GetAllColliders(bool log, out Dictionary<int, List<Collider>> colliders)
     {
         colliders = new Dictionary<int, List<Collider>>
         {
-            [10] = StaticColliders.GetTempList(),
+            [10] = StaticColliders.Keys.GetTempList(),
             [20] = DynamicColliders.Keys.GetTempList(),
             [30] = Interactables.Keys.GetTempList(),
-            [40] = WaterBoxes.GetTempList()
+            [40] = WaterBoxes.Keys.GetTempList()
         };
 
         if (!log) return;

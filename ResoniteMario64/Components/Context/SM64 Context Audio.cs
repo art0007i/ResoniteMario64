@@ -3,7 +3,6 @@ using System.Diagnostics;
 using Elements.Assets;
 using FrooxEngine;
 using ResoniteMario64.libsm64;
-using ResoniteModLoader;
 using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Components.Context;

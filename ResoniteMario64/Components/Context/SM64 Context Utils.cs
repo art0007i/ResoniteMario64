@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
-using FrooxEngine;
+﻿using FrooxEngine;
 using ResoniteMario64.libsm64;
 using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Components.Context;
 
-public partial class SM64Context
+public sealed partial class SM64Context
 {
     public static Slot TempSlot { get; set; }
 
@@ -158,5 +157,26 @@ public partial class SM64Context
             Logger.Msg("No more Marios left, stopping music");
             Interop.StopMusic();
         }
+    }
+    
+    private static void HandleSlotAdded(Slot slot, Slot child)
+    {
+        if (child.Tag != ContextTag) return;
+
+        child.RunSynchronously(() =>
+        {
+            Logger.Msg($"A ContextSlot ({child.Name}) was Added - {slot.Name}");
+            if (EnsureInstanceExists(child.World, out SM64Context context))
+            {
+                context.MarioContainersSlot.ForeachChild(marioSlot =>
+                {
+                    if (marioSlot.Tag == MarioTag)
+                    {
+                        Logger.Msg($"Found Mario slot in new context: {marioSlot.Name} ({marioSlot.ReferenceID})");
+                        TryAddMario(marioSlot, false);
+                    }
+                });
+            }
+        });
     }
 }

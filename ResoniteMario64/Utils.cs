@@ -5,7 +5,6 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
-using ResoniteMario64.Components;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
@@ -34,33 +33,59 @@ public static class Utils
             Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType, force);
         }
     }
+    
+    public enum ColliderCategory
+    {
+        None,
+        Static,
+        Dynamic,
+        WaterBox,
+        Interactable
+    }
+
+    private static ColliderCategory GetColliderCategory(Collider col)
+    {
+        string tag = col.Slot.Tag ?? string.Empty;
+        bool hasStaticTag = tag.Contains("SM64 StaticCollider") || tag.Contains("SM64 Collider");
+        bool hasDynamicTag = tag.Contains("SM64 DynamicCollider");
+        bool isActive = IsActive(col);
+
+        if ((CollidesWithCharacters(col) || hasStaticTag) && !hasDynamicTag && isActive)
+            return ColliderCategory.Static;
+
+        if (hasDynamicTag && isActive)
+            return ColliderCategory.Dynamic;
+
+        if (tag.Contains("SM64 WaterBox") && isActive)
+            return ColliderCategory.WaterBox;
+
+        if (col.Enabled && tag.Contains("SM64 Interactable"))
+            return ColliderCategory.Interactable;
+
+        return ColliderCategory.None;
+    }
 
     public static bool IsGoodStaticCollider(Collider col)
     {
-        if (!IsActive(col)) return false;
-
-        bool hasStaticTag = HasTag(col, "SM64 StaticCollider") || HasTag(col, "SM64 Collider");
-        bool hasDynamicTag = HasTag(col, "SM64 DynamicCollider");
-
-        return CollidesWithCharacters(col) || hasStaticTag && !hasDynamicTag;
+        return GetColliderCategory(col) == ColliderCategory.Static;
     }
 
     public static bool IsGoodDynamicCollider(Collider col)
     {
-        if (!IsActive(col)) return false;
-
-        bool hasDynamicTag = HasTag(col, "SM64 DynamicCollider");
-        bool hasStaticTag = HasTag(col, "SM64 StaticCollider") || HasTag(col, "SM64 Collider");
-
-        return col.Type.Value != ColliderType.Trigger && hasDynamicTag && !hasStaticTag;
+        return GetColliderCategory(col) == ColliderCategory.Dynamic && col.Type.Value != ColliderType.Trigger;
     }
 
-    public static bool IsGoodWaterBox(Collider col) => IsActive(col) && HasTag(col, "SM64 WaterBox");
+    public static bool IsGoodWaterBox(Collider col)
+    {
+        return GetColliderCategory(col) == ColliderCategory.WaterBox;
+    }
 
-    public static bool IsGoodInteractable(Collider col) => col.Enabled && HasTag(col, "SM64 Interactable");
+    public static bool IsGoodInteractable(Collider col)
+    {
+        return GetColliderCategory(col) == ColliderCategory.Interactable;
+    }
 
     private static bool IsActive(Collider col) => col.Enabled && col.Slot.IsActive;
-    private static bool HasTag(Collider col, string tag) => col.Slot.Tag?.Contains(tag) == true;
 
     private static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
 
@@ -95,7 +120,7 @@ public static class Utils
         // Remove all MeshColliders that are Null or Non-Readable
         meshColliders.RemoveAll(InvalidCollider);
 
-        // Sort the meshColliders list by the length of their triangles array in ascending order
+        // Sort the meshColliders list it by the length of their triangle's array in ascending order
         meshColliders.Sort((a, b) => a.collider.Mesh.Asset.Data.TotalTriangleCount.CompareTo(b.collider.Mesh.Asset.Data.TotalTriangleCount));
 
         // Add the mesh colliders until we reach the max mesh collider polygon limit
@@ -122,19 +147,15 @@ public static class Utils
     }
 
     // Function used for static colliders. Returns correct global positions, rotations and scales.
-    public static List<SM64Surface> GetTransformedSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static void GetTransformedSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
-
-        return surfaces;
     }
 
-    // Function used for dynamic colliders. Returns correct scales. (rotation and position is set dynamically)
-    internal static List<SM64Surface> GetScaledSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    // Function used for dynamic colliders. Returns correct scales. (rotation and position are set dynamically)
+    public static void GetScaledSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
-
-        return surfaces;
     }
 
     public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
@@ -192,15 +213,28 @@ public static class Utils
             else if (trimmed.StartsWith("Force_", StringComparison.OrdinalIgnoreCase))
             {
                 string idxString = trimmed.Substring("Force_".Length);
-                if (int.TryParse(idxString, out int parsedIdx))
+                string[] ids = idxString.Split('.');
+
+                if (ids.Length == 2 && int.TryParse(ids[0], out int speedIndex) && int.TryParse(ids[1], out int angleIndex))
                 {
-                    interactableId = parsedIdx;
+                    interactableId = speedIndex << 8 | angleIndex;
+                }
+                else if (int.TryParse(idxString, out int forceIndex))
+                {
+                    interactableId = forceIndex;
                 }
             }
         }
     }
-    
-    public static bool CheckDebug() => ResoniteMod.IsDebugEnabled();
+
+    public static bool CheckDebug()
+    {
+        bool debug = false;
+#if DEBUG
+        debug = true;
+#endif
+        return debug || ResoniteMod.IsDebugEnabled();
+    }
 
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
 

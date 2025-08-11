@@ -14,24 +14,24 @@ namespace ResoniteMario64.Components.Context;
 
 public sealed partial class SM64Context
 {
-    public Comment InputBlock;
+    private Comment _inputBlock;
 
     public float2 Joystick;
     public bool Jump;
     public bool Kick;
     public bool Stomp;
 
-    public bool MovementBlocked = true;
+    private bool _movementBlocked = true;
 
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
         if (inp.GetKeyUp(Key.Period))
         {
-            MovementBlocked = !MovementBlocked;
+            _movementBlocked = !_movementBlocked;
         }
 
-        bool shouldRun = !World.LocalUser.HasActiveFocus() && MovementBlocked;
+        bool shouldRun = !World.LocalUser.HasActiveFocus() && _movementBlocked;
         bool shouldGamepad = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyUseGamepad) && inp.GetDevices<StandardGamepad>().Count != 0;
         if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
@@ -83,30 +83,30 @@ public sealed partial class SM64Context
             Kick = false;
         }
 
-        if (InputBlock == null || InputBlock.IsRemoved)
+        if (_inputBlock == null || _inputBlock.IsRemoved)
         {
             Comment block = World.LocalUser.Root?.Slot?.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
             if (block != null)
             {
                 block.Text.Value = InputBlockTag;
-                InputBlock = block;
+                _inputBlock = block;
             }
         }
 
         LocomotionController loco = World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco == null) return;
         
-        if (AnyControlledMarios && !inp.VR_Active && MovementBlocked && !shouldGamepad)
+        if (AnyControlledMarios && !inp.VR_Active && _movementBlocked && !shouldGamepad)
         {
             Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
             if (currentBlock == null)
             {
-                loco.SupressSources.Add(InputBlock);
+                loco.SupressSources.Add(_inputBlock);
             }
         }
         else
         {
-            loco.SupressSources.RemoveAll(InputBlock);
+            loco.SupressSources.RemoveAll(_inputBlock);
         }
     }
 
@@ -159,7 +159,7 @@ public sealed partial class SM64Context
             {
                 __instance.Inputs.Axis.RegisterBlocks = true;
             }
-            /*if (ShouldblockInputs(__instance, __instance.LocalUser.Primaryhand))
+            /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
             {
                 __instance.Inputs.UserspaceToggle.RegisterBlocks = true;
                 __instance.Inputs.Interact.RegisterBlocks = true;

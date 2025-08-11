@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FrooxEngine;
+using ResoniteMario64.Components.Objects;
 using ResoniteMario64.libsm64;
 using static ResoniteMario64.Constants;
 #if IsNet9
@@ -22,7 +23,7 @@ public sealed partial class SM64Context : IDisposable
     {
         get
         {
-            Slot tempSlot = GetTempSlot(World);
+            Slot tempSlot = SM64Context.GetTempSlot(World);
             if (_contextSlot != null && (!_contextSlot.IsDestroyed || tempSlot is not { IsDestroyed: false })) return _contextSlot;
             
             Logger.Msg("ContextSlot is null/destroyed, attempting to refresh from tempSlot");
@@ -82,9 +83,8 @@ public sealed partial class SM64Context : IDisposable
 
     private bool AnyControlledMarios => AllMarios.Values.Any(x => x.IsLocal);
     
-    public DynamicVariableSpace WorldVariableSpace { get; private set; }
-
     public World World { get; }
+    public DynamicVariableSpace WorldVariableSpace { get; private set; }
 
     internal double LastTick;
 
@@ -123,6 +123,14 @@ public sealed partial class SM64Context : IDisposable
         ResoniteMario64.KeyMaxMariosPerPerson.OnChanged += HandleMaxMariosPerPersonChanged;
 
         ResoniteMario64.KeyUseGamepad.OnChanged += HandleKeyUseGamepadChanged;
+        
+        world.RunInUpdates(1, () =>
+        {
+            if (WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music))
+            {
+                Interop.PlayMusic(music);
+            }
+        });
 
         world.RunInUpdates(3, () =>
         {
@@ -138,7 +146,7 @@ public sealed partial class SM64Context : IDisposable
             if (ContextSlot == null)
             {
                 Logger.Msg("Setting up ContextSlot");
-                Slot contextSlot = GetTempSlot(world).AddSlot(ContextSlotName, false);
+                Slot contextSlot = SM64Context.GetTempSlot(world).AddSlot(ContextSlotName, false);
                 contextSlot.OrderOffset = -1000;
                 contextSlot.Tag = ContextTag;
 
@@ -237,8 +245,7 @@ public sealed partial class SM64Context : IDisposable
             if (gasAttached)
             {
                 gasLevel.VariableName.Value = GasVarName;
-                DynamicVariableSpace worldVar = World.RootSlot.GetComponent<DynamicVariableSpace>(x => x.SpaceName.Value == "World");
-                gasLevel.Value.Value = worldVar?.TryReadValue(GasVarName, out float gasLevelValue) ?? false ? gasLevelValue : -100f;
+                gasLevel.Value.Value = WorldVariableSpace?.TryReadValue(GasVarName, out float gasLevelValue) ?? false ? gasLevelValue : -100f;
 
                 Logger.Msg($"GasLevel variable attached/set with value {gasLevel.Value.Value}");
             }
@@ -266,7 +273,7 @@ public sealed partial class SM64Context : IDisposable
             MarioContainersSlot.Destroyed += HandleRemoved;
 
             Logger.Msg("Creating My Mario Container Slot");
-            MyMariosSlot = MarioContainersSlot.FindChild(x => x.Name == $"{world.LocalUser.UserName}'s Marios") ?? GetTempSlot(world).AddSlot($"{world.LocalUser.UserName}'s Marios", false);
+            MyMariosSlot = MarioContainersSlot.FindChild(x => x.Name == $"{world.LocalUser.UserName}'s Marios") ?? SM64Context.GetTempSlot(world).AddSlot($"{world.LocalUser.UserName}'s Marios", false);
             MyMariosSlot.OrderOffset = MyMariosSlot.LocalUser.AllocationID * 3;
             MyMariosSlot.Tag = MarioContainerTag;
             MyMariosSlot.DestroyWhenUserLeaves(world.LocalUser);
@@ -296,7 +303,7 @@ public sealed partial class SM64Context : IDisposable
     {
         if (child.Tag != MarioTag || AllMarios.ContainsKey(child)) return;
 
-        child.RunSynchronously(() => TryAddMario(child, false));
+        child.RunSynchronously(() => SM64Context.TryAddMario(child, false));
     }
 
     private void HandleContainerAdded(Slot slot, Slot child)
@@ -312,28 +319,7 @@ public sealed partial class SM64Context : IDisposable
             if (child2.Tag != MarioTag || AllMarios.ContainsKey(child2)) return;
 
             Logger.Msg($"New Mario ({child2.Name}) Found in new Container - {slot.Name}");
-            child2.RunSynchronously(() => TryAddMario(child2, false));
-        });
-    }
-
-    public static void HandleSlotAdded(Slot slot, Slot child)
-    {
-        if (child.Tag != ContextTag) return;
-
-        child.RunSynchronously(() =>
-        {
-            Logger.Msg($"A ContextSlot ({child.Name}) was Added - {slot.Name}");
-            if (SM64Context.EnsureInstanceExists(child.World, out SM64Context context))
-            {
-                context.MarioContainersSlot.ForeachChild(marioSlot =>
-                {
-                    if (marioSlot.Tag == MarioTag)
-                    {
-                        Logger.Msg($"Found Mario slot in new context: {marioSlot.Name} ({marioSlot.ReferenceID})");
-                        SM64Context.TryAddMario(marioSlot, false);
-                    }
-                });
-            }
+            child2.RunSynchronously(() => SM64Context.TryAddMario(child2, false));
         });
     }
 
@@ -448,7 +434,7 @@ public sealed partial class SM64Context : IDisposable
     public void Dispose()
     {
         Dispose(true);
-        GC.SuppressFinalize(this);
+        // GC.SuppressFinalize(this);
     }
 
     private void Dispose(bool disposing)
@@ -501,25 +487,25 @@ public sealed partial class SM64Context : IDisposable
             _staticUpdateTimer?.Dispose();
             _staticUpdateTimer = null;
 
-            // Release the locomotion input block
-            if (World is { IsDestroyed: false, CanCurrentThreadModify: true })
+            World.RunSynchronously(() =>
             {
+                // Release the locomotion input block
                 LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
-                if (loco != null && InputBlock != null)
+                if (loco != null && _inputBlock != null)
                 {
-                    loco.SupressSources?.Remove(InputBlock);
+                    loco.SupressSources?.Remove(_inputBlock);
                 }
-            }
 
-            // Clean up audio resources
-            if (_audioSlot != null)
-            {
-                _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
-                if (_audioSlot.IsLocalElement && !_audioSlot.IsDestroyed)
+                // Clean up audio resources
+                if (_audioSlot != null)
                 {
-                    _audioSlot.Destroy();
+                    _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+                    if (_audioSlot.IsLocalElement && !_audioSlot.IsDestroyed)
+                    {
+                        _audioSlot.Destroy();
+                    }
                 }
-            }
+            }, true, null, true);
 
             // Nullify references to Resonite objects
             _contextSlot = null;
@@ -528,7 +514,7 @@ public sealed partial class SM64Context : IDisposable
             _marioAudioStream = null;
             _marioAudioOutput = null;
             _audioSlot = null;
-            InputBlock = null;
+            _inputBlock = null;
         }
 
         // Free unmanaged resources (from the C++ library)

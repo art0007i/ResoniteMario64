@@ -4,10 +4,8 @@ using System.Runtime.InteropServices;
 using Elements.Assets;
 using Elements.Core;
 using ResoniteMario64.Components.Context;
-using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
 #if IsNet9
-using Renderite.Shared;
 #endif
 
 namespace ResoniteMario64.libsm64;

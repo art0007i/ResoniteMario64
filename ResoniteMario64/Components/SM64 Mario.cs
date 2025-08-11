@@ -1,14 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices.Marshalling;
-using System.Threading.Tasks;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Components.Context;
+using ResoniteMario64.Components.Interfaces;
+using ResoniteMario64.Components.Objects;
 using ResoniteMario64.libsm64;
-using ResoniteModLoader;
 using static ResoniteMario64.Constants;
 using static ResoniteMario64.libsm64.SM64Constants;
 #if IsNet9
@@ -17,7 +15,7 @@ using Renderite.Shared;
 
 namespace ResoniteMario64.Components;
 
-public sealed class SM64Mario : IDisposable
+public sealed class SM64Mario : ISM64Object
 {
 #region Fields & Properties
 
@@ -35,9 +33,10 @@ public sealed class SM64Mario : IDisposable
     private bool _enabled;
     private bool _isDying;
     private bool _isNuked;
-    private bool _disposed;
     private bool _initialized;
     private int _buffIndex; // Used for state double-buffering
+
+    public bool IsDisposed { get; private set; }
 
 #endregion
 
@@ -51,6 +50,7 @@ public sealed class SM64Mario : IDisposable
     public bool IsLocal => MarioUser.IsLocalUser;
     private readonly Grabbable _marioGrabbable;
     private readonly CapsuleCollider _marioCollider;
+    public Collider Collider => _marioCollider;
 
 #endregion
 
@@ -456,10 +456,8 @@ public sealed class SM64Mario : IDisposable
         _colorBufferColors = new color[bufferSize];
         _uvBuffer = new float2[bufferSize];
         Logger.Msg("Buffers initialized.");
-
-#if DEBUG
-        bool useLocalSlot = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal);
-        if (useLocalSlot)
+        
+        if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal) && Utils.CheckDebug())
         {
             _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
             Logger.Msg("Added local Mario renderer slot.");
@@ -469,10 +467,6 @@ public sealed class SM64Mario : IDisposable
             _marioRendererSlot = MarioSlot.World.AddSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}", false);
             Logger.Msg("Added global Mario renderer slot.");
         }
-#else
-        _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
-        Logger.Msg($"Added local Mario renderer slot (release mode).");
-#endif
 
         _marioMeshRenderer = _marioRendererSlot.AttachComponent<MeshRenderer>();
         _marioMeshProvider = _marioRendererSlot.AttachComponent<LocalMeshProvider>();
@@ -602,7 +596,7 @@ public sealed class SM64Mario : IDisposable
     // Game Tick
     internal void ContextFixedUpdateSynced()
     {
-        if (!_enabled || !_initialized || _isNuked || _disposed) return;
+        if (!_enabled || !_initialized || _isNuked || IsDisposed) return;
 
         UpdateIsOverMaxDistance();
         
@@ -737,24 +731,25 @@ public sealed class SM64Mario : IDisposable
         float waterSurface = float.NaN;
         float3 marioPos = _marioCollider.GlobalBoundingBox.Center;
 
-        foreach (Collider waterBox in Context.WaterBoxes.GetTempList())
+        foreach (SM64WaterBox waterBox in Context.WaterBoxes.Values.GetTempList())
         {
-            if (waterBox == null || waterBox.IsRemoved || waterBox.IsDisposed) continue;
+            Collider collider = waterBox?.Collider;
+            if (collider == null || collider.IsRemoved || collider.IsDisposed) continue;
 
-            if (waterBox is BoxCollider box)
+            if (collider is BoxCollider box)
             {
-                float3 localMarioPos = waterBox.Slot.GlobalPointToLocal(marioPos);
+                float3 localMarioPos = collider.Slot.GlobalPointToLocal(marioPos);
                 var localWaterBox = box.LocalBoundingBox;
 
                 if (localWaterBox.Contains(localMarioPos))
                 {
-                    waterSurface = waterBox.GlobalBoundingBox.max.y;
+                    waterSurface = collider.GlobalBoundingBox.max.y;
                     break;
                 }
             }
-            else if (waterBox.GlobalBoundingBox.Contains(marioPos))
+            else if (collider.GlobalBoundingBox.Contains(marioPos))
             {
-                waterSurface = waterBox.GlobalBoundingBox.max.y;
+                waterSurface = collider.GlobalBoundingBox.max.y;
                 break;
             }
         }
@@ -763,7 +758,7 @@ public sealed class SM64Mario : IDisposable
         
         if (waterSurface.IsValid())
         {
-            newWaterLevel = MathX.Min(marioPos.y + 0.1f, waterSurface);
+            newWaterLevel = MathX.Min(marioPos.y + 0.2f, waterSurface);
         }
 
         if (!MathX.Approximately(_waterLevel, newWaterLevel))
@@ -854,7 +849,7 @@ public sealed class SM64Mario : IDisposable
     // Engine Tick
     internal void ContextUpdateSynced()
     {
-        if (!_enabled || !_initialized || _isNuked || _disposed) return;
+        if (!_enabled || !_initialized || _isNuked || IsDisposed) return;
 
         // lerp from previous state to current (this means when you make an input it's delayed by one frame, but it means we can have nice interpolation)
         float t = (float)((MarioSlot.Time.WorldTime - Context.LastTick) / (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f));
@@ -1185,7 +1180,7 @@ public sealed class SM64Mario : IDisposable
     
     private void UpdateIsBypassed()
     {
-        if (!_initialized || _disposed) return;
+        if (!_initialized || IsDisposed) return;
 
         bool isBypassed = _isOverMaxDistance || _isOverMaxCount;
         // if (isBypassed == _wasBypassed) return;
@@ -1198,7 +1193,7 @@ public sealed class SM64Mario : IDisposable
 
     private void HandleSlotDestroyed(Slot slot)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         Dispose();
     }
@@ -1216,7 +1211,7 @@ public sealed class SM64Mario : IDisposable
 
     private void Dispose(bool disposing)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         if (disposing)
         {
@@ -1274,7 +1269,7 @@ public sealed class SM64Mario : IDisposable
 
         _enabled = false;
         _initialized = false;
-        _disposed = true;
+        IsDisposed = true;
     }
 
     private enum Button

@@ -5,7 +5,6 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Elements.Core;
 using FrooxEngine;
-using FrooxEngine.ProtoFlux;
 using FrooxEngine.UIX;
 using HarmonyLib;
 using ResoniteMario64.Components;
@@ -89,21 +88,19 @@ public class ResoniteMario64 : ResoniteMod
 
     [AutoRegisterConfigKey]
     public static readonly ModConfigurationKey<Uri> KeyMarioUrl = new ModConfigurationKey<Uri>("mario_url", "The URL for the Non-Modded Renderer for Mario - Null = Default Mario", () => null);
-
-#if DEBUG
+    
     // DEBUG
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<dummy> Spacer4 = new ModConfigurationKey<dummy>("    ", "    ", () => new dummy());
+    public static readonly ModConfigurationKey<dummy> Spacer4 = new ModConfigurationKey<dummy>("    ", "    ", () => new dummy(), Utils.CheckDebug(), _ => Utils.CheckDebug());
 
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<dummy> DebugSeparator = new ModConfigurationKey<dummy>("----------- Debug Settings -----------", "----------- Debug Settings -----------", () => new dummy());
+    public static readonly ModConfigurationKey<dummy> DebugSeparator = new ModConfigurationKey<dummy>("----------- Debug Settings -----------", "----------- Debug Settings -----------", () => new dummy(), Utils.CheckDebug(), _ => Utils.CheckDebug());
 
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true);
+    public static readonly ModConfigurationKey<bool> KeyRenderSlotLocal = new ModConfigurationKey<bool>("render_slot_local", "Whether the Renderer should be Local or not.", () => true, Utils.CheckDebug(), _ => Utils.CheckDebug());
 
     [AutoRegisterConfigKey]
-    public static readonly ModConfigurationKey<bool> KeyLogColliderChanges = new ModConfigurationKey<bool>("log_collider_changes", "Whether to Log Collider changes or not.", () => false);
-#endif
+    public static readonly ModConfigurationKey<bool> KeyLogColliderChanges = new ModConfigurationKey<bool>("log_collider_changes", "Whether to Log Collider changes or not.", () => false, Utils.CheckDebug(), _ => Utils.CheckDebug());
 
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
@@ -222,6 +219,8 @@ public class ResoniteMario64 : ResoniteMod
     [HarmonyPatch(typeof(World), MethodType.Constructor, new Type[] { typeof(WorldManager), typeof(bool), typeof(bool) })]
     public class WorldStartRunningPatch
     {
+        private static Action<World> _subHandler;
+
         public static void Postfix(World __instance)
         {
             Logger.Msg($"World constructor called with AssemblyHash: {AssemblyMD5Hash}");
@@ -229,7 +228,9 @@ public class ResoniteMario64 : ResoniteMod
             if (__instance.IsUserspace()) return;
             if (Engine.Current?.WorldManager == null) return;
 
-            Engine.Current.WorldManager.WorldFocused += Sub;
+            _subHandler ??= world => WorldSubMethod(world, __instance);
+
+            Engine.Current.WorldManager.WorldFocused += _subHandler;
             Logger.Msg("Subscribed to WorldFocused event");
 
             __instance.RootSlot.ChildAdded += (slot, child) =>
@@ -250,49 +251,47 @@ public class ResoniteMario64 : ResoniteMod
                     Logger.Msg("Remade TempSlot");
                 });
             };
+        }
 
-            return;
+        private static void WorldSubMethod(World world, World instance)
+        {
+            Logger.Msg($"WorldFocused event triggered for world: {world.Name}");
+            if (world != instance) return;
+            if (world.Focus != World.WorldFocus.Focused) return;
 
-            void Sub(World world)
+            world.RunInUpdates(3, () =>
             {
-                Logger.Msg($"WorldFocused event triggered for world: {world.Name}");
-                if (world != __instance) return;
-                if (world.Focus != World.WorldFocus.Focused) return;
-
-                world.RunInUpdates(3, () =>
+                Logger.Msg("Trying to find TempSlot with ContextSlot");
+                Slot contextSlot = SM64Context.GetTempSlot(instance).FindChild(x => x.Tag == ContextTag);
+                if (contextSlot == null)
                 {
-                    Logger.Msg("Trying to find TempSlot with ContextSlot");
-                    Slot contextSlot = SM64Context.GetTempSlot(__instance).FindChild(x => x.Tag == ContextTag);
-                    if (contextSlot == null)
-                    {
-                        Logger.Msg("ContextSlot not found in TempSlot");
-                        return;
-                    }
+                    Logger.Msg("ContextSlot not found in TempSlot");
+                    return;
+                }
 
-                    if (SM64Context.EnsureInstanceExists(__instance, out SM64Context context))
+                if (SM64Context.EnsureInstanceExists(instance, out SM64Context context))
+                {
+                    Logger.Msg("Ensured SM64Context instance exists");
+                    context.World.RunInUpdates(3, () =>
                     {
-                        Logger.Msg("Ensured SM64Context instance exists");
-                        context.World.RunInUpdates(3, () =>
+                        context.MarioContainersSlot?.ForeachChild(slot =>
                         {
-                            context?.MarioContainersSlot?.ForeachChild(slot =>
+                            if (slot.Tag == MarioTag)
                             {
-                                if (slot.Tag == MarioTag)
-                                {
-                                    Logger.Msg($"Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
-                                    SM64Context.TryAddMario(slot, false);
-                                }
-                            });
+                                Logger.Msg($"Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
+                                SM64Context.TryAddMario(slot, false);
+                            }
                         });
-                    }
-                    else
-                    {
-                        Logger.Msg("Failed to ensure SM64Context instance");
-                    }
+                    });
+                }
+                else
+                {
+                    Logger.Msg("Failed to ensure SM64Context instance");
+                }
 
-                    Engine.Current.WorldManager.WorldFocused -= Sub;
-                    Logger.Msg("Unsubscribed from WorldFocused event");
-                });
-            }
+                Engine.Current.WorldManager.WorldFocused -= _subHandler;
+                Logger.Msg("Unsubscribed from WorldFocused event");
+            });
         }
     }
 
@@ -326,7 +325,7 @@ public class ResoniteMario64 : ResoniteMod
     [HarmonyPatch(typeof(Button))]
     private class ButtonPatches
     {
-        private static bool spawnRunning;
+        private static bool _spawnRunning;
 
         [HarmonyPatch("RunPressed"), HarmonyPrefix]
         public static bool RunPressed(Button __instance)
@@ -344,15 +343,13 @@ public class ResoniteMario64 : ResoniteMod
 
                         __instance.LabelTextField.OverrideForUser(__instance.LocalUser, SM64Context.TryAddMario(mario) ? "Mario Spawned!" : "Mario Spawn Failed!");
 
-                        UpdateButtonEnabledState(__instance);
+                        if (_spawnRunning) return;
 
-                        if (spawnRunning) return;
-
-                        spawnRunning = true;
+                        _spawnRunning = true;
                         __instance.RunInSeconds(5, () =>
                         {
                             __instance.LabelTextField.OverrideForUser(__instance.LocalUser, oldText);
-                            spawnRunning = false;
+                            _spawnRunning = false;
                         });
                     });
 
@@ -364,7 +361,6 @@ public class ResoniteMario64 : ResoniteMod
                         __instance.RunSynchronously(() =>
                         {
                             SM64Context.Instance?.Dispose();
-                            UpdateButtonEnabledState(__instance);
                         });
                     }
 
@@ -372,36 +368,6 @@ public class ResoniteMario64 : ResoniteMod
                 }
                 default:
                     return true;
-            }
-        }
-
-        // [HarmonyPatch("RunHoverEnter")]
-        // public static void RunHoverEnter(Button __instance)
-        // {
-        //     UpdateButtonEnabledState(__instance);
-        // }
-        // 
-        // [HarmonyPatch("RunHoverStay")]
-        // public static void RunHoverStay(Button __instance)
-        // {
-        //     UpdateButtonEnabledState(__instance);
-        // }
-        // 
-        // [HarmonyPatch("RunHoverLeave")]
-        // public static void RunHoverLeave(Button __instance)
-        // {
-        //     UpdateButtonEnabledState(__instance);
-        // }
-        // 
-        private static void UpdateButtonEnabledState(Button button)
-        {
-            if (button.Slot.Tag == "KillInstance")
-            {
-                bool shouldEnable = SM64Context.Instance != null;
-                if (button.Enabled != shouldEnable)
-                {
-                    button.EnabledField.OverrideForUser(button.LocalUser, shouldEnable);
-                }
             }
         }
     }
