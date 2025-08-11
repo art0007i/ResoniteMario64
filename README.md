@@ -63,9 +63,13 @@ Below are the types of colliders you can give to an object
 - Tag: `"SM64 WaterBox"`
 - Collider must be enabled and active.
 
+---
+
 ### Teleporter
 
 - Soon™️
+
+---
 
 </details>
 
@@ -78,7 +82,7 @@ These are used in the Tag Field on the Slot of which contains a Valid Collider. 
 <details>
   <summary>Click to Expand</summary>
 
-## TerrainType_(Enum)
+### TerrainType_(Enum)
 
 Defines the type of terrain for collision and environmental behavior.
 
@@ -92,7 +96,9 @@ Defines the type of terrain for collision and environmental behavior.
 | Water     | Water surfaces                          |
 | Slide     | Slide surfaces (icy or slippery slopes) |
 
-## SurfaceType_(Enum)
+---
+
+### SurfaceType_(Enum)
 
 Specifies various surface properties affecting player interaction, camera behavior, and environmental effects.
 
@@ -151,7 +157,9 @@ Specifies various surface properties affecting player interaction, camera behavi
 | VanishCapWalls         | Walls passable only with Vanish Cap           |
 | Trapdoor               | Bowser’s trapdoor surface                     |
 
-## InteractableType_(Enum)
+---
+
+### InteractableType_(Enum)
 
 Represents different interactable objects and items within the game.
 
@@ -174,7 +182,9 @@ example:
 - `Damage0`, `Damage1`, `Damage2`, etc., can represent different damage strengths.
 - `RedCoin0`, `RedCoin1`, `RedCoin2`, etc., can play the different red coin sounds.
 
-## Force_(speed.angle)
+---
+
+### Force_(speed.angle)
 
 You can specify forces applied from colliders:
 
@@ -189,6 +199,8 @@ You can specify forces applied from colliders:
 | 128   | 128   | Strong force backward (~180°)            | 0x8080              |
 | 255   | 255   | Maximum force nearly full circle (~359°) | 0xFFFF              |
 
+---
+
 </details>
 
 ## Available World Variables
@@ -198,7 +210,7 @@ Below are enums that you can use to play music when spawning a mario, or set spe
 <details>
 <summary>Click to Expand</summary>
 
-## SM64Music
+### SM64Music
 
 Enumerates music sequences used for different game events, levels, menus, and cutscenes. Variations represent alternate
 versions of the same music sequence.
@@ -242,19 +254,21 @@ versions of the same music sequence.
 | EventCutsceneLakitu      | EventCutsceneLakituVariation      | Lakitu cutscene                                |
 | None                     |                                   | No music / default                             |
 
-## Scale
+---
+
+### Scale
 
 The global scale factor applied to all Mario characters when they first spawn in the world. This controls how large or small every player's Mario appears initially.
 
 ---
 
-## WaterLevel
+### WaterLevel
 
 The global water height level within the world. This determines the vertical position of the water surface that affects gameplay, such as swimming or drowning mechanics.
 
 ---
 
-## GasLevel
+### GasLevel
 
 The global gas height level within the world. This represents the vertical position of a gas layer that may affect the player, such as causing damage or impairing movement if entered.
 
