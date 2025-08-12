@@ -49,22 +49,22 @@ public sealed partial class SM64Context
 
     private int? TryAddCollider(Collider collider)
     {
-        if (Utils.IsGoodStaticCollider(collider))
+        if (Utils.IsStaticCollider(collider))
         {
             return RegisterStaticCollider(collider);
         }
 
-        if (Utils.IsGoodDynamicCollider(collider))
+        if (Utils.IsDynamicCollider(collider))
         {
             return RegisterDynamicCollider(collider);
         }
 
-        if (Utils.IsGoodInteractable(collider))
+        if (Utils.IsInteractable(collider))
         {
             return RegisterInteractable(collider);
         }
 
-        if (Utils.IsGoodWaterBox(collider))
+        if (Utils.IsWaterBox(collider))
         {
             return RegisterWaterBox(collider);
         }

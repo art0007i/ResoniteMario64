@@ -46,68 +46,52 @@ public static class Utils
     private static ColliderCategory GetColliderCategory(Collider col)
     {
         string tag = col.Slot.Tag ?? string.Empty;
-        bool hasStaticTag = tag.Contains("SM64 StaticCollider") || tag.Contains("SM64 Collider");
-        bool hasDynamicTag = tag.Contains("SM64 DynamicCollider");
-        bool isActive = IsActive(col);
+        
+        bool isStatic = tag.Contains("SM64 StaticCollider") || tag.Contains("SM64 Collider");
+        bool isDynamic = tag.Contains("SM64 DynamicCollider");
+        bool isWaterBox = tag.Contains("SM64 WaterBox");
+        bool isInteractable = tag.Contains("SM64 Interactable");
+        bool isValid = col.Enabled && col.Slot.IsActive;
 
-        if ((CollidesWithCharacters(col) || hasStaticTag) && !hasDynamicTag && isActive)
+        if ((isStatic || ((ICollider)col).CollidesWithCharacters) && !isDynamic && isValid)
             return ColliderCategory.Static;
 
-        if (hasDynamicTag && isActive)
+        if (isDynamic && isValid)
             return ColliderCategory.Dynamic;
 
-        if (tag.Contains("SM64 WaterBox") && isActive)
+        if (isWaterBox && isValid)
             return ColliderCategory.WaterBox;
 
-        if (col.Enabled && tag.Contains("SM64 Interactable"))
+        if (isInteractable && col.Enabled)
             return ColliderCategory.Interactable;
 
         return ColliderCategory.None;
     }
 
-    public static bool IsGoodStaticCollider(Collider col)
-    {
-        return GetColliderCategory(col) == ColliderCategory.Static;
-    }
-
-    public static bool IsGoodDynamicCollider(Collider col)
-    {
-        return GetColliderCategory(col) == ColliderCategory.Dynamic && col.Type.Value != ColliderType.Trigger;
-    }
-
-    public static bool IsGoodWaterBox(Collider col)
-    {
-        return GetColliderCategory(col) == ColliderCategory.WaterBox;
-    }
-
-    public static bool IsGoodInteractable(Collider col)
-    {
-        return GetColliderCategory(col) == ColliderCategory.Interactable;
-    }
-
-    private static bool IsActive(Collider col) => col.Enabled && col.Slot.IsActive;
-
-    private static bool CollidesWithCharacters(Collider col) => ((ICollider)col).CollidesWithCharacters;
-
+    public static bool IsStaticCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Static;
+    public static bool IsDynamicCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Dynamic && col.Type.Value != ColliderType.Trigger;
+    public static bool IsWaterBox(Collider col) => GetColliderCategory(col) == ColliderCategory.WaterBox;
+    public static bool IsInteractable(Collider col) => GetColliderCategory(col) == ColliderCategory.Interactable;
+    
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
         List<SM64Surface> surfaces = new List<SM64Surface>();
         List<(MeshCollider collider, SM64SurfaceType, SM64TerrainType, int)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType, int)>();
 
-        foreach (Collider obj in wld.RootSlot.GetComponentsInChildren<Collider>())
+        foreach (Collider col in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
-            if (!IsGoodStaticCollider(obj)) continue;
+            if (!IsStaticCollider(col)) continue;
 
-            string[] tagParts = obj.Slot.Tag?.Split(',');
+            string[] tagParts = col.Slot.Tag?.Split(',');
             Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force);
 
-            if (obj is MeshCollider meshCollider)
+            if (col is MeshCollider meshCollider)
             {
                 meshColliders.Add((meshCollider, surfaceType, terrainType, force));
             }
             else
             {
-                GetTransformedSurfaces(obj, surfaces, surfaceType, terrainType, force);
+                GetTransformedSurfaces(col, surfaces, surfaceType, terrainType, force);
             }
         }
 

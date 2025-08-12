@@ -25,8 +25,8 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <IsNet9 Condition="Exists('$(GamePath)\Resonite.dll')">true</IsNet9>
-        <IsNet9 Condition="!Exists('$(GamePath)\Resonite.dll')">false</IsNet9>
+        <IsNet9 Condition="Exists('$(GamePath)\Renderite.Host.dll')">true</IsNet9>
+        <IsNet9 Condition="!Exists('$(GamePath)\Renderite.Host.dll')">false</IsNet9>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(IsNet9)' == 'false'">

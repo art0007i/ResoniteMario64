@@ -123,14 +123,6 @@ public sealed partial class SM64Context : IDisposable
         ResoniteMario64.KeyMaxMariosPerPerson.OnChanged += HandleMaxMariosPerPersonChanged;
 
         ResoniteMario64.KeyUseGamepad.OnChanged += HandleKeyUseGamepadChanged;
-        
-        world.RunInUpdates(1, () =>
-        {
-            if (WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music))
-            {
-                Interop.PlayMusic(music);
-            }
-        });
 
         world.RunInUpdates(3, () =>
         {

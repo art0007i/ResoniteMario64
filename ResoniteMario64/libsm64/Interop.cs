@@ -266,6 +266,10 @@ public static class Interop
         IsGlobalInit = false;
     }
 
+    public static bool IsMusicPlaying() => sm64_get_current_background_music() != (ushort)MusicSequence.None;
+    
+    public static bool IsMusicPlaying(MusicSequence music) => sm64_get_current_background_music() == (ushort)music;
+
     public static void PlayMusic(MusicSequence music)
     {
         StopMusic();

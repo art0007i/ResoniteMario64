@@ -1,4 +1,5 @@
-﻿using FrooxEngine;
+﻿using System;
+using FrooxEngine;
 using ResoniteMario64.libsm64;
 using static ResoniteMario64.Constants;
 
@@ -10,7 +11,7 @@ public sealed partial class SM64Context
 
     public static Slot GetTempSlot(World world)
     {
-        World currentWorld = world ?? Engine.Current.WorldManager.FocusedWorld;
+        World currentWorld = world ?? Engine.Current.WorldManager?.FocusedWorld;
         if (TempSlot is { IsDestroyed: false } && TempSlot.World == currentWorld) return TempSlot;
 
         if (currentWorld == null)
@@ -77,17 +78,17 @@ public sealed partial class SM64Context
 
     private static SM64Mario AddMario(Slot slot, bool manual = true)
     {
-        bool success = EnsureInstanceExists(slot.World, out SM64Context instance);
+        bool success = EnsureInstanceExists(slot.World, out SM64Context context);
         if (!success)
         {
             Logger.Error($"Failed to ensure SM64Context instance for world: {slot.World?.Name}");
             return null;
         }
 
-        bool hasMaxMarios = instance.WorldVariableSpace.TryReadValue("MaxMarios", out int maxMarios);
+        bool hasMaxMarios = context.WorldVariableSpace.TryReadValue("MaxMarios", out int maxMarios);
         if (hasMaxMarios && maxMarios > 0)
         {
-            if (instance.MyMarios.Count >= maxMarios)
+            if (context.MyMarios.Count >= maxMarios)
             {
                 Logger.Error("You have too many marios for this world!");
                 slot.RunSynchronously(slot.Destroy);
@@ -96,15 +97,21 @@ public sealed partial class SM64Context
         }
 
         SM64Mario mario = null;
-        if (!instance.AllMarios.ContainsKey(slot))
+        if (!context.AllMarios.ContainsKey(slot))
         {
             Logger.Msg($"Adding Mario for Slot: {slot.Name} ({slot.ReferenceID})");
 
-            mario = new SM64Mario(slot, instance);
-            instance.AllMarios.Add(slot, mario);
+            mario = new SM64Mario(slot, context);
+            context.AllMarios.Add(slot, mario);
             if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic))
             {
                 Interop.PlayRandomMusic();
+            }
+            
+            if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music) && !Interop.IsMusicPlaying(music))
+            {
+                Logger.Msg($"Playing World Music - {music}");
+                Interop.PlayMusic(music);
             }
 
             Logger.Msg($"Added mario for Slot: {slot.Name} ({slot.ReferenceID})");
@@ -112,7 +119,7 @@ public sealed partial class SM64Context
 
         if (!manual) return mario;
 
-        Slot containerSlot = instance.MarioContainersSlot;
+        Slot containerSlot = context.MarioContainersSlot;
         if (containerSlot != null)
         {
             containerSlot.RunInUpdates(3, () =>
@@ -122,18 +129,18 @@ public sealed partial class SM64Context
                     foreach (Slot child2 in child1.Children.GetTempList())
                     {
                         if (child2.Tag != MarioTag) continue;
-                        if (instance.AllMarios.ContainsKey(child2)) continue;
+                        if (context.AllMarios.ContainsKey(child2)) continue;
 
                         Logger.Msg($"Adding existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
 
-                        SM64Mario mario2 = new SM64Mario(child2, instance);
-                        instance.AllMarios.Add(child2, mario2);
+                        SM64Mario mario2 = new SM64Mario(child2, context);
+                        context.AllMarios.Add(child2, mario2);
 
                         Logger.Msg($"Added existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
                     }
                 }
 
-                instance.ReloadAllColliders(false);
+                context.ReloadAllColliders(false);
                 Logger.Msg("Reloaded all colliders after adding existing Marios");
             });
         }
