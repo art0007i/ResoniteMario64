@@ -16,9 +16,9 @@ public static class ColliderShapeExtensions
         {
             case TriangleCollider col:
                 TriangleSubmesh triSubMesh = meshx.AddSubmesh<TriangleSubmesh>();
-                meshx.AddVertex(col.A + col.Offset.Value);
-                meshx.AddVertex(col.B + col.Offset.Value);
-                meshx.AddVertex(col.C + col.Offset.Value);
+                meshx.AddVertex(col.A.Value + col.Offset.Value);
+                meshx.AddVertex(col.B.Value + col.Offset.Value);
+                meshx.AddVertex(col.C.Value + col.Offset.Value);
                 triSubMesh.AddTriangle(0, 1, 2);
                 break;
             case CapsuleCollider col:
@@ -50,14 +50,14 @@ public static class ColliderShapeExtensions
             case BoxCollider col:
                 Box box = new Box(meshx)
                 {
-                    Size = col.Size
+                    Size = col.Size.Value
                 };
                 box.Update();
                 break;
             case SphereCollider col:
                 UVSphereCapsule uvsphere = new UVSphereCapsule(meshx, 8, 16, UVSphereCapsule.Shading.Flat)
                 {
-                    Radius = col.Radius
+                    Radius = col.Radius.Value
                 };
                 uvsphere.Update();
                 break;

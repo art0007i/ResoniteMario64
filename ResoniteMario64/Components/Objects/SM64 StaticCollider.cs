@@ -6,11 +6,11 @@ using static ResoniteMario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.Components.Objects;
 
-public sealed class SM64StaticCollider : ISM64Object
+public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
 {
-    public readonly SM64SurfaceType SurfaceType;
-    public readonly SM64TerrainType TerrainType;
-    public readonly int Force;
+    public SM64SurfaceType SurfaceType { get; }
+    public SM64TerrainType TerrainType { get; }
+    public int Force { get; }
 
     public World World { get; private set; }
     public SM64Context Context { get; private set; }
@@ -25,7 +25,11 @@ public sealed class SM64StaticCollider : ISM64Object
         Collider = col;
         
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out Force);
+        Utils.TryParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force);
+        
+        SurfaceType = surfaceType;
+        TerrainType = terrainType;
+        Force = force;
     }
 
     ~SM64StaticCollider()

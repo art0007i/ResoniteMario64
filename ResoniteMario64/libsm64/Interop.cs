@@ -13,11 +13,9 @@ namespace ResoniteMario64.libsm64;
 public static class MarioExtensions
 {
     public static float3 ToMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
-
     public static float3 FromMarioRotation(this float3 rot) => new float3(FixAngle(-rot.x), FixAngle(rot.y), FixAngle(rot.z));
 
     public static float3 ToMarioPosition(this float3 pos) => Interop.ScaleFactor * pos * new float3(-1, 1, 1);
-
     public static float3 FromMarioPosition(this float3 pos) => pos / Interop.ScaleFactor * new float3(-1, 1, 1);
 
     public static float ToMarioFloat(this float value) => Interop.ScaleFactor * value;
@@ -26,34 +24,38 @@ public static class MarioExtensions
     public static float FromMarioFloat(this float value) => value / Interop.ScaleFactor;
     public static float3 FromMarioFloat(this float3 value) => value / Interop.ScaleFactor;
 
-    private static float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
-
     private static float FixAngle(float a) => Fmod(a + 180.0f, 360.0f) - 180.0f;
+    private static float Fmod(float a, float b) => a - b * MathX.Floor(a / b);
 }
 
 public static class Interop
 {
     public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) ?? false ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
 
-    public const int SM64TextureWidth = 64 * 11;
-    public const int SM64TextureHeight = 64;
+    private const int SM64TextureWidth = 64 * 11;
+    private const int SM64TextureHeight = 64;
     public const int SM64GeoMaxTriangles = 1024;
 
     public const float SM64HealthPerHealthPoint = 256;
+    private const byte HealPointMultiplier = 4;
 
-    public const byte SecondsMultiplier = 40;
+    private const byte SecondsMultiplier = 40;
 
     public const int SM64LevelResetValue = -10000;
 
-    // It seems a collider can't be too big, otherwise it will be ignored
-    // This seems like too much of a pain to fix rn, let the future me worry about it
-    public static int SM64MaxVertexDistance => 250000 * (int)ScaleFactor;
+    /*
+    - !! This is old and idk what to do with it
+    - 
+    - It seems a collider can't be too big, otherwise it will be ignored
+    - This seems like too much of a pain to fix rn, let the future me worry about it
+    */
+    //public static int SM64MaxVertexDistance => 250000 * (int)ScaleFactor;
+    
+    private const float SM64MaxVertexDistance = 23170f; // 32767f / sqrt(2) -- We need to figure out if we need to change this based on scale...
 
     public const float SM64Deg2Angle = 182.04459f;
-    
-    private const byte HealPointMultiplier = 4;
 
-    public static Bitmap2D MarioTexture { get; private set; }
+    // public static Bitmap2D MarioTexture { get; private set; }
     public static bool IsGlobalInit;
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -225,6 +227,13 @@ public static class Interop
 
         try
         {
+            // This is laggy as all balls with audio.
+            // if (Utils.CheckDebug())
+            // {
+            //     var callbackDelegate = new SM64DebugPrintFunctionPtr(c => UniLog.Log($"[libsm64] {c}"));
+            //     sm64_register_debug_print_function(Marshal.GetFunctionPointerForDelegate(callbackDelegate));
+            // }
+            
             sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
             sm64_audio_init(romHandle.AddrOfPinnedObject());
 
@@ -238,7 +247,7 @@ public static class Interop
                     textureData[4 * (ix + SM64TextureWidth * iy) + 2],
                     textureData[4 * (ix + SM64TextureWidth * iy) + 3]
                 );
-                // Make the 100% transparent colors white. So we can multiply with the vertex colors.
+                // Make the 100% transparent colors white. so we can multiply with the vertex colors.
                 if (color.a == 0)
                 {
                     color = new color32(255, 255, 255, 0);
@@ -262,7 +271,7 @@ public static class Interop
     {
         StopMusic();
         sm64_global_terminate();
-        MarioTexture = null;
+        // MarioTexture = null;
         IsGlobalInit = false;
     }
 
@@ -343,6 +352,8 @@ public static class Interop
             colorHandle.Free();
             uvHandle.Free();
         }
+        
+        
 
         return outState;
     }
@@ -421,25 +432,62 @@ public static class Interop
     {
         for (int i = 0; i < triangles.Length; i += 3)
         {
-            outSurfaces.Add(new SM64Surface
+            float3 p0 = vertices[triangles[i]];
+            float3 p1 = vertices[triangles[i + 1]];
+            float3 p2 = vertices[triangles[i + 2]];
+
+            float3 fp0 = new float3(-p0.x, p0.y, p0.z);
+            float3 fp1 = new float3(-p1.x, p1.y, p1.z);
+            float3 fp2 = new float3(-p2.x, p2.y, p2.z);
+
+            float3 e1 = new float3(fp1.x - fp0.x, fp1.y - fp0.y, fp1.z - fp0.z);
+            float3 e2 = new float3(fp2.x - fp0.x, fp2.y - fp0.y, fp2.z - fp0.z);
+            float3 norm = new float3(
+                e1.y * e2.z - e1.z * e2.y,
+                e1.z * e2.x - e1.x * e2.z,
+                e1.x * e2.y - e1.y * e2.x
+            );
+
+            float area2 = norm.x * norm.x + norm.y * norm.y + norm.z * norm.z;
+            if (area2 <= 1e-6f)
+                continue;
+
+            if (norm.y < 0f)
+            {
+                (fp1, fp2) = (fp2, fp1);
+            }
+            
+            SM64Surface surface = new SM64Surface
             {
                 Force = (short)(force == -1 ? 0 : force),
                 Type = (short)surfaceType,
                 Terrain = (ushort)terrainType,
 
-                v0x = (int)(ScaleFactor * -vertices[triangles[i]].x),
-                v0y = (int)(ScaleFactor * vertices[triangles[i]].y),
-                v0z = (int)(ScaleFactor * vertices[triangles[i]].z),
+                v0x = (int)ClampToSm64(ScaleFactor * fp0.x),
+                v0y = (int)ClampToSm64(ScaleFactor * fp0.y),
+                v0z = (int)ClampToSm64(ScaleFactor * fp0.z),
 
-                v1x = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
-                v1y = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
-                v1z = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
+                v1x = (int)ClampToSm64(ScaleFactor * fp1.x),
+                v1y = (int)ClampToSm64(ScaleFactor * fp1.y),
+                v1z = (int)ClampToSm64(ScaleFactor * fp1.z),
 
-                v2x = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
-                v2y = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
-                v2z = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
-            });
+                v2x = (int)ClampToSm64(ScaleFactor * fp2.x),
+                v2y = (int)ClampToSm64(ScaleFactor * fp2.y),
+                v2z = (int)ClampToSm64(ScaleFactor * fp2.z)
+            };
+            
+            outSurfaces.Add(surface);
         }
+    }
+    
+    private static float ClampToSm64(float value)
+    {
+        return value switch
+        {
+            > SM64MaxVertexDistance  => SM64MaxVertexDistance,
+            < -SM64MaxVertexDistance => -SM64MaxVertexDistance,
+            _               => value
+        };
     }
 
     public static void SetWaterLevel(uint marioId, float waterLevel)

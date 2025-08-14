@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
+using ResoniteMario64.Components.Interfaces;
 using ResoniteMario64.Components.Objects;
 using ResoniteMario64.libsm64;
 
@@ -18,6 +21,8 @@ public sealed partial class SM64Context
     public void HandleCollider(Collider collider, bool log = true)
     {
         if (collider == null) return;
+        
+        if (collider.World != World) return;
         if (collider.IsDestroyed)
         {
             HandleColliderDestroyed(collider);
@@ -124,7 +129,7 @@ public sealed partial class SM64Context
     private int RegisterStaticCollider(Collider collider)
     {
         QueueStaticCollidersUpdate();
-
+        
         if (StaticColliders.ContainsKey(collider))
         {
             return 10;
@@ -263,23 +268,28 @@ public sealed partial class SM64Context
             Logger.Warn(message, caller, line);
     }
 
-    public void GetAllColliders(bool log, out Dictionary<int, List<Collider>> colliders)
+    public void GetAllColliders(bool log, out Dictionary<string, List<ISM64Object>> colliders)
     {
-        colliders = new Dictionary<int, List<Collider>>
+        Dictionary<string, (int Key, IEnumerable<ISM64Object> Source)> sources = new Dictionary<string, (int, IEnumerable<ISM64Object>)>
         {
-            [10] = StaticColliders.Keys.GetTempList(),
-            [20] = DynamicColliders.Keys.GetTempList(),
-            [30] = Interactables.Keys.GetTempList(),
-            [40] = WaterBoxes.Keys.GetTempList()
+            ["Static Collider"] = (10, StaticColliders.Values),
+            ["Dynamic Collider"] = (20, DynamicColliders.Values),
+            ["Interactable"] = (30, Interactables.Values),
+            ["Waterbox"] = (40, WaterBoxes.Values)
         };
+
+        colliders = sources.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.Source.GetTempList()
+        );
 
         if (!log) return;
 
-        foreach (KeyValuePair<int, List<Collider>> kvp in colliders)
+        foreach (KeyValuePair<string, (int Key, IEnumerable<ISM64Object> Source)> kvp in sources)
         {
-            foreach (Collider collider in kvp.Value)
+            foreach (ISM64Object obj in kvp.Value.Source)
             {
-                LogCollider(collider, kvp.Key, collider.IsDestroyed);
+                LogCollider(obj.Collider, kvp.Value.Key, obj.Collider.IsDestroyed);
             }
         }
     }

@@ -1009,10 +1009,7 @@ public sealed class SM64Mario : ISM64Object
     {
         if (CurrentState.IsDead) return;
 
-        if ((CurrentActionFlags & (uint)ActionFlag.Sleeping) == (uint)ActionFlag.Sleeping)
-        {
-            SetAction(ActionFlag.WakingUp);
-        }
+        SetAction(ActionFlag.Idle);
 
         SetAction(ActionFlag.Grabbed);
     }

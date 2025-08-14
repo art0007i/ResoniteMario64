@@ -5,6 +5,8 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
+using ResoniteMario64.Components.Context;
+using ResoniteMario64.Components.Objects;
 using ResoniteMario64.libsm64;
 using ResoniteModLoader;
 using static ResoniteMario64.libsm64.SM64Constants;
@@ -13,6 +15,8 @@ namespace ResoniteMario64;
 
 public static class Utils
 {
+    internal static readonly List<Collider> StaticSurfaces = new List<Collider>(); 
+    
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
     public static readonly colorX ColorXWhite = colorX.White;
 
@@ -75,6 +79,8 @@ public static class Utils
     
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
+        StaticSurfaces.Clear();
+        
         List<SM64Surface> surfaces = new List<SM64Surface>();
         List<(MeshCollider collider, SM64SurfaceType, SM64TerrainType, int)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType, int)>();
 
@@ -93,12 +99,18 @@ public static class Utils
             {
                 GetTransformedSurfaces(col, surfaces, surfaceType, terrainType, force);
             }
+            
+            StaticSurfaces.Add(col);
         }
 
         // Print all MeshColliders that are Null or Non-Readable
         if (Utils.CheckDebug())
         {
-            meshColliders.Where(InvalidCollider).Do(invalid => Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}"));
+            meshColliders.Where(InvalidCollider).Do(invalid =>
+            {
+                Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}");
+                StaticSurfaces.Remove(invalid.collider);
+            });
         }
 
         // Remove all MeshColliders that are Null or Non-Readable
@@ -118,6 +130,7 @@ public static class Utils
             if (newTotalMeshColliderTris > maxTris)
             {
                 if (Utils.CheckDebug()) Logger.Warn($"[{meshCollider.GetType()}] {meshCollider.Slot.Name} ({meshCollider.ReferenceID}) Mesh has too many triangles.");
+                StaticSurfaces.Remove(meshCollider);
                 continue;
             }
 
@@ -125,6 +138,22 @@ public static class Utils
             totalMeshColliderTris = newTotalMeshColliderTris;
         }
 
+        SM64Context instance = SM64Context.Instance;
+        if (instance != null)
+        {
+            lock (instance.StaticColliders)
+            {
+                List<Collider> toRemove = instance.StaticColliders.Keys.Except(StaticSurfaces).GetTempList();
+                if (toRemove != null)
+                {
+                    foreach (Collider col in toRemove)
+                    {
+                        instance.UnregisterStaticCollider(col);
+                    }
+                }
+            }
+        }
+        
         return surfaces.ToArray();
 
         bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType, int) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
@@ -141,7 +170,7 @@ public static class Utils
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
     }
-
+    
     public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
     {
         surfaceType = SM64SurfaceType.Default;

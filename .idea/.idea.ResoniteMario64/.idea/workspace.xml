@@ -10,12 +10,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7d707737-cec8-423b-b466-83ac0aaea739" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/developer-tools.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/encodings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Interfaces/ISM64Collider.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64/ColliderShapeExtensions.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/ColliderShapeExtensions.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context Terrain.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context Terrain.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context Utils.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context Utils.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Context/SM64 Context.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/Objects/SM64 DynamicCollider.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Objects/SM64 DynamicCollider.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/Objects/SM64 StaticCollider.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/Objects/SM64 StaticCollider.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64/Components/SM64 Mario.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Components/SM64 Mario.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.csproj" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ResoniteMario64/Utils.cs" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64/Utils.cs" afterDir="false" />
@@ -33,45 +34,50 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "NepuShiro"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;NepuShiro&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/NepuShiro/ResoniteMario64.git",
-    "accountId": "d232003e-7d5f-4168-b7b5-38f13d849df1"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/NepuShiro/ResoniteMario64.git&quot;,
+    &quot;accountId&quot;: &quot;d232003e-7d5f-4168-b7b5-38f13d849df1&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 5
-}]]></component>
+}</component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$USER_HOME$/AppData/Local/JetBrains/Shared/vAny/DecompilerCache/decompiler/e41906b8e691446880fc2b03e84e59bc9e600/b2/9db8727f/MeshX.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$USER_HOME$/AppData/Local/JetBrains/Shared/vAny/DecompilerCache/decompiler/edb8ede9976f46169179f43b84422f079e600/9b/eadf8e09/ConicalFrustum.cs" root0="FORCE_HIGHLIGHTING" />
+  </component>
+  <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="31AhWDRRWRJWv4lQC7OrMzKOe0K" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    ".NET Launch Settings Profile.ResoniteMario64: Launch Multi.executor": "Debug",
-    ".NET Launch Settings Profile.ResoniteMario64: Launch Resonite.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "XThreadsFramesViewSplitterKey": "0.80986637",
-    "git-widget-placeholder": "master",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "AtomSettingsConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;.NET Launch Settings Profile.ResoniteMario64: Launch Multi.executor&quot;: &quot;Debug&quot;,
+    &quot;.NET Launch Settings Profile.ResoniteMario64: Launch Resonite.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;XThreadsFramesViewSplitterKey&quot;: &quot;0.80986637&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;AtomSettingsConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected=".NET Launch Settings Profile.ResoniteMario64: Launch Resonite">
     <configuration name="ResoniteMario64: Launch Multi" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
       <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.csproj" />
@@ -126,16 +132,31 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1754972815921</updated>
-      <workItem from="1754972817702" duration="2695000" />
+      <workItem from="1754972817702" duration="6065000" />
+      <workItem from="1755051412753" duration="10247000" />
+      <workItem from="1755113288065" duration="15005000" />
+      <workItem from="1755144578775" duration="4689000" />
     </task>
+    <task id="LOCAL-00001" summary="Refactor collider utility methods: simplify collider checks and improve readability">
+      <option name="closed" value="true" />
+      <created>1754976170652</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1754976170653</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="UnityCheckinConfiguration" checkUnsavedScenes="true" />
   <component name="UnityProjectConfiguration" hasMinimizedUI="false" />
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
+    <MESSAGE value="Refactor collider utility methods: simplify collider checks and improve readability" />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor collider utility methods: simplify collider checks and improve readability" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

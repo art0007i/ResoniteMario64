@@ -9,11 +9,11 @@ using static ResoniteMario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.Components.Objects;
 
-public sealed class SM64DynamicCollider : ISM64Object
+public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
 {
-    public readonly SM64SurfaceType SurfaceType;
-    public readonly SM64TerrainType TerrainType;
-    public readonly int Force;
+    public SM64SurfaceType SurfaceType { get; }
+    public SM64TerrainType TerrainType { get; }
+    public int Force { get; }
 
     public readonly uint ObjectId;
 
@@ -38,7 +38,11 @@ public sealed class SM64DynamicCollider : ISM64Object
         InitScale = col.Slot.GlobalScale;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out SurfaceType, out TerrainType, out _, out Force);
+        Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force);
+        
+        SurfaceType = surfaceType;
+        TerrainType = terrainType;
+        Force = force;
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {

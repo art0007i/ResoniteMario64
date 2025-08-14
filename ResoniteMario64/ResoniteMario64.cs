@@ -107,7 +107,7 @@ public class ResoniteMario64 : ResoniteMod
 
     public static ModConfiguration Config;
     internal static byte[] SuperMario64UsZ64RomBytes;
-    internal static string AssemblyMD5Hash = "";
+    private static string AssemblyMD5Hash = "";
 
     // Internal
     internal static bool FilesLoaded;
@@ -259,7 +259,7 @@ public class ResoniteMario64 : ResoniteMod
             Engine.Current.WorldManager.WorldFocused += handler;
             Logger.Msg($"Subscribed to WorldFocused event for world: {__instance.Name}");
 
-            __instance.RootSlot.ChildAdded += (slot, child) =>
+            __instance.RootSlot.ChildAdded += (_, child) =>
             {
                 if (child.Name != TempSlotName) return;
 
@@ -310,11 +310,10 @@ public class ResoniteMario64 : ResoniteMod
                         {
                             context.MarioContainersSlot?.ForeachChild(slot =>
                             {
-                                if (slot.Tag == MarioTag)
-                                {
-                                    Logger.Msg($"Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
-                                    SM64Context.TryAddMario(slot, false);
-                                }
+                                if (slot.Tag != MarioTag) return;
+                                
+                                Logger.Msg($"Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
+                                SM64Context.TryAddMario(slot, false);
                             });
                         });
                     }
@@ -422,11 +421,12 @@ public class ResoniteMario64 : ResoniteMod
         public static void Postfix(Slot __instance, UIBuilder ui)
         {
             SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
-            if (inspector?.ComponentView?.Target.FindParent(x => x.Tag == ContextTag) == null) return;
+            Slot compView = inspector?.ComponentView?.Target;
+            if (compView?.Tag == ContextTag || compView?.FindParent(x => x.Tag == ContextTag) == null) return;
 
-            // ui.Button("Button Label").LocalPressed += (b, e) => { b.RunSynchronously(() => { /* Do things here */ }) };
+            // ui.Button("Button Label").LocalPressed += (b, _) => { b.RunSynchronously(() => { /* Do things here */ }) };
 
-            ui.Button("Spawn Mario").LocalPressed += (b, e) =>
+            ui.Button("Spawn Mario").LocalPressed += (b, _) =>
             {
                 b.RunSynchronously(() =>
                 {
@@ -440,43 +440,40 @@ public class ResoniteMario64 : ResoniteMod
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
-            if (Interop.IsGlobalInit) ui.Button("Reload All Colliders").LocalPressed += (b, e) => b.RunSynchronously(() => SM64Context.Instance?.ReloadAllColliders());
-            ui.Button("Destroy Mario64 Context").LocalPressed += (b, e) => b.RunSynchronously(() => SM64Context.Instance?.Dispose());
+            if (Interop.IsGlobalInit) ui.Button("Reload All Colliders").LocalPressed += (b, _) => b.RunSynchronously(() => SM64Context.Instance?.ReloadAllColliders());
+            ui.Button("Destroy Mario64 Context").LocalPressed += (b, _) => b.RunSynchronously(() => SM64Context.Instance?.Dispose());
 
             if (SM64Context.Instance == null || !Interop.IsGlobalInit) return;
 
             try
             {
-                if (inspector?.ComponentView?.Target?.Tag == MarioTag && SM64Context.Instance?.AllMarios.TryGetValue(inspector?.ComponentView?.Target, out SM64Mario mario) is true)
-                {
-                    if (mario.IsLocal)
-                    {
-                        ui.Spacer(8);
-
-                        foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
-                        {
-                            ui.Button($"Wear {capType.ToString()}").LocalPressed += (b, e) => mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.GetValue(KeyDisableAudio));
-                        }
-
-                        ui.Spacer(8);
-
-                        ui.Button("Heal Mario").LocalPressed += (b, e) => mario.Heal(1);
-
-                        ui.Spacer(8);
-
-                        ui.Button("Damage Mario").LocalPressed += (b, e) => mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1);
-                        ui.Button("Kill Mario").LocalPressed += (b, e) => mario.SetHealthPoints(0);
-                        ui.Button("Nuke Mario").LocalPressed += (b, e) => mario.SetMarioAsNuked(true);
-
-                        ui.Spacer(8);
-                    }
-                }
-                else if (inspector?.ComponentView?.Target?.Tag == AudioTag)
+                if ((compView.Tag == MarioTag || compView.FindParent(x => x.Tag == MarioTag) != null) && SM64Context.Instance.AllMarios.TryGetValue(compView, out SM64Mario mario) && mario.IsLocal)
                 {
                     ui.Spacer(8);
 
-                    ui.Button("Play Random Music").LocalPressed += (b, e) => Interop.PlayRandomMusic();
-                    ui.Button("Stop Music").LocalPressed += (b, e) => Interop.StopMusic();
+                    foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
+                    {
+                        ui.Button($"Wear {capType.ToString()}").LocalPressed += (_, _) => mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.GetValue(KeyDisableAudio));
+                    }
+
+                    ui.Spacer(8);
+
+                    ui.Button("Heal Mario").LocalPressed += (_, _) => mario.Heal(1);
+
+                    ui.Spacer(8);
+
+                    ui.Button("Damage Mario").LocalPressed += (_, _) => mario.TakeDamage(mario.MarioSlot.GlobalPosition, 1);
+                    ui.Button("Kill Mario").LocalPressed += (_, _) => mario.SetHealthPoints(0);
+                    ui.Button("Nuke Mario").LocalPressed += (_, _) => mario.SetMarioAsNuked(true);
+
+                    ui.Spacer(8);
+                }
+                else if (compView.Tag == AudioTag)
+                {
+                    ui.Spacer(8);
+
+                    ui.Button("Play Random Music").LocalPressed += (_, _) => Interop.PlayRandomMusic();
+                    ui.Button("Stop Music").LocalPressed += (_, _) => Interop.StopMusic();
 
                     ui.Spacer(8);
                 }
