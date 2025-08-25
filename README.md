@@ -1,6 +1,6 @@
 # ResoniteMario64
 
-A [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader) mod
+A [BepisLoader](https://github.com/ResoniteModding/BepisLoader) mod
 for [Resonite](https://resonite.com/) that allows you to spawn in and control mario from Super Mario 64.
 
 Made possible by [libsm64](https://github.com/libsm64/libsm64).
@@ -17,15 +17,13 @@ creating this.
 
 ## Installation
 
-1. Install [ResoniteModLoader](https://github.com/resonite-modding-group/ResoniteModLoader).
-2. Find `Super Mario 64 [US].z64` with hash `20b854b239203baf6c961b850a4a51a2` rename it to `baserom.us.z64` then place
-   it into your `rml_libs` folder. This folder should be at
-   `C:\Program Files (x86)\Steam\steamapps\common\Resonite\rml_libs` for a default install. You can create it if it's
-   missing, or if you launch the game once with ResoniteModLoader installed it will create the folder for you.
-3. Place [ResoniteMario64.dll](https://github.com/art0007i/ResoniteMario64/releases/latest/download/ResoniteMario64.dll)
-   into your `rml_mods` folder. This folder should be at
-   `C:\Program Files (x86)\Steam\steamapps\common\Resonite\rml_mods` for a default install. You can create it if it's
-   missing, or if you launch the game once with ResoniteModLoader installed it will create the folder for you.
+1. Install [BepisLoader](https://github.com/ResoniteModding/BepisLoader).
+2. Place [ResoniteMario64.dll](https://github.com/art0007i/ResoniteMario64/releases/latest/download/ResoniteMario64.dll)
+   into your `BepInEx\plugins` folder. This folder should be at
+   `C:\Program Files (x86)\Steam\steamapps\common\Resonite\BepInEx\plugins` for a default install. You can create it if it's
+   missing, or if you launch the game once with BepisLoader installed it will create the folder for you.
+3. Find `Super Mario 64 [US].z64` with hash `20b854b239203baf6c961b850a4a51a2` rename it to `baserom.us.z64` then place
+      it next to the `ResoniteMario64.dll`.
 4. Start the game. If you want to verify that the mod is working you can check your Resonite logs.
 
 ## Available Collider Types
