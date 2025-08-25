@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using Elements.Assets;
 using Elements.Core;
-using ResoniteMario64.Components.Context;
-using static ResoniteMario64.libsm64.SM64Constants;
+using ResoniteMario64.Mario64.Components.Context;
+using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 #if IsNet9
 #endif
 
-namespace ResoniteMario64.libsm64;
+namespace ResoniteMario64.Mario64.libsm64;
 
 public static class MarioExtensions
 {
@@ -30,7 +29,7 @@ public static class MarioExtensions
 
 public static class Interop
 {
-    public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) ?? false ? scale : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
+    public static float ScaleFactor => SM64Context.Instance?.ContextVariableSpace?.TryReadValue("Scale", out float scale) ?? false ? scale : Config.MarioScaleFactor.Value;
 
     private const int SM64TextureWidth = 64 * 11;
     private const int SM64TextureHeight = 64;

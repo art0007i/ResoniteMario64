@@ -3,17 +3,15 @@ using System.Linq;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
-using ResoniteMario64.Components.Context;
-using ResoniteMario64.Components.Interfaces;
-using ResoniteMario64.Components.Objects;
-using ResoniteMario64.libsm64;
-using static ResoniteMario64.Constants;
-using static ResoniteMario64.libsm64.SM64Constants;
-#if IsNet9
 using Renderite.Shared;
-#endif
+using ResoniteMario64.Mario64.Components.Context;
+using ResoniteMario64.Mario64.Components.Interfaces;
+using ResoniteMario64.Mario64.Components.Objects;
+using ResoniteMario64.Mario64.libsm64;
+using static ResoniteMario64.Constants;
+using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
-namespace ResoniteMario64.Components;
+namespace ResoniteMario64.Mario64.Components;
 
 public sealed class SM64Mario : ISM64Object
 {
@@ -296,7 +294,7 @@ public sealed class SM64Mario : ISM64Object
     public uint CurrentActionFlags => CurrentState.ActionFlags;
     public uint CurrentStateFlags => CurrentState.StateFlags;
     private uint _lastActionFlags;
-    
+
     // private uint _lastStateFlags;
 
 #endregion
@@ -305,11 +303,11 @@ public sealed class SM64Mario : ISM64Object
 
     static SM64Mario()
     {
-        _skipFarMarioDistance = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioCullDistance);
-        ResoniteMario64.KeyMarioCullDistance.OnChanged += newValue => _skipFarMarioDistance = (float)(newValue ?? 0f);
-        
-        _marioCollisionSampleCount = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioCollisionChecks);
-        ResoniteMario64.KeyMarioCollisionChecks.OnChanged += newValue => _marioCollisionSampleCount = (int)(newValue ?? 0);
+        _skipFarMarioDistance = Config.MarioCullDistance.Value;
+        Config.MarioCullDistance.SettingChanged += (_, _) => _skipFarMarioDistance = Config.MarioCullDistance.Value;
+
+        _marioCollisionSampleCount = Config.MarioCollisionChecks.Value;
+        Config.MarioCollisionChecks.SettingChanged += (_, _) => _marioCollisionSampleCount = Config.MarioCollisionChecks.Value;
     }
 
     public SM64Mario(Slot slot, SM64Context instance)
@@ -349,7 +347,7 @@ public sealed class SM64Mario : ISM64Object
             _marioCollider.Height.Value = 0.15f * MarioScale;
             Logger.Msg("Configured CapsuleCollider for local Mario", caller);
         }
-        
+
         Logger.Msg("Component references obtained", caller);
 
         MarioSlot.OnPrepareDestroy += HandleSlotDestroyed;
@@ -434,7 +432,7 @@ public sealed class SM64Mario : ISM64Object
         Context.UpdatePlayerMariosState();
 
         _initialized = true;
-        
+
         slot.RunInUpdates(3, () => SyncedIsShown = !_wasBypassed);
         Logger.Msg($"Mario construction complete. ID: {MarioId}");
     }
@@ -456,8 +454,8 @@ public sealed class SM64Mario : ISM64Object
         _colorBufferColors = new color[bufferSize];
         _uvBuffer = new float2[bufferSize];
         Logger.Msg("Buffers initialized.");
-        
-        if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyRenderSlotLocal) && Utils.CheckDebug())
+
+        if (Config.RenderSlotLocal.Value && Utils.CheckDebug())
         {
             _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
             Logger.Msg("Added local Mario renderer slot.");
@@ -554,7 +552,7 @@ public sealed class SM64Mario : ISM64Object
     {
         Logger.Msg("Starting creation of non-modded renderer.");
 
-        Uri uri = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioUrl);
+        Uri uri = Config.MarioUrl.Value;
         if (uri == null)
         {
             uri = new Uri("resdb:///4a51849e3d7065641304a06981da62c4177a8b403553b2bf685f1460e3664b05.brson");
@@ -580,7 +578,7 @@ public sealed class SM64Mario : ISM64Object
                 await tempSlot.LoadObjectAsync(uri);
                 tempSlot.GetComponent<InventoryItem>()?.Unpack(true);
                 Logger.Msg("Non-modded renderer object loaded and unpacked.");
-                
+
                 foreach (Slot child in _marioNonModdedRendererSlot.Children)
                     child.SetIdentityTransform();
             });
@@ -599,7 +597,7 @@ public sealed class SM64Mario : ISM64Object
         if (!_enabled || !_initialized || _isNuked || IsDisposed) return;
 
         UpdateIsOverMaxDistance();
-        
+
         if (_wasBypassed) return;
 
         SM64MarioInputs inputs = new SM64MarioInputs
@@ -727,7 +725,7 @@ public sealed class SM64Mario : ISM64Object
 
             _wasPickedUp = pickup;
         }
-        
+
         float waterSurface = float.NaN;
         float3 marioPos = _marioCollider.GlobalBoundingBox.Center;
 
@@ -755,7 +753,7 @@ public sealed class SM64Mario : ISM64Object
         }
 
         float newWaterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float fallbackLevel) ? fallbackLevel : -100f;
-        
+
         if (waterSurface.IsValid())
         {
             newWaterLevel = MathX.Min(marioPos.y + 0.2f, waterSurface);
@@ -798,9 +796,9 @@ public sealed class SM64Mario : ISM64Object
         }
         else
         {
-            if (_marioMaterialClipped.AlbedoColor.Value != Utils.ColorXWhite)
+            if (_marioMaterialClipped.AlbedoColor.Value != colorX.White)
             {
-                _marioMaterialClipped.AlbedoColor.Value = Utils.ColorXWhite;
+                _marioMaterialClipped.AlbedoColor.Value = colorX.White;
             }
 
             if (_marioMaterialClipped.RenderQueue.Value != -1)
@@ -852,7 +850,7 @@ public sealed class SM64Mario : ISM64Object
         if (!_enabled || !_initialized || _isNuked || IsDisposed) return;
 
         // lerp from previous state to current (this means when you make an input it's delayed by one frame, but it means we can have nice interpolation)
-        float t = (float)((MarioSlot.Time.WorldTime - Context.LastTick) / (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f));
+        float t = (float)((MarioSlot.Time.WorldTime - Context.LastTick) / (Config.GameTickMs.Value / 1000f));
 
         int j = 1 - _buffIndex;
 
@@ -959,7 +957,7 @@ public sealed class SM64Mario : ISM64Object
     public void SetVelocity(float3 frooxVelocity) => Interop.MarioSetVelocity(MarioId, frooxVelocity);
 
     public void SetForwardVelocity(float frooxVelocity) => Interop.MarioSetForwardVelocity(MarioId, frooxVelocity);
-    
+
     public void Heal(byte healthPoints)
     {
         if (CurrentState.IsDead || !IsLocal) return;
@@ -970,15 +968,15 @@ public sealed class SM64Mario : ISM64Object
     public void TakeDamage(float3 worldPosition, uint damage)
     {
         if (CurrentState.IsDead || !IsLocal) return;
-        
+
         Interop.MarioTakeDamage(MarioId, worldPosition, damage);
     }
-    
+
     public void WearCap(MarioCapType capType, float duration = 15f, bool playMusic = true)
     {
         if (playMusic)
         {
-            playMusic = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayCapMusic);
+            playMusic = Config.PlayCapMusic.Value;
         }
 
         switch (capType)
@@ -1056,15 +1054,13 @@ public sealed class SM64Mario : ISM64Object
         SetAction(ActionFlag.TeleportFadeIn);
     }*/
 
-    
-
     private void HandleInteractable(SM64Interactable interactable)
     {
         if (interactable?.Collider?.Slot is not { IsActive: true }) return;
-        
+
         Collider interactableCollider = interactable.Collider;
         BoundingBox interactableBox = interactableCollider.LocalBoundingBox;
-        
+
         float3 localMarioCenterPos = interactableCollider.Slot.GlobalPointToLocal(_marioCollider.GlobalBoundingBox.Center);
         float3 localMarioFootPos = interactableCollider.Slot.GlobalPointToLocal(MarioSlot.GlobalPosition);
         float3 localMarioHeadPos = localMarioCenterPos + (localMarioCenterPos - localMarioFootPos);
@@ -1075,12 +1071,13 @@ public sealed class SM64Mario : ISM64Object
             float t = i / (float)_marioCollisionSampleCount;
             float3 pointOnLine = MathX.Lerp(localMarioFootPos, localMarioHeadPos, t);
             if (!interactableBox.Contains(pointOnLine)) continue;
-            
+
             anyPointInside = true;
             break;
         }
+
         if (!anyPointInside) return;
-        
+
         int typeId = interactable.TypeId;
         bool disable = true;
         switch (interactable.Type)
@@ -1151,30 +1148,30 @@ public sealed class SM64Mario : ISM64Object
 
         interactableCollider.Slot.ActiveSelf = !disable;
     }
-    
+
     public void SetMarioAsNuked(bool delete = false)
     {
         _isNuked = true;
-        bool deleteMario = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDeleteAfterDeath) || delete;
+        bool deleteMario = Config.DeleteAfterDeath.Value || delete;
 
         Logger.Debug($"One of our Marios died, so {(deleteMario ? "delete the mario" : "stop its engine updates")}.");
 
         if (deleteMario) Dispose();
     }
-    
+
     public void SetIsOverMaxCount(bool isOverTheMaxCount)
     {
         _isOverMaxCount = isOverTheMaxCount;
         UpdateIsBypassed();
     }
-    
+
     private void UpdateIsOverMaxDistance()
     {
         // Check the distance to see if we should ignore the updates
         _isOverMaxDistance = !IsLocal && MarioSlot.DistanceFromUserHead() > _skipFarMarioDistance;
         UpdateIsBypassed();
     }
-    
+
     private void UpdateIsBypassed()
     {
         if (!_initialized || IsDisposed) return;

@@ -5,29 +5,18 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
-using ResoniteMario64.Components.Context;
-using ResoniteMario64.Components.Objects;
-using ResoniteMario64.libsm64;
-using ResoniteModLoader;
-using static ResoniteMario64.libsm64.SM64Constants;
+using ResoniteMario64.Mario64.Components.Context;
+using ResoniteMario64.Mario64.libsm64;
+using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
-namespace ResoniteMario64;
+namespace ResoniteMario64.Mario64;
 
 public static class Utils
 {
     internal static readonly List<Collider> StaticSurfaces = new List<Collider>(); 
     
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
-    public static readonly colorX ColorXWhite = colorX.White;
-
-    public static readonly float2 Float2Zero = float2.Zero;
-    public static readonly float2 Float2One = float2.One;
-    public static readonly float2 Float2NegOne = -float2.One;
-    public static readonly float2 Float2Up = new float2(0, 1);
-    public static readonly float2 Float2Down = new float2(0, -1);
-    public static readonly float2 Float2Left = new float2(1);
-    public static readonly float2 Float2Right = new float2(-1);
-
+    
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
@@ -120,7 +109,7 @@ public static class Utils
         meshColliders.Sort((a, b) => a.collider.Mesh.Asset.Data.TotalTriangleCount.CompareTo(b.collider.Mesh.Asset.Data.TotalTriangleCount));
 
         // Add the mesh colliders until we reach the max mesh collider polygon limit
-        int maxTris = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMeshColliderTris);
+        int maxTris = Config.MaxMeshColliderTris.Value;
         int totalMeshColliderTris = 0;
 
         foreach ((MeshCollider meshCollider, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force) in meshColliders)
@@ -139,21 +128,15 @@ public static class Utils
         }
 
         SM64Context instance = SM64Context.Instance;
-        if (instance != null)
+        List<Collider> toRemove = instance?.StaticColliders.Keys.Except(StaticSurfaces).GetTempList();
+        if (toRemove != null)
         {
-            lock (instance.StaticColliders)
+            foreach (Collider col in toRemove)
             {
-                List<Collider> toRemove = instance.StaticColliders.Keys.Except(StaticSurfaces).GetTempList();
-                if (toRemove != null)
-                {
-                    foreach (Collider col in toRemove)
-                    {
-                        instance.UnregisterStaticCollider(col);
-                    }
-                }
+                instance.UnregisterStaticCollider(col);
             }
         }
-        
+
         return surfaces.ToArray();
 
         bool InvalidCollider((MeshCollider collider, SM64SurfaceType, SM64TerrainType, int) col) => col.collider.Mesh.Target == null || !col.collider.Mesh.IsAssetAvailable;
@@ -171,12 +154,12 @@ public static class Utils
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
     }
     
-    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int interactableId)
+    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;
         interactableType = SM64InteractableType.None;
-        interactableId = -1;
+        idx = -1;
 
         if (tagParts == null) return;
 
@@ -219,7 +202,7 @@ public static class Utils
 
                     if (int.TryParse(indexString, out int parsedIndex))
                     {
-                        interactableId = parsedIndex;
+                        idx = parsedIndex;
                     }
                 }
             }
@@ -230,11 +213,11 @@ public static class Utils
 
                 if (ids.Length == 2 && int.TryParse(ids[0], out int speedIndex) && int.TryParse(ids[1], out int angleIndex))
                 {
-                    interactableId = speedIndex << 8 | angleIndex;
+                    idx = speedIndex << 8 | angleIndex;
                 }
                 else if (int.TryParse(idxString, out int forceIndex))
                 {
-                    interactableId = forceIndex;
+                    idx = forceIndex;
                 }
             }
         }
@@ -246,7 +229,7 @@ public static class Utils
 #if DEBUG
         debug = true;
 #endif
-        return debug || ResoniteMod.IsDebugEnabled();
+        return debug || Config.DebugEnabled.Value;
     }
 
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);

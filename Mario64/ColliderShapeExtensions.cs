@@ -5,7 +5,7 @@ using FrooxEngine;
 
 #endregion
 
-namespace ResoniteMario64;
+namespace ResoniteMario64.Mario64;
 
 public static class ColliderShapeExtensions
 {

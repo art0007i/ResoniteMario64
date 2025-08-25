@@ -1,6 +1,6 @@
-﻿using static ResoniteMario64.libsm64.SM64Constants;
+﻿using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
-namespace ResoniteMario64.Components.Interfaces;
+namespace ResoniteMario64.Mario64.Components.Interfaces;
 
 public interface ISM64Collider
 {

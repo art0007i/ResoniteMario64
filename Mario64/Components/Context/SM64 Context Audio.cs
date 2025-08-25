@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
+using System.Threading;
+using System.Threading.Tasks;
 using Elements.Assets;
 using FrooxEngine;
-using ResoniteMario64.libsm64;
+using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
 
-namespace ResoniteMario64.Components.Context;
+namespace ResoniteMario64.Mario64.Components.Context;
 
 public sealed partial class SM64Context
 {
@@ -49,8 +52,8 @@ public sealed partial class SM64Context
                 }
 
 
-                bool useLocalAudio = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLocalAudio);
-                float defaultVolume = ResoniteMario64.KeyAudioVolume.TryComputeDefaultTyped(out float defaultValue) ? defaultValue : 0f;
+                bool useLocalAudio = Config.LocalAudio.Value;
+                float defaultVolume = (float)Config.AudioVolume.DefaultValue;
 
                 Logger.Msg($"useLocalAudio={useLocalAudio}, defaultVolume={defaultVolume}");
 
@@ -65,7 +68,7 @@ public sealed partial class SM64Context
                     if (localAttached || localAudio.Source.Target == null)
                     {
                         localAudio.Source.Target = _marioAudioStream;
-                        localAudio.Volume.Value = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
+                        localAudio.Volume.Value = Config.AudioVolume.Value;
                         localAudio.SpatialBlend.Value = 0;
                         localAudio.Spatialize.Value = false;
                         localAudio.DopplerLevel.Value = 0;
@@ -120,7 +123,7 @@ public sealed partial class SM64Context
 
                 World.RunInUpdates(World.LocalUser.AllocationID + 1, () =>
                 {
-                    float volume = useLocalAudio ? 0f : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyAudioVolume);
+                    float volume = useLocalAudio ? 0f : Config.AudioVolume.Value;
                     Logger.Msg($"Overriding volume for user: {World.LocalUser.UserID} to {volume}");
 
                     ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(World.LocalUser, volume);
@@ -148,14 +151,14 @@ public sealed partial class SM64Context
                     Logger.Msg("AudioSlot is null, skipping OnPrepareDestroy subscription");
                 }
 
-                ResoniteMario64.KeyLocalAudio.OnChanged -= HandleLocalAudioChange;
-                ResoniteMario64.KeyLocalAudio.OnChanged += HandleLocalAudioChange;
+                Config.LocalAudio.SettingChanged -= HandleLocalAudioChange;
+                Config.LocalAudio.SettingChanged += HandleLocalAudioChange;
 
-                ResoniteMario64.KeyDisableAudio.OnChanged -= HandleDisableChange;
-                ResoniteMario64.KeyDisableAudio.OnChanged += HandleDisableChange;
+                Config.DisableAudio.SettingChanged -= HandleDisableChange;
+                Config.DisableAudio.SettingChanged += HandleDisableChange;
 
-                ResoniteMario64.KeyAudioVolume.OnChanged -= HandleVolumeChange;
-                ResoniteMario64.KeyAudioVolume.OnChanged += HandleVolumeChange;
+                Config.AudioVolume.SettingChanged -= HandleVolumeChange;
+                Config.AudioVolume.SettingChanged += HandleVolumeChange;
 
                 Logger.Msg("Event handlers subscribed");
                 Logger.Msg($"AudioSource setup finished at {DateTime.Now:HH:mm:ss.fff}");
@@ -182,7 +185,7 @@ public sealed partial class SM64Context
         }
     }
 
-    private void HandleVolumeChange(object value)
+    private void HandleVolumeChange(object value, EventArgs args)
     {
         if (_audioSlot == null || _marioAudioOutput == null)
         {
@@ -190,7 +193,7 @@ public sealed partial class SM64Context
             return;
         }
 
-        float volume = (float)value;
+        float volume = Config.AudioVolume.Value;
         Logger.Msg($"Volume change requested: {volume}");
 
         if (_audioSlot.IsLocalElement)
@@ -205,7 +208,7 @@ public sealed partial class SM64Context
         }
     }
 
-    private void HandleDisableChange(object value)
+    private void HandleDisableChange(object value, EventArgs args)
     {
         if (_audioSlot == null)
         {
@@ -224,7 +227,7 @@ public sealed partial class SM64Context
         }
     }
 
-    private void HandleLocalAudioChange(object value)
+    private void HandleLocalAudioChange(object value, EventArgs args)
     {
         if (_audioSlot == null)
         {
@@ -242,9 +245,11 @@ public sealed partial class SM64Context
         SetAudioSource();
     }
 
+    private CancellationTokenSource _audioCts;
+
     private void ProcessAudio()
     {
-        if (_marioAudioStream == null || ResoniteMario64.Config.GetValue(ResoniteMario64.KeyDisableAudio))
+        if (_marioAudioStream == null || Config.DisableAudio.Value)
         {
             return;
         }
@@ -286,35 +291,6 @@ public sealed partial class SM64Context
         Span<StereoSample> writeSpan = _convertedBuffer.AsSpan(0, written);
         _marioAudioStream.Write(writeSpan, ref _writeState);
     }
-
-    // private static int DownmixAndResampleMono(short[] input, float inputRate, float outputRate, MonoSample[] output)
-    // {
-    //     float ratio = inputRate / outputRate;
-    //     float pos = 0.0f;
-    //     int outputIndex = 0;
-    // 
-    //     while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
-    //     {
-    //         int i = (int)pos * 2;
-    // 
-    //         float l1 = input[i] / 32768.0f;
-    //         float r1 = input[i + 1] / 32768.0f;
-    //         float l2 = input[i + 2] / 32768.0f;
-    //         float r2 = input[i + 3] / 32768.0f;
-    // 
-    //         float t = pos - (int)pos;
-    // 
-    //         float s1 = (l1 + r1) * 0.5f;
-    //         float s2 = (l2 + r2) * 0.5f;
-    // 
-    //         float sample = s1 * (1 - t) + s2 * t;
-    // 
-    //         output[outputIndex++] = new MonoSample(sample);
-    //         pos += ratio;
-    //     }
-    // 
-    //     return outputIndex;
-    // }
 
     private static int DownmixAndResampleStereo(short[] input, float inputRate, float outputRate, StereoSample[] output)
     {

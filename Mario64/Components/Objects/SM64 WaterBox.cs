@@ -1,9 +1,9 @@
 ﻿using System;
 using FrooxEngine;
-using ResoniteMario64.Components.Context;
-using ResoniteMario64.Components.Interfaces;
+using ResoniteMario64.Mario64.Components.Context;
+using ResoniteMario64.Mario64.Components.Interfaces;
 
-namespace ResoniteMario64.Components.Objects;
+namespace ResoniteMario64.Mario64.Components.Objects;
 
 public sealed class SM64WaterBox : ISM64Object
 {

@@ -5,12 +5,10 @@ using System.Reflection.Emit;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
-using static ResoniteMario64.Constants;
-#if IsNet9
 using Renderite.Shared;
-#endif
+using static ResoniteMario64.Constants;
 
-namespace ResoniteMario64.Components.Context;
+namespace ResoniteMario64.Mario64.Components.Context;
 
 public sealed partial class SM64Context
 {
@@ -32,7 +30,7 @@ public sealed partial class SM64Context
         }
 
         bool shouldRun = !World.LocalUser.HasActiveFocus() && _movementBlocked;
-        bool shouldGamepad = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyUseGamepad) && inp.GetDevices<StandardGamepad>().Count != 0;
+        bool shouldGamepad = Config.UseGamepad.Value && inp.GetDevices<StandardGamepad>().Count != 0;
         if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
             InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
@@ -57,7 +55,7 @@ public sealed partial class SM64Context
         }
         else if (shouldGamepad)
         {
-            float2 accum = Utils.Float2Zero;
+            float2 accum = float2.Zero;
             bool jump = false;
             bool stomp = false;
             bool kick = false;
@@ -70,14 +68,14 @@ public sealed partial class SM64Context
                 kick |= d.X.Held;
             });
 
-            Joystick = MathX.Clamp(accum, Utils.Float2NegOne, Utils.Float2One);
+            Joystick = MathX.Clamp(accum, -float2.One, float2.One);
             Jump = jump;
             Stomp = stomp;
             Kick = kick;
         }
         else
         {
-            Joystick = Utils.Float2Zero;
+            Joystick = float2.Zero;
             Jump = false;
             Stomp = false;
             Kick = false;
@@ -95,7 +93,7 @@ public sealed partial class SM64Context
 
         LocomotionController loco = World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco == null) return;
-        
+
         if (AnyControlledMarios && !inp.VR_Active && _movementBlocked && !shouldGamepad)
         {
             Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
@@ -112,12 +110,12 @@ public sealed partial class SM64Context
 
     private static float2 GetDesktopJoystick(bool up, bool down, bool left, bool right)
     {
-        float2 input = Utils.Float2Zero;
+        float2 input = float2.Zero;
 
-        if (up) input += Utils.Float2Up;
-        if (down) input += Utils.Float2Down;
-        if (left) input += Utils.Float2Left;
-        if (right) input += Utils.Float2Right;
+        if (up) input += new float2(0, 1);
+        if (down) input += new float2(0, -1);
+        if (left) input += new float2(1);
+        if (right) input += new float2(-1);
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
         return length > 1.0f
@@ -141,7 +139,7 @@ public sealed partial class SM64Context
             {
                 yield return code;
                 if (!code.LoadsField(lookFor)) continue;
-                
+
                 yield return new CodeInstruction(OpCodes.Ldarg_0);
                 yield return new CodeInstruction(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
             }
@@ -171,6 +169,6 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(StandardGamepad), nameof(StandardGamepad.Bind))]
     public class GamepadInputBlocker
     {
-        public static bool Prefix() => !ResoniteMario64.Config.GetValue(ResoniteMario64.KeyUseGamepad);
+        public static bool Prefix() => !Config.UseGamepad.Value;
     }
 }

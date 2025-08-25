@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
+using System.Threading;
 using FrooxEngine;
-using ResoniteMario64.Components.Objects;
-using ResoniteMario64.libsm64;
-using static ResoniteMario64.Constants;
-#if IsNet9
 using Renderite.Shared;
-#endif
+using ResoniteMario64.Mario64.Components.Objects;
+using ResoniteMario64.Mario64.libsm64;
+using static ResoniteMario64.Constants;
 
-namespace ResoniteMario64.Components.Context;
+namespace ResoniteMario64.Mario64.Components.Context;
 
 public sealed partial class SM64Context : IDisposable
 {
@@ -106,7 +106,7 @@ public sealed partial class SM64Context : IDisposable
         if (!Interop.IsGlobalInit)
         {
             Logger.Msg("Init SM64", caller);
-            Interop.GlobalInit(ResoniteMario64.SuperMario64UsZ64RomBytes);
+            Interop.GlobalInit(Mario64Manager.RomBytes);
         }
         else
         {
@@ -117,12 +117,12 @@ public sealed partial class SM64Context : IDisposable
 
         // Update context's colliders
         Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
-        ResoniteMario64.KeyMaxMeshColliderTris.OnChanged += HandleMaxMeshColliderTrisChanged;
+        Config.MaxMeshColliderTris.SettingChanged += HandleMaxMeshColliderTrisChanged;
 
-        _maxMariosAnimatedPerPerson = ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMaxMariosPerPerson);
-        ResoniteMario64.KeyMaxMariosPerPerson.OnChanged += HandleMaxMariosPerPersonChanged;
+        _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
+        Config.MaxMariosPerPerson.SettingChanged += HandleMaxMariosPerPersonChanged;
 
-        ResoniteMario64.KeyUseGamepad.OnChanged += HandleKeyUseGamepadChanged;
+        Config.UseGamepad.SettingChanged += HandleKeyUseGamepadChanged;
 
         world.RunInUpdates(3, () =>
         {
@@ -199,7 +199,7 @@ public sealed partial class SM64Context : IDisposable
                 scale.VariableName.Value = ScaleVarName;
                 scale.Value.Value = WorldVariableSpace?.TryReadValue(ScaleVarName, out float scaleValue) ?? false
                         ? scaleValue
-                        : ResoniteMario64.Config.GetValue(ResoniteMario64.KeyMarioScaleFactor);
+                        : Config.MarioScaleFactor.Value;
 
                 Logger.Msg($"Scale variable attached/set with value {scale.Value.Value}");
             }
@@ -337,7 +337,7 @@ public sealed partial class SM64Context : IDisposable
 
         HandleInputs();
 
-        if (World.Time.WorldTime - LastTick >= ResoniteMario64.Config.GetValue(ResoniteMario64.KeyGameTickMs) / 1000f)
+        if (World.Time.WorldTime - LastTick >= Config.GameTickMs.Value / 1000f)
         {
             SM64GameTick();
             LastTick = World.Time.WorldTime;
@@ -387,23 +387,23 @@ public sealed partial class SM64Context : IDisposable
         Dispose();
     }
 
-    private void HandleKeyUseGamepadChanged(object newValue)
+    private void HandleKeyUseGamepadChanged(object sender, EventArgs args)
     {
         if (_disposed) return;
 
         World?.Input.InvalidateBindings();
     }
 
-    private void HandleMaxMeshColliderTrisChanged(object newValue)
+    private void HandleMaxMeshColliderTrisChanged(object sender, EventArgs args)
     {
         if (_disposed) return;
 
         ReloadAllColliders();
     }
 
-    private void HandleMaxMariosPerPersonChanged(object newValue)
+    private void HandleMaxMariosPerPersonChanged(object sender, EventArgs args)
     {
-        _maxMariosAnimatedPerPerson = (int)(newValue ?? 0);
+        _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
         UpdatePlayerMariosState();
     }
     
@@ -439,12 +439,12 @@ public sealed partial class SM64Context : IDisposable
 
             // Unsubscribe from all events to prevent memory leaks
             World.WorldDestroyed -= HandleRemoved;
-            ResoniteMario64.KeyUseGamepad.OnChanged -= HandleKeyUseGamepadChanged;
-            ResoniteMario64.KeyMaxMeshColliderTris.OnChanged -= HandleMaxMeshColliderTrisChanged;
-            ResoniteMario64.KeyMaxMariosPerPerson.OnChanged -= HandleMaxMariosPerPersonChanged;
-            ResoniteMario64.KeyLocalAudio.OnChanged -= HandleLocalAudioChange;
-            ResoniteMario64.KeyDisableAudio.OnChanged -= HandleDisableChange;
-            ResoniteMario64.KeyAudioVolume.OnChanged -= HandleVolumeChange;
+            Config.UseGamepad.SettingChanged -= HandleKeyUseGamepadChanged;
+            Config.MaxMeshColliderTris.SettingChanged -= HandleMaxMeshColliderTrisChanged;
+            Config.MaxMariosPerPerson.SettingChanged -= HandleMaxMariosPerPersonChanged;
+            Config.LocalAudio.SettingChanged -= HandleLocalAudioChange;
+            Config.DisableAudio.SettingChanged -= HandleDisableChange;
+            Config.AudioVolume.SettingChanged -= HandleVolumeChange;
 
             if (_contextSlot != null)
             {

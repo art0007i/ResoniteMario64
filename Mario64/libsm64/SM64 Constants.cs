@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
-namespace ResoniteMario64.libsm64;
+namespace ResoniteMario64.Mario64.libsm64;
 
 public static class SM64Constants
 {

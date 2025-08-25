@@ -1,9 +1,9 @@
 ﻿using System;
 using FrooxEngine;
-using ResoniteMario64.libsm64;
+using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
 
-namespace ResoniteMario64.Components.Context;
+namespace ResoniteMario64.Mario64.Components.Context;
 
 public sealed partial class SM64Context
 {
@@ -103,7 +103,7 @@ public sealed partial class SM64Context
 
             mario = new SM64Mario(slot, context);
             context.AllMarios.Add(slot, mario);
-            if (ResoniteMario64.Config.GetValue(ResoniteMario64.KeyPlayRandomMusic))
+            if (Config.PlayRandomMusic.Value)
             {
                 Interop.PlayRandomMusic();
             }

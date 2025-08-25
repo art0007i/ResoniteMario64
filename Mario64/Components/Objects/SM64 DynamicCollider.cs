@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using Elements.Core;
 using FrooxEngine;
-using ResoniteMario64.Components.Context;
-using ResoniteMario64.Components.Interfaces;
-using ResoniteMario64.libsm64;
-using static ResoniteMario64.libsm64.SM64Constants;
+using ResoniteMario64.Mario64.Components.Context;
+using ResoniteMario64.Mario64.Components.Interfaces;
+using ResoniteMario64.Mario64.libsm64;
+using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
-namespace ResoniteMario64.Components.Objects;
+namespace ResoniteMario64.Mario64.Components.Objects;
 
 public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
 {

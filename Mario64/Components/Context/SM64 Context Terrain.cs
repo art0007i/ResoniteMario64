@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Timers;
 using FrooxEngine;
 using HarmonyLib;
-using ResoniteMario64.Components.Interfaces;
-using ResoniteMario64.Components.Objects;
-using ResoniteMario64.libsm64;
+using ResoniteMario64.Mario64.Components.Interfaces;
+using ResoniteMario64.Mario64.Components.Objects;
+using ResoniteMario64.Mario64.libsm64;
 
-namespace ResoniteMario64.Components.Context;
+namespace ResoniteMario64.Mario64.Components.Context;
 
 public sealed partial class SM64Context
 {
@@ -223,7 +222,7 @@ public sealed partial class SM64Context
         {
             if (SM64Context.Instance == null) return;
 
-            __instance.RunInUpdates(1, () => SM64Context.Instance?.HandleCollider(__instance));
+            SM64Context.Instance?.HandleCollider(__instance);
         }
     }
 
@@ -231,7 +230,7 @@ public sealed partial class SM64Context
     {
         if (added == null) return;
         if (obj is not Collider collider) return;
-        if (!ResoniteMario64.Config.GetValue(ResoniteMario64.KeyLogColliderChanges) || !Utils.CheckDebug()) return;
+        if (!Config.LogColliderChanges.Value || !Utils.CheckDebug()) return;
         
         bool isNewlyAdded = added is 1 or 2 or 3 or 4;
         string name = added switch
