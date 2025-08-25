@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Elements.Assets;
 using FrooxEngine;
+using FrooxEngine.CommonAvatar;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
 
@@ -177,7 +178,23 @@ public sealed partial class SM64Context
         if (Interop.IsGlobalInit)
         {
             Logger.Msg("GlobalInit is true, scheduling SetAudioSource");
-            slot.RunInUpdates(slot.LocalUser.AllocationID * 3, SetAudioSource);
+            if (Config.LocalAudio.Value)
+            {
+                slot.StartTask(async () =>
+                {
+                    Logger.Msg("Waiting for LocalUser to be valid...");
+                    while (World?.LocalUser?.Root?.GetRegisteredComponent<AvatarManager>() == null)
+                    {
+                        await Task.Delay(10);
+                    }
+                    Logger.Msg("LocalUser is valid, running SetAudioSource");
+                    SetAudioSource();
+                });
+            }
+            else
+            {
+                slot.RunInUpdates(slot.LocalUser.AllocationID + 3, SetAudioSource);
+            }
         }
         else
         {
@@ -244,9 +261,7 @@ public sealed partial class SM64Context
         Logger.Msg("Reinitializing audio source after local audio change");
         SetAudioSource();
     }
-
-    private CancellationTokenSource _audioCts;
-
+    
     private void ProcessAudio()
     {
         if (_marioAudioStream == null || Config.DisableAudio.Value)

@@ -13,6 +13,7 @@ public class Config
     
     // CONTROLS
     public static ConfigEntry<bool> UseGamepad;
+    public static ConfigEntry<bool> BlockDashWithMarios;
 
     // AUDIO
     public static ConfigEntry<bool> DisableAudio;
@@ -42,6 +43,7 @@ public class Config
             MarioUrl = config.Bind<Uri>("Engine", "Mario Url", null, "The URL for the Non-Modded Renderer for Mario - Null = Default Mario");
             
             UseGamepad = config.Bind("Controls", "Use Gamepad", false, "Whether to use gamepads for input or not.");
+            BlockDashWithMarios = config.Bind("Controls", "Block Dash with Marios", true, "Whether to Block opening the dash with marios or not. !VR-Only!");
 
             DisableAudio = config.Bind("Audio", "Disable Audio", false, "Whether to disable all Super Mario 64 Music/Sounds or not.");
             PlayRandomMusic = config.Bind("Audio", "Play Random Music", true, "Whether to play a random music when a mario joins or not.");

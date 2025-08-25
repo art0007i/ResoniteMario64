@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -123,39 +124,140 @@ public sealed partial class SM64Context
                 : input;
     }
 
-    private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => Instance?.World == c.World &&
-                                                                                   (Instance?.AnyControlledMarios ?? false) &&
-                                                                                   c.InputInterface.VR_Active &&
-                                                                                   c.Side.Value == hand &&
-                                                                                   (!Instance?.World?.LocalUser.HasActiveFocus() ?? false);
-
-    [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
-    public class JumpInputBlocker
+    private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => ShouldBlockInit() && c.Side.Value == hand;
+    private static bool ShouldBlockInputs() => ShouldBlockInit() && Config.BlockDashWithMarios.Value;
+    private static bool ShouldBlockInit() => Instance?.World != null && Instance.AnyControlledMarios && Instance.World.InputInterface.VR_Active && !Instance.World.LocalUser.HasActiveFocus();
+    
+    [HarmonyPatch(typeof(UserspaceRadiantDash), nameof(UserspaceRadiantDash.Open), MethodType.Setter)]
+    public class DashInputBlocker
     {
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        public static void Prefix(ref bool value)
         {
-            FieldInfo lookFor = AccessTools.Field(typeof(InteractionHandler), "_blockUserspaceOpen");
-            foreach (CodeInstruction code in codes)
-            {
-                yield return code;
-                if (!code.LoadsField(lookFor)) continue;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return new CodeInstruction(OpCodes.Call, typeof(JumpInputBlocker).GetMethod(nameof(Injection)));
-            }
+            if (ShouldBlockInputs()) value = false;
         }
-
-        public static bool Injection(bool b, InteractionHandler c) => ShouldBlockInputs(c, c.LocalUser.Primaryhand) || b;
     }
+
+    // [HarmonyPatch(typeof(InteractionHandler), "OnInputUpdate")]
+    // public class JumpInputBlocker
+    // {
+    //     public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    //     {
+    //         List<CodeInstruction> list = new List<CodeInstruction>(instructions);
+    //         MethodInfo invoke = typeof(Action<InteractionHandler>).GetMethod("Invoke", new Type[] { typeof(InteractionHandler) });
+    //         bool done = false;
+    //
+    //         for (int i = 0; i < list.Count; i++)
+    //         {
+    //             if (!done && i >= 3)
+    //             {
+    //                 if (list[i].opcode == OpCodes.Callvirt && Equals(list[i].operand, invoke))
+    //                 {
+    //                     if (list[i - 1].opcode == OpCodes.Ldarg_0 &&
+    //                         list[i - 2].opcode == OpCodes.Ldfld &&
+    //                         list[i - 3].opcode == OpCodes.Ldarg_0)
+    //                     {
+    //                         Label skip = generator.DefineLabel();
+    //                         int after = i + 1;
+    //                         if (after < list.Count)
+    //                         {
+    //                             list[after].labels.Add(skip);
+    //                         }
+    //
+    //                         List<CodeInstruction> inject = new List<CodeInstruction>()
+    //                         {
+    //                             new CodeInstruction(OpCodes.Ldarg_0),
+    //                             new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(JumpInputBlocker), nameof(Injection))),
+    //                             new CodeInstruction(OpCodes.Brfalse_S, skip)
+    //                         };
+    //
+    //                         list.InsertRange(i - 3, inject);
+    //                         i += inject.Count;
+    //                         done = true;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //
+    //         return list;
+    //     }
+    //
+    //     public static bool Injection(InteractionHandler handler)
+    //     {
+    //         return !ShouldBlockInputs(handler, handler.LocalUser.Primaryhand);
+    //     }
+    // }
 
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
     public class MarioInputBlocker
     {
         public static void Postfix(InteractionHandler __instance)
         {
+            if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
+            
+            bool isIndex = __instance.Controller is IndexController;
             if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
             {
-                __instance.Inputs.Axis.RegisterBlocks = true;
+                if (isIndex)
+                {
+                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
+                    switch (module)
+                    {
+                        case PhysicalLocomotion phys:
+                            if (phys.CharacterController.Gravity == float3.Zero)
+                            {
+                                phys.CharacterController.AirSpeed.Value = 0f;
+                            }
+                            else
+                            {
+                                phys.CharacterController.Speed.Value = 0f;
+                            }
+
+                            break;
+                        case NoclipLocomotion noclip:
+                            noclip.MaxSpeed.Value = 0f;
+                            break;
+                    }
+                }
+                else
+                {
+                    __instance.Inputs.Axis.RegisterBlocks = true;
+                }
+            }
+            else
+            {
+                if (isIndex)
+                {
+                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
+                    var builder = __instance.World.RootSlot.GetComponentInChildren<CommonAvatarBuilder>();
+                    switch (module)
+                    {
+                        case PhysicalLocomotion phys:
+
+                            if (phys.CharacterController.Gravity == float3.Zero && phys.CharacterController.AirSpeed.Value == 0f)
+                            {
+                                var fly = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity == float3.Zero);
+                                phys.CharacterController.AirSpeed.Value = fly?.CharacterController.AirSpeed.Value ?? 10f;
+                            }
+                            else if (phys.CharacterController.Speed.Value == 0f)
+                            {
+                                var walk = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity != float3.Zero);
+                                phys.CharacterController.Speed.Value = walk?.CharacterController.Speed.Value ?? 4f;
+                            }
+
+                            break;
+                        case NoclipLocomotion noclip:
+                            if (noclip.MaxSpeed.Value == 0f)
+                            {
+                                var noclip2 = builder?.LocomotionModules.Target?.GetComponentInChildren<NoclipLocomotion>();
+                                noclip.MaxSpeed.Value = noclip2?.MaxSpeed.Value ?? 15f;
+                            }
+                            break;
+                    }
+                }
+                else
+                {
+                    __instance.Inputs.Axis.RegisterBlocks = true;
+                }
             }
             /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
             {
