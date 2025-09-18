@@ -4,15 +4,43 @@
     <projectFile profileName="Launch Multi">ResoniteMario64.csproj</projectFile>
     <projectFile profileName="Launch NonModded">ResoniteMario64.csproj</projectFile>
     <projectFile profileName="Launch Resonite">ResoniteMario64.csproj</projectFile>
+    <projectFile profileName="Launch">ResoniteMario64/ResoniteMario64.csproj</projectFile>
   </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e648b26d-3dc8-47fd-830b-070a6b7a6685" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Config.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Config.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Audio.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Audio.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Inputs.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Inputs.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Constants.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/LICENSE.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logger.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/ColliderShapeExtensions.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Audio.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Inputs.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Terrain.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Utils.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Interfaces/ISM64Collider.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Interfaces/ISM64Object.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 DynamicCollider.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 Interactable.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 StaticCollider.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 WaterBox.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Components/SM64 Mario.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Mario64.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Patches.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/Utils.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Interop.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/include/libsm64.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/sm64.dll" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/sm64.dll.info" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/SM64 Constants.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Plugin.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Properties/launchSettings.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64.csproj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ResoniteMario64.sln" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64.sln" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,9 +71,7 @@
     <setting file="file://$USER_HOME$/AppData/Local/JetBrains/Shared/vAny/DecompilerCache/decompiler/fcdf5d27ec304be7b7c0c8e76dac2755c67e00/db/5d9c2818/InteractionHandler.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$USER_HOME$/AppData/Local/JetBrains/Shared/vAny/SourcesCache/6f38619b9e7c3b5c42b0581c73e413a4cf30be6fb394636ceb6d1abd8ce56d/BasePlugin.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$USER_HOME$/AppData/Local/JetBrains/Shared/vAny/SourcesCache/c43c2f47f2c2e8f49b63133e24df3f437cdaf69f6ce4364bbfc18a3a55e2d4/Timer.cs" root0="SKIP_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Config.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Mario64/Mario64.cs" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Mario64/Patches.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../.MyMods/AvatarModuleInjector/AvatarModuleInjector/AvatarModuleInjector.cs" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="ProjectColorInfo">{
@@ -123,6 +149,22 @@
         <option name="Build" />
       </method>
     </configuration>
+    <configuration name="ResoniteMario64: Launch" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
+      <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/ResoniteMario64/ResoniteMario64.csproj" />
+      <option name="LAUNCH_PROFILE_TFM" value="net9.0" />
+      <option name="LAUNCH_PROFILE_NAME" value="Launch" />
+      <option name="USE_EXTERNAL_CONSOLE" value="0" />
+      <option name="USE_MONO" value="0" />
+      <option name="RUNTIME_ARGUMENTS" value="" />
+      <option name="GENERATE_APPLICATIONHOST_CONFIG" value="1" />
+      <option name="SHOW_IIS_EXPRESS_OUTPUT" value="0" />
+      <option name="SEND_DEBUG_REQUEST" value="1" />
+      <option name="ADDITIONAL_IIS_EXPRESS_ARGUMENTS" value="" />
+      <option name="AUTO_ATTACH_CHILDREN" value="0" />
+      <method v="2">
+        <option name="Build" />
+      </method>
+    </configuration>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -132,7 +174,9 @@
       <option name="presentableId" value="Default" />
       <updated>1756115517842</updated>
       <workItem from="1756115519044" duration="12540000" />
-      <workItem from="1756132078977" duration="11286000" />
+      <workItem from="1756132078977" duration="13855000" />
+      <workItem from="1758232079358" duration="648000" />
+      <workItem from="1758232758062" duration="1471000" />
     </task>
     <task id="LOCAL-00001" summary="Update to Bepis">
       <option name="closed" value="true" />
@@ -150,7 +194,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756132388589</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Fix LocalAudio breaking, fix Index Inputs, fix Userspace dash open/close">
+      <option name="closed" value="true" />
+      <created>1756146487500</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1756146487500</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -162,7 +214,8 @@
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Update to Bepis" />
     <MESSAGE value="Update README.md" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update README.md" />
+    <MESSAGE value="Fix LocalAudio breaking, fix Index Inputs, fix Userspace dash open/close" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix LocalAudio breaking, fix Index Inputs, fix Userspace dash open/close" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

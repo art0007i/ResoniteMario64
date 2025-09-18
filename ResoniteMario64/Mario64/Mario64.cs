@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
+using FrooxEngine;
 using HarmonyLib;
 
 namespace ResoniteMario64.Mario64;
@@ -15,7 +16,7 @@ public static class Mario64Manager
     // SM64 ROM
     private const string RomExpectedHash = "20b854b239203baf6c961b850a4a51a2"; // MD5 hash
     private const string RomFileName = "baserom.us.z64";
-    private static readonly string RomPath = Path.Combine(Plugin.DllDirectory, RomFileName);
+    private static string _romPath = Path.Combine(Plugin.DllDirectory, RomFileName);
     internal static byte[] RomBytes;
     
     internal static bool Init()
@@ -46,7 +47,7 @@ public static class Mario64Manager
 
             Logger.Msg($"Copying {LibName} to {LibPath}");
 
-            using Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(LibName);
+            using System.IO.Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(LibName);
             if (resourceStream == null)
             {
                 throw new FileLoadException($"Embedded resource {LibName} not found in assembly.");
@@ -69,14 +70,36 @@ public static class Mario64Manager
     {
         try
         {
-            Logger.Info($"Loading \"Super Mario 64 [US].z64\" ROM from {RomPath}...");
+            string[] candidatePaths = new string[]
+            {
+                _romPath,
+                Path.Combine(Directory.GetCurrentDirectory(), RomFileName),
+                Path.Combine(Directory.GetCurrentDirectory(), "rml_libs", RomFileName),
+                Path.Combine(Directory.GetCurrentDirectory(), "rml_mods", RomFileName)
+            };
 
-            if (!File.Exists(RomPath))
+            string foundPath = null;
+            foreach (string path in candidatePaths)
+            {
+                Logger.Info($"Checking for ROM at {path}");
+                if (File.Exists(path))
+                {
+                    foundPath = path;
+                    break;
+                }
+
+                Logger.Warn($"ROM not found at {path}");
+            }
+
+            if (foundPath == null)
             {
                 throw new FileLoadException($"Missing ROM: Download a \"Super Mario 64 [US].z64\" ROM (MD5 {RomExpectedHash})");
             }
 
-            using FileStream romFileStream = File.OpenRead(RomPath);
+            Logger.Info($"Loading \"Super Mario 64 [US].z64\" ROM from {foundPath}...");
+            _romPath = foundPath;
+
+            using FileStream romFileStream = File.OpenRead(_romPath);
             string romFileHash = Convert.ToHexStringLower(MD5.Create().ComputeHash(romFileStream));
 
             if (romFileHash != RomExpectedHash)
@@ -84,7 +107,7 @@ public static class Mario64Manager
                 throw new FileLoadException($"Invalid ROM Hash: Found {romFileHash}, expected {RomExpectedHash}.");
             }
 
-            RomBytes = File.ReadAllBytes(RomPath);
+            RomBytes = File.ReadAllBytes(_romPath);
             return true;
         }
         catch (Exception ex)

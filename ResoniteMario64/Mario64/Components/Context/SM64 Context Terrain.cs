@@ -105,13 +105,13 @@ public sealed partial class SM64Context
         return null;
     }
 
-    private static Timer _staticUpdateTimer;
+    private static System.Timers.Timer _staticUpdateTimer;
 
     private void QueueStaticCollidersUpdate()
     {
         if (_staticUpdateTimer != null) return;
 
-        _staticUpdateTimer = new Timer(1500);
+        _staticUpdateTimer = new System.Timers.Timer(1500);
         _staticUpdateTimer.Elapsed += delegate
         {
             _staticUpdateTimer.Stop();
