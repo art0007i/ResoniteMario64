@@ -3,6 +3,9 @@
 A [BepisLoader](https://github.com/ResoniteModding/BepisLoader) mod
 for [Resonite](https://resonite.com/) that allows you to spawn in and control mario from Super Mario 64.
 
+To spawn mario use the "Spawn Mario" button from the public folder (Or any button tagged with "SpawnMario").
+You can also find a bunch of useful prefabs like interactables or different types of colliders in that folder.
+
 Made possible by [libsm64](https://github.com/libsm64/libsm64).
 I also used [CVRSuperMario64](https://github.com/kafeijao/Kafe_CVR_Mods/tree/master/CVRSuperMario64) as a reference for
 creating this.

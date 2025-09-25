@@ -38,7 +38,6 @@ public static class Mario64Manager
     {
         try
         {
-            // TODO: package the dll using tcli, instead of embedding it as a resource
             Logger.Info($"Copying {LibName} to {LibPath} from embedded resources.");
 
             using System.IO.Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(LibName);

@@ -426,7 +426,7 @@ public sealed class SM64Mario : ISM64Object
         _colorBufferColors = new color[bufferSize];
         _uvBuffer = new float2[bufferSize];
 
-        if (Config.RenderSlotLocal.Value && Utils.CheckDebug())
+        if (!Config.RenderSlotPublic.Value && !Utils.CheckDebug())
         {
             _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
         }
@@ -1107,6 +1107,8 @@ public sealed class SM64Mario : ISM64Object
 
     private void UpdateIsOverMaxDistance()
     {
+        if (MarioSlot.LocalUser.Root == null) return;
+
         // Check the distance to see if we should ignore the updates
         _isOverMaxDistance = !IsLocal && MarioSlot.DistanceFromUserHead() > _skipFarMarioDistance;
         UpdateIsBypassed();

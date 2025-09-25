@@ -25,7 +25,11 @@ public sealed partial class SM64Context
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
-        if (inp.GetKeyUp(Key.Period))
+        if(!Config.UnlockMovementKeyToggle.Value)
+        {
+            _movementBlocked = !inp.GetKey(Config.UnlockMovementKey.Value);
+        }
+        else if (inp.GetKeyUp(Config.UnlockMovementKey.Value))
         {
             _movementBlocked = !_movementBlocked;
         }

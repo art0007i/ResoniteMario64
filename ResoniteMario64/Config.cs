@@ -1,5 +1,5 @@
-﻿using System;
-using BepInEx.Configuration;
+﻿using BepInEx.Configuration;
+using Renderite.Shared;
 
 namespace ResoniteMario64;
 
@@ -14,6 +14,8 @@ public class Config
     // CONTROLS
     public static ConfigEntry<bool> UseGamepad;
     public static ConfigEntry<bool> BlockDashWithMarios;
+    public static ConfigEntry<Key> UnlockMovementKey;
+    public static ConfigEntry<bool> UnlockMovementKeyToggle;
 
     // AUDIO
     public static ConfigEntry<bool> DisableAudio;
@@ -30,7 +32,7 @@ public class Config
 
     // DEBUG
     public static ConfigEntry<bool> DebugEnabled;
-    public static ConfigEntry<bool> RenderSlotLocal;
+    public static ConfigEntry<bool> RenderSlotPublic;
     public static ConfigEntry<bool> LogColliderChanges;
 
     internal static bool ConfigInit(ConfigFile config)
@@ -44,6 +46,8 @@ public class Config
             
             UseGamepad = config.Bind("Controls", "Use Gamepad", false, "Whether to use gamepads for input or not.");
             BlockDashWithMarios = config.Bind("Controls", "Block Dash with Marios", true, "Whether to Block opening the dash with marios or not. !VR-Only!");
+            UnlockMovementKey = config.Bind("Controls", "Unlock Movement Key", Key.Period, "The key to unlock movement when marios are present.");
+            UnlockMovementKeyToggle = config.Bind("Controls", "Unlock Movement Key Toggle", true, "When true the unlock movement key will toggle, when false it needs to be held the entire time.");
 
             DisableAudio = config.Bind("Audio", "Disable Audio", false, "Whether to disable all Super Mario 64 Music/Sounds or not.");
             PlayRandomMusic = config.Bind("Audio", "Play Random Music", true, "Whether to play a random music when a mario joins or not.");
@@ -57,7 +61,7 @@ public class Config
             MaxMeshColliderTris = config.Bind("Performance", "Max Mesh Collider Tris", 50000, "Maximum total number of triangles of automatically generated from mesh colliders allowed.");   // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
 
             DebugEnabled = config.Bind("Debug", "Debug Enabled", false, "Whether to enable debug mode or not.");
-            RenderSlotLocal = config.Bind("Debug", "Render SlotLocal", true, "Whether the Renderer should be Local or not.");
+            RenderSlotPublic = config.Bind("Debug", "Render Slot Public", true, "When true the renderer slot will not be a local slot.");
             LogColliderChanges = config.Bind("Debug", "Log Collider Changes", false, "Whether to Log Collider changes or not.");
 
             return true;

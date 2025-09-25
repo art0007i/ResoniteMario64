@@ -13,7 +13,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Deterministic>true</Deterministic>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <CopyToPlugins>true</CopyToPlugins>
+    <CopyToPlugins>false</CopyToPlugins>
     <ThunderstorePackable>true</ThunderstorePackable>
     <GamePath Condition="'$(ResonitePath)' != ''">$(ResonitePath)/</GamePath>
     <GamePath Condition="Exists('$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\')">$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\</GamePath>

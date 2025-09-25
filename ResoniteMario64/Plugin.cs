@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Reflection;
+﻿using System.Reflection;
 using BepInEx;
 using BepInEx.Logging;
 using BepInEx.NET.Common;
@@ -16,7 +14,7 @@ public class Plugin : BasePlugin
     internal new static ManualLogSource Log;
     
     public static readonly string DllDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-    
+
     public override void Load()
     {
         Log = base.Log;
