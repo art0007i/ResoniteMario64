@@ -1,9 +1,9 @@
 {
   "profiles": {
-    "Launch Resonite": {
+    "Launch": {
       "commandName": "Executable",
-      "executablePath": "$(GamePath)Resonite.exe",
-      "commandLineArgs": "-DataPath \"D:\\YDMS\\Resonite Data\" -CachePath \"D:\\YDMS\\Resonite Cache\" -Screen -Invisible -LoadAssembly \"Libraries/ResoniteModLoader.dll\" -LoadAssembly \"Libraries/ResoniteMario64.dll\" -DoNotAutoLoadHome",
+      "executablePath": "$(GamePath)Renderite.Host.exe",
+      "commandLineArgs": "-Screen $(ResoniteLaunchArguments)",
       "workingDirectory": "$(GamePath)"
     }
   }

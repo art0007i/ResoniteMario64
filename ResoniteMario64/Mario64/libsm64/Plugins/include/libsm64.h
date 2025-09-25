@@ -5,14 +5,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef _WIN32
-    #ifdef SM64_LIB_EXPORT
+#if defined(_WIN32)
+#ifdef SM64_LIB_EXPORT
         #define SM64_LIB_FN __declspec(dllexport)
-    #else
-        #define SM64_LIB_FN __declspec(dllimport)
-    #endif
 #else
-    #define SM64_LIB_FN
+        #define SM64_LIB_FN __declspec(dllimport)
+#endif
+#elif defined(__GNUC__) && __GNUC__ >= 4
+#ifdef SM64_LIB_EXPORT
+        #define SM64_LIB_FN __attribute__ ((visibility("default")))
+#else
+        #define SM64_LIB_FN
+#endif
+#else
+#define SM64_LIB_FN
 #endif
 
 #ifdef __cplusplus
@@ -44,7 +50,7 @@ struct SM64SurfaceObject
 {
     struct SM64ObjectTransform transform;
     uint32_t surfaceCount;
-    struct SM64Surface *surfaces;
+    struct SM64Surface* surfaces;
 };
 
 struct SM64MarioState
@@ -61,21 +67,27 @@ struct SM64MarioState
 
 struct SM64MarioGeometryBuffers
 {
-    float *position;
-    float *normal;
-    float *color;
-    float *uv;
+    float* position;
+    float* normal;
+    float* color;
+    float* uv;
     uint16_t numTrianglesUsed;
 };
 
 struct SM64WallCollisionData
 {
-    /*0x00*/ float x, y, z;
-    /*0x0C*/ float offsetY;
-    /*0x10*/ float radius;
-    /*0x14*/ int16_t unk14;
-    /*0x16*/ int16_t numWalls;
-    /*0x18*/ struct SM64SurfaceCollisionData *walls[4];
+    /*0x00*/
+    float x, y, z;
+    /*0x0C*/
+    float offsetY;
+    /*0x10*/
+    float radius;
+    /*0x14*/
+    int16_t unk14;
+    /*0x16*/
+    int16_t numWalls;
+    /*0x18*/
+    struct SM64SurfaceCollisionData* walls[4];
 };
 
 struct SM64FloorCollisionData
@@ -112,15 +124,17 @@ struct SM64SurfaceCollisionData
     int32_t vertex1[3]; // libsm64: 32 bit
     int32_t vertex2[3]; // libsm64: 32 bit
     int32_t vertex3[3]; // libsm64: 32 bit
-    struct {
+    struct
+    {
         float x;
         float y;
         float z;
     } normal;
+
     float originOffset;
 
     uint8_t isValid; // libsm64: added field
-    struct SM64SurfaceObjectTransform *transform; // libsm64: added field
+    struct SM64SurfaceObjectTransform* transform; // libsm64: added field
     uint16_t terrain; // libsm64: added field
 };
 
@@ -132,23 +146,23 @@ enum
 };
 
 
-typedef void (*SM64DebugPrintFunctionPtr)( const char * );
-extern SM64_LIB_FN void sm64_register_debug_print_function( SM64DebugPrintFunctionPtr debugPrintFunction );
+typedef void (*SM64DebugPrintFunctionPtr)(const char*);
+extern SM64_LIB_FN void sm64_register_debug_print_function(SM64DebugPrintFunctionPtr debugPrintFunction);
 
-typedef void (*SM64PlaySoundFunctionPtr)( uint32_t soundBits, float *pos );
-extern SM64_LIB_FN void sm64_register_play_sound_function( SM64PlaySoundFunctionPtr playSoundFunction );
+typedef void (*SM64PlaySoundFunctionPtr)(uint32_t soundBits, float* pos);
+extern SM64_LIB_FN void sm64_register_play_sound_function(SM64PlaySoundFunctionPtr playSoundFunction);
 
-extern SM64_LIB_FN void sm64_global_init( const uint8_t *rom, uint8_t *outTexture );
-extern SM64_LIB_FN void sm64_global_terminate( void );
+extern SM64_LIB_FN void sm64_global_init(const uint8_t* rom, uint8_t* outTexture);
+extern SM64_LIB_FN void sm64_global_terminate(void);
 
-extern SM64_LIB_FN void sm64_audio_init( const uint8_t *rom );
-extern SM64_LIB_FN uint32_t sm64_audio_tick( uint32_t numQueuedSamples, uint32_t numDesiredSamples, int16_t *audio_buffer );
+extern SM64_LIB_FN void sm64_audio_init(const uint8_t* rom);
+extern SM64_LIB_FN uint32_t sm64_audio_tick(uint32_t numQueuedSamples, uint32_t numDesiredSamples, int16_t* audio_buffer);
 
-extern SM64_LIB_FN void sm64_static_surfaces_load( const struct SM64Surface *surfaceArray, uint32_t numSurfaces );
+extern SM64_LIB_FN void sm64_static_surfaces_load(const struct SM64Surface* surfaceArray, uint32_t numSurfaces);
 
-extern SM64_LIB_FN int32_t sm64_mario_create( float x, float y, float z );
-extern SM64_LIB_FN void sm64_mario_tick( int32_t marioId, const struct SM64MarioInputs *inputs, struct SM64MarioState *outState, struct SM64MarioGeometryBuffers *outBuffers );
-extern SM64_LIB_FN void sm64_mario_delete( int32_t marioId );
+extern SM64_LIB_FN int32_t sm64_mario_create(float x, float y, float z);
+extern SM64_LIB_FN void sm64_mario_tick(int32_t marioId, const struct SM64MarioInputs* inputs, struct SM64MarioState* outState, struct SM64MarioGeometryBuffers* outBuffers);
+extern SM64_LIB_FN void sm64_mario_delete(int32_t marioId);
 
 extern SM64_LIB_FN void sm64_set_mario_action(int32_t marioId, uint32_t action);
 extern SM64_LIB_FN void sm64_set_mario_action_arg(int32_t marioId, uint32_t action, uint32_t actionArg);
@@ -171,25 +185,25 @@ extern SM64_LIB_FN void sm64_mario_interact_cap(int32_t marioId, uint32_t capFla
 extern SM64_LIB_FN void sm64_mario_extend_cap(int32_t marioId, uint16_t capTime);
 extern SM64_LIB_FN bool sm64_mario_attack(int32_t marioId, float x, float y, float z, float hitboxHeight);
 
-extern SM64_LIB_FN uint32_t sm64_surface_object_create( const struct SM64SurfaceObject *surfaceObject );
-extern SM64_LIB_FN void sm64_surface_object_move( uint32_t objectId, const struct SM64ObjectTransform *transform );
-extern SM64_LIB_FN void sm64_surface_object_delete( uint32_t objectId );
+extern SM64_LIB_FN uint32_t sm64_surface_object_create(const struct SM64SurfaceObject* surfaceObject);
+extern SM64_LIB_FN void sm64_surface_object_move(uint32_t objectId, const struct SM64ObjectTransform* transform);
+extern SM64_LIB_FN void sm64_surface_object_delete(uint32_t objectId);
 
-extern SM64_LIB_FN int32_t sm64_surface_find_wall_collision( float *xPtr, float *yPtr, float *zPtr, float offsetY, float radius );
-extern SM64_LIB_FN int32_t sm64_surface_find_wall_collisions( struct SM64WallCollisionData *colData );
-extern SM64_LIB_FN float sm64_surface_find_ceil( float posX, float posY, float posZ, struct SM64SurfaceCollisionData **pceil );
-extern SM64_LIB_FN float sm64_surface_find_floor_height_and_data( float xPos, float yPos, float zPos, struct SM64FloorCollisionData **floorGeo );
-extern SM64_LIB_FN float sm64_surface_find_floor_height( float x, float y, float z );
-extern SM64_LIB_FN float sm64_surface_find_floor( float xPos, float yPos, float zPos, struct SM64SurfaceCollisionData **pfloor );
-extern SM64_LIB_FN float sm64_surface_find_water_level( float x, float z );
-extern SM64_LIB_FN float sm64_surface_find_poison_gas_level( float x, float z );
+extern SM64_LIB_FN int32_t sm64_surface_find_wall_collision(float* xPtr, float* yPtr, float* zPtr, float offsetY, float radius);
+extern SM64_LIB_FN int32_t sm64_surface_find_wall_collisions(struct SM64WallCollisionData* colData);
+extern SM64_LIB_FN float sm64_surface_find_ceil(float posX, float posY, float posZ, struct SM64SurfaceCollisionData** pceil);
+extern SM64_LIB_FN float sm64_surface_find_floor_height_and_data(float xPos, float yPos, float zPos, struct SM64FloorCollisionData** floorGeo);
+extern SM64_LIB_FN float sm64_surface_find_floor_height(float x, float y, float z);
+extern SM64_LIB_FN float sm64_surface_find_floor(float xPos, float yPos, float zPos, struct SM64SurfaceCollisionData** pfloor);
+extern SM64_LIB_FN float sm64_surface_find_water_level(float x, float z);
+extern SM64_LIB_FN float sm64_surface_find_poison_gas_level(float x, float z);
 
 extern SM64_LIB_FN void sm64_seq_player_play_sequence(uint8_t player, uint8_t seqId, uint16_t arg2);
 extern SM64_LIB_FN void sm64_play_music(uint8_t player, uint16_t seqArgs, uint16_t fadeTimer);
 extern SM64_LIB_FN void sm64_stop_background_music(uint16_t seqId);
 extern SM64_LIB_FN void sm64_fadeout_background_music(uint16_t arg0, uint16_t fadeOut);
 extern SM64_LIB_FN uint16_t sm64_get_current_background_music();
-extern SM64_LIB_FN void sm64_play_sound(int32_t soundBits, float *pos);
+extern SM64_LIB_FN void sm64_play_sound(int32_t soundBits, float* pos);
 extern SM64_LIB_FN void sm64_play_sound_global(int32_t soundBits);
 extern SM64_LIB_FN void sm64_set_sound_volume(float vol);
 

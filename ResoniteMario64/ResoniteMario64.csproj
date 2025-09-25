@@ -1,70 +1,75 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <ProjectGuid>{FFA93FA9-4040-46FF-8A1C-2A190C0CC235}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <Version>1.0.0</Version>
+    <Authors>art0007i</Authors>
+    <TargetFramework>net9.0</TargetFramework>
+    <RepositoryUrl>https://github.com/art0007i/ResoniteMario64</RepositoryUrl>
+    <PackageId>art0007i.ResoniteMario64</PackageId>
+    <Product>ResoniteMario64</Product>
     <RootNamespace>ResoniteMario64</RootNamespace>
-    <AssemblyTitle>ResoniteMario64</AssemblyTitle>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <LangVersion>10</LangVersion>
-    <TargetFramework>net472</TargetFramework>
-    <FileAlignment>512</FileAlignment>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Deterministic>true</Deterministic>
-    <GamePath>$(MSBuildThisFileDirectory)Resonite</GamePath>
-    <GamePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</GamePath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyToPlugins>true</CopyToPlugins>
+    <ThunderstorePackable>true</ThunderstorePackable>
+    <GamePath Condition="'$(ResonitePath)' != ''">$(ResonitePath)/</GamePath>
+    <GamePath Condition="Exists('$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\')">$(MSBuildProgramFiles32)\Steam\steamapps\common\Resonite\</GamePath>
     <GamePath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</GamePath>
-    <GamePath Condition="Exists('E:\Programs\Steam\steamapps\common\Resonite')">E:\Programs\Steam\steamapps\common\Resonite\</GamePath>
-    <CopyLocal>false</CopyLocal>
-    <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
-    <AutoWeaver Condition="'$(AutoWeaver)'==''">false</AutoWeaver>
-    <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
-    <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
+    <PluginTargetDir>$(GamePath)BepInEx\plugins\$(AssemblyName)</PluginTargetDir>
+    <RestoreAdditionalProjectSources>
+      https://nuget-modding.resonite.net/v3/index.json;
+    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
+  <!-- Modding dependencies -->
   <ItemGroup>
-    <Reference Include="HarmonyLib">
-      <HintPath>$(GamePath)rml_libs\0Harmony.dll</HintPath>
-      <HintPath Condition="Exists('$(GamePath)0Harmony.dll')">$(GamePath)0Harmony.dll</HintPath>
-    </Reference>
-    <Reference Include="Elements.Core">
-      <HintPath>$(GamePath)Resonite_Data\Managed\Elements.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Elements.Assets">
-      <HintPath>$(GamePath)Resonite_Data\Managed\Elements.Assets.dll</HintPath>
+    <PackageReference Include="BepInEx.ResonitePluginInfoProps" Version="3.*" />
+    <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.8.*" />
+    <PackageReference Include="ResoniteModding.BepisResoniteWrapper" Version="1.*" />
+  </ItemGroup>
+
+  <!-- NuGet fallback stripped game references -->
+  <ItemGroup Condition="!Exists('$(GamePath)')">
+    <PackageReference Include="Resonite.GameLibs" Version="2025.*" />
+  </ItemGroup>
+
+  <!-- Local game references -->
+  <ItemGroup Condition="Exists('$(GamePath)')">
+    <Reference Include="FrooxEngine">
+      <HintPath>$(GamePath)FrooxEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="BepuPhysics">
-      <HintPath>$(GamePath)Resonite_Data\Managed\BepuPhysics.dll</HintPath>
+      <HintPath>$(GamePath)BepuPhysics.dll</HintPath>
+      <Private>False</Private>
     </Reference>
-    <Reference Include="FrooxEngine">
-      <HintPath>$(GamePath)Resonite_Data\Managed\FrooxEngine.dll</HintPath>
+    <Reference Include="Elements.Core">
+      <HintPath>$(GamePath)Elements.Core.dll</HintPath>
+      <Private>False</Private>
     </Reference>
-    <Reference Include="ResoniteModLoader">
-      <HintPath>$(GamePath)ResoniteModLoader.dll</HintPath>
-      <HintPath>$(GamePath)Libraries\ResoniteModLoader.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Memory">
-      <HintPath>$(GamePath)Resonite_Data\Managed\System.Memory.dll</HintPath>
-    </Reference>
-    <Reference Include="CSCore">
-      <HintPath>$(GamePath)Resonite_Data\Managed\CSCore.dll</HintPath>
+    <Reference Include="Renderite.Shared">
+      <HintPath>$(GamePath)Renderite.Shared.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
-  
-  <ItemGroup>
-    <_CopyItems Include="$(ProjectDir)AutoWeaver\*.*" />
-  </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(AutoWeaver)'=='true'">
-    <Copy SourceFiles="@(_CopyItems)" DestinationFolder="$(TargetDir)" />
-    <Message Text="Copied AutoWeaver files to $(TargetDir)" Importance="high" />
-	<Exec Command="$(TargetDir)AutoWeaver.exe $(TargetPath)"/>
-    <Message Text="Weaver Processed $(TargetPath)" Importance="high" />
-  </Target>
-  
-  <Target Name="PostBuild2" AfterTargets="PostBuild" Condition="'$(CopyToMods)'=='true'">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)rml_mods" />
-    <Message Text="Copied $(TargetFileName) to $(GamePath)rml_mods" Importance="high" />
-  </Target>
-  
+    <ItemGroup>
+        <EmbeddedResource Include="Mario64\libsm64\Plugins\sm64.dll">
+            <LogicalName>sm64.dll</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
 
+  <!-- Post-build copy to game plugins folder -->
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <ItemGroup>
+      <PluginFiles Include="$(TargetPath)" />
+      <PluginFiles Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    
+    <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginTargetDir)" Condition="'$(CopyToPlugins)' == 'true'" />
+    <Message Text="Copied plugin files to $(PluginTargetDir)" Importance="high" Condition="'$(CopyToPlugins)' == 'true'" />
+  </Target>
 </Project>
