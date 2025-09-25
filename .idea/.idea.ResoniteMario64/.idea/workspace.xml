@@ -11,36 +11,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e648b26d-3dc8-47fd-830b-070a6b7a6685" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitattributes" beforeDir="false" afterPath="$PROJECT_DIR$/.gitattributes" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.ResoniteMario64/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Constants.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/LICENSE.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Logger.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/ColliderShapeExtensions.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Audio.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Inputs.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Terrain.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context Utils.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Context/SM64 Context.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Interfaces/ISM64Collider.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Interfaces/ISM64Object.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 DynamicCollider.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 Interactable.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 StaticCollider.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/Objects/SM64 WaterBox.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Components/SM64 Mario.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Mario64.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Patches.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/Utils.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Interop.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/include/libsm64.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/sm64.dll" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/Plugins/sm64.dll.info" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Mario64/libsm64/SM64 Constants.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Plugin.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Properties/launchSettings.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ResoniteMario64.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ResoniteMario64.sln" beforeDir="false" afterPath="$PROJECT_DIR$/ResoniteMario64.sln" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/art0007i-ResoniteMario64-1.0.0.zip" beforeDir="false" afterPath="$PROJECT_DIR$/build/art0007i-ResoniteMario64-1.0.0.zip" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -176,7 +151,8 @@
       <workItem from="1756115519044" duration="12540000" />
       <workItem from="1756132078977" duration="13855000" />
       <workItem from="1758232079358" duration="648000" />
-      <workItem from="1758232758062" duration="1471000" />
+      <workItem from="1758232758062" duration="3209000" />
+      <workItem from="1758830486813" duration="321000" />
     </task>
     <task id="LOCAL-00001" summary="Update to Bepis">
       <option name="closed" value="true" />
@@ -202,7 +178,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756146487500</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Update">
+      <option name="closed" value="true" />
+      <created>1758234290768</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1758234290768</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -215,7 +199,8 @@
     <MESSAGE value="Update to Bepis" />
     <MESSAGE value="Update README.md" />
     <MESSAGE value="Fix LocalAudio breaking, fix Index Inputs, fix Userspace dash open/close" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fix LocalAudio breaking, fix Index Inputs, fix Userspace dash open/close" />
+    <MESSAGE value="Update" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
