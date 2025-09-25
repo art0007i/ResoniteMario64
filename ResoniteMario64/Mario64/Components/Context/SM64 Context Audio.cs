@@ -37,34 +37,26 @@ public sealed partial class SM64Context
         {
             World.RunSynchronously(() =>
             {
-                Logger.Msg($"Starting AudioSource setup at {DateTime.Now:HH:mm:ss}");
-
                 _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(
                     World.LocalUser,
                     $"{AudioTag} - {World.LocalUser.UserID}",
                     out bool created);
 
-                Logger.Msg($"AudioStream {(created ? "created" : "reused")} for user {World.LocalUser.UserID}");
-
                 if (created)
                 {
                     _marioAudioStream.Group = "SM64";
-                    Logger.Msg("AudioStream group set to SM64");
                 }
 
 
                 bool useLocalAudio = Config.LocalAudio.Value;
                 float defaultVolume = (float)Config.AudioVolume.DefaultValue;
 
-                Logger.Msg($"useLocalAudio={useLocalAudio}, defaultVolume={defaultVolume}");
 
                 if (useLocalAudio)
                 {
-                    Logger.Msg("Creating LocalAudioSlot");
                     Slot localSlot = World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
                     localSlot.Tag = AudioTag;
 
-                    Logger.Msg("Attaching or getting LocalAudioOutput component");
                     AudioOutput localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
                     if (localAttached || localAudio.Source.Target == null)
                     {
@@ -75,25 +67,18 @@ public sealed partial class SM64Context
                         localAudio.DopplerLevel.Value = 0;
                         localAudio.IgnoreAudioEffects.Value = true;
                         localAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
-
-                        Logger.Msg("LocalAudioOutput configured");
                     }
 
                     _audioSlot = localSlot;
                     _marioAudioOutput = localAudio;
-
-                    Logger.Msg("LocalAudioSlot and AudioOutput set");
                 }
 
-                Logger.Msg("Creating GlobalAudioSlot");
                 Slot globalSlot = ContextSlot?.FindChildOrAdd(AudioSlotName, false);
                 AudioOutput globalAudio = null;
 
                 if (globalSlot != null)
                 {
                     globalSlot.Tag = AudioTag;
-
-                    Logger.Msg("Attaching or getting GlobalAudioOutput component");
                     globalAudio = globalSlot.GetComponentOrAttach<AudioOutput>(out bool globalAttached);
                     if (globalAttached || globalAudio.Source.Target == null)
                     {
@@ -104,52 +89,34 @@ public sealed partial class SM64Context
                         globalAudio.DopplerLevel.Value = 0;
                         globalAudio.IgnoreAudioEffects.Value = true;
                         globalAudio.AudioTypeGroup.Value = AudioTypeGroup.Multimedia;
-
-                        Logger.Msg("GlobalAudioOutput configured");
                     }
-
-                    Logger.Msg("GlobalAudioSlot ready");
                 }
                 else
                 {
-                    Logger.Msg("GlobalAudioSlot not found or ContextSlot is null");
+                    Logger.Warn("GlobalAudioSlot not found or ContextSlot is null");
                 }
 
                 if (!useLocalAudio)
                 {
                     _audioSlot = globalSlot;
                     _marioAudioOutput = globalAudio;
-                    Logger.Msg("Using GlobalAudioSlot and AudioOutput");
                 }
 
                 World.RunInUpdates(World.LocalUser.AllocationID + 1, () =>
                 {
                     float volume = useLocalAudio ? 0f : Config.AudioVolume.Value;
-                    Logger.Msg($"Overriding volume for user: {World.LocalUser.UserID} to {volume}");
 
                     ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(World.LocalUser, volume);
                     if (overrideForUser != null)
                     {
                         overrideForUser.Default.Value = defaultVolume;
-                        Logger.Msg($"Override default volume set to {defaultVolume}");
-                    }
-                    else
-                    {
-                        Logger.Msg("No override created for volume");
                     }
                 });
-
-                Logger.Msg("Subscribing event handlers");
 
                 if (_audioSlot != null)
                 {
                     _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
                     _audioSlot.OnPrepareDestroy += HandleAudioDestroy;
-                    Logger.Msg("Subscribed to AudioSlot.OnPrepareDestroy");
-                }
-                else
-                {
-                    Logger.Msg("AudioSlot is null, skipping OnPrepareDestroy subscription");
                 }
 
                 Config.LocalAudio.SettingChanged -= HandleLocalAudioChange;
@@ -160,34 +127,26 @@ public sealed partial class SM64Context
 
                 Config.AudioVolume.SettingChanged -= HandleVolumeChange;
                 Config.AudioVolume.SettingChanged += HandleVolumeChange;
-
-                Logger.Msg("Event handlers subscribed");
-                Logger.Msg($"AudioSource setup finished at {DateTime.Now:HH:mm:ss.fff}");
             });
         }
         catch (Exception ex)
         {
-            Logger.Msg($"ERROR during SetAudioSource: {ex}");
+            Logger.Error($"ERROR during SetAudioSource: {ex}");
         }
     }
 
     private void HandleAudioDestroy(Slot slot)
     {
-        Logger.Msg("AudioSlot is being destroyed, checking if global init");
-
         if (Interop.IsGlobalInit)
         {
-            Logger.Msg("GlobalInit is true, scheduling SetAudioSource");
             if (Config.LocalAudio.Value)
             {
                 slot.StartTask(async () =>
                 {
-                    Logger.Msg("Waiting for LocalUser to be valid...");
                     while (World?.LocalUser?.Root?.GetRegisteredComponent<AvatarManager>() == null)
                     {
                         await Task.Delay(10);
                     }
-                    Logger.Msg("LocalUser is valid, running SetAudioSource");
                     SetAudioSource();
                 });
             }
@@ -196,32 +155,24 @@ public sealed partial class SM64Context
                 slot.RunInUpdates(slot.LocalUser.AllocationID + 3, SetAudioSource);
             }
         }
-        else
-        {
-            Logger.Msg("GlobalInit is false, skipping SetAudioSource");
-        }
     }
 
     private void HandleVolumeChange(object value, EventArgs args)
     {
         if (_audioSlot == null || _marioAudioOutput == null)
         {
-            Logger.Msg("AudioSlot or _marioAudioOutput is null, ignoring volume change");
             return;
         }
 
         float volume = Config.AudioVolume.Value;
-        Logger.Msg($"Volume change requested: {volume}");
 
         if (_audioSlot.IsLocalElement)
         {
             _marioAudioOutput.Volume.Value = volume;
-            Logger.Msg("Volume set directly on local AudioOutput");
         }
         else
         {
             _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, volume);
-            Logger.Msg($"Volume overridden for user {World.LocalUser.UserID}");
         }
     }
 
@@ -229,18 +180,12 @@ public sealed partial class SM64Context
     {
         if (_audioSlot == null)
         {
-            Logger.Msg("AudioSlot is null, ignoring disable change");
             return;
         }
 
         if (_audioSlot.GetAllocatingUser() == World.LocalUser)
         {
-            Logger.Msg("Disabling audio, destroying AudioSlot");
             _audioSlot.Destroy();
-        }
-        else
-        {
-            Logger.Msg("Allocating user is not local user, no action taken");
         }
     }
 
@@ -248,17 +193,12 @@ public sealed partial class SM64Context
     {
         if (_audioSlot == null)
         {
-            Logger.Msg("AudioSlot is null, cannot change local audio");
             return;
         }
-
         if (_audioSlot.IsLocalElement)
         {
-            Logger.Msg("Local audio slot detected, destroying it");
             _audioSlot.Destroy();
         }
-
-        Logger.Msg("Reinitializing audio source after local audio change");
         SetAudioSource();
     }
     

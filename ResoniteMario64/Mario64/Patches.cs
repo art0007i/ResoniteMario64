@@ -82,31 +82,22 @@ public class Patches
             {
                 try
                 {
-                    Logger.Msg("Trying to find TempSlot with ContextSlot");
                     Slot contextSlot = SM64Context.GetTempSlot(instance).FindChild(x => x.Tag == ContextTag);
                     if (contextSlot == null)
                     {
-                        Logger.Msg("ContextSlot not found in TempSlot");
                         return;
                     }
 
                     if (SM64Context.EnsureInstanceExists(instance, out SM64Context context))
                     {
-                        Logger.Msg("Ensured SM64Context instance exists");
                         context.World.RunInUpdates(3, () =>
                         {
                             context.MarioContainersSlot?.ForeachChild(slot =>
                             {
                                 if (slot.Tag != MarioTag) return;
-
-                                Logger.Msg($"Trying to add Mario slot: {slot.Name} ({slot.ReferenceID})");
                                 SM64Context.TryAddMario(slot, false);
                             });
                         });
-                    }
-                    else
-                    {
-                        Logger.Msg("Failed to ensure SM64Context instance");
                     }
                 }
                 finally

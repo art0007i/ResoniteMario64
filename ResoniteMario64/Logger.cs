@@ -12,6 +12,21 @@ public static class Logger
         return $"[{caller}|{line}] {message?.ToString() ?? "null"}";
     }
 
+    /* Log levels in a nutshell
+
+    Debug: you shouldn't see this.
+    Info: you don't need to see this.
+    Msg: you might want to see this.
+    Warn: you need to see this.
+    Error: something got fucked.
+    Fatal: everything got fucked.
+    */
+
+    public static void Debug(object message, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
+    {
+        Log.LogDebug(Format(message, caller, line));
+    }
+
     public static void Info(object message, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
         Log.LogInfo(Format(message, caller, line));
@@ -35,10 +50,5 @@ public static class Logger
     public static void Fatal(object message, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
         Log.LogFatal(Format(message, caller, line));
-    }
-
-    public static void Debug(object message, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
-    {
-        Log.LogDebug(Format(message, caller, line));
     }
 }

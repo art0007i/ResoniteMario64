@@ -313,10 +313,8 @@ public sealed class SM64Mario : ISM64Object
     public SM64Mario(Slot slot, SM64Context instance)
     {
         const string caller = nameof(SM64Mario);
-        Logger.Msg($"Mario ctor started for slot: {slot.Name}", caller);
 
         MarioUser = slot.GetAllocatingUser();
-        Logger.Msg($"User: {MarioUser?.UserName ?? "null"}, IsLocal: {IsLocal}", caller);
 
         World = instance.World;
         Context = instance;
@@ -329,15 +327,12 @@ public sealed class SM64Mario : ISM64Object
         {
             int count = Context.AllMarios.Count(x => x.Value.IsLocal);
             MarioSlot.Name += $" #{count}";
-            Logger.Msg($"Renamed slot for local Mario: {MarioSlot.Name}", caller);
         }
 
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
         MarioSpace.SpaceName.Value = MarioSpaceName;
-        Logger.Msg($"Attached DynamicVariableSpace with name: {MarioSpaceName}", caller);
 
         _marioGrabbable = MarioSlot.GetComponentOrAttach<Grabbable>();
-        Logger.Msg("Attached Grabbable", caller);
 
         _marioCollider = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
         if (IsLocal)
@@ -345,17 +340,12 @@ public sealed class SM64Mario : ISM64Object
             _marioCollider.Offset.Value = new float3(0, 0.075f * MarioScale);
             _marioCollider.Radius.Value = 0.05f * MarioScale;
             _marioCollider.Height.Value = 0.15f * MarioScale;
-            Logger.Msg("Configured CapsuleCollider for local Mario", caller);
         }
-
-        Logger.Msg("Component references obtained", caller);
 
         MarioSlot.OnPrepareDestroy += HandleSlotDestroyed;
 
         float3 initPos = MarioSlot.GlobalPosition;
-        Logger.Msg($"Initial position: {initPos}", caller);
 
-        Logger.Msg("Creating native Mario", caller);
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
 
         if (MarioId == int.MaxValue)
@@ -366,16 +356,12 @@ public sealed class SM64Mario : ISM64Object
 
         _waterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float waterLevel) ? waterLevel : -100f;
         Interop.SetWaterLevel(MarioId, _waterLevel);
-        Logger.Msg($"Water level set to {_waterLevel}", caller);
 
         _gasLevel = Context.ContextVariableSpace.TryReadValue(GasVarName, out float gasLevel) ? gasLevel : -200f;
         Interop.SetGasLevel(MarioId, _gasLevel);
-        Logger.Msg($"Gas level set to {_gasLevel}", caller);
 
-        Logger.Msg("Creating renderer", caller);
         CreateMarioRenderer();
 
-        Logger.Msg("Scheduling non-modded renderer", caller);
         MarioSlot.RunInUpdates(3, CreateNonModdedRenderer);
 
         if (IsLocal)
@@ -384,47 +370,37 @@ public sealed class SM64Mario : ISM64Object
             isShown.VariableName.Value = IsShownVarName;
             ValueUserOverride<bool> @override = isShown.Value.OverrideForUser(MarioUser, true);
             @override.CreateOverrideOnWrite.Value = true;
-            Logger.Msg("Created IsShown variable", caller);
 
-            Logger.Msg("Setting up input streams", caller);
             Slot inputsSlot = MarioSlot.AddSlot("Inputs");
             inputsSlot.Tag = null;
 
             DynamicReferenceVariable<IValue<float2>> joystick1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<float2>>>();
             joystick1.VariableName.Value = JoystickVarName;
             joystick1.Reference.Target = JoystickStream;
-            Logger.Msg("Mapped Joystick stream", caller);
 
             DynamicReferenceVariable<IValue<bool>> jump1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             jump1.VariableName.Value = JumpVarName;
             jump1.Reference.Target = JumpStream;
-            Logger.Msg("Mapped Jump stream", caller);
 
             DynamicReferenceVariable<IValue<bool>> kick1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             kick1.VariableName.Value = PunchVarName;
             kick1.Reference.Target = PunchStream;
-            Logger.Msg("Mapped Punch stream", caller);
 
             DynamicReferenceVariable<IValue<bool>> stomp1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             stomp1.VariableName.Value = CrouchVarName;
             stomp1.Reference.Target = CrouchStream;
-            Logger.Msg("Mapped Crouch stream", caller);
 
-            Logger.Msg("Setting up SyncedVars", caller);
             Slot varsSlot = MarioSlot.AddSlot("Vars");
             varsSlot.Tag = null;
 
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
-            Logger.Msg("Created health points variable", caller);
 
             DynamicValueVariable<uint> actionFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             actionFlags.VariableName.Value = ActionFlagsVarName;
-            Logger.Msg("Created action flags variable", caller);
 
             DynamicValueVariable<uint> stateFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             stateFlags.VariableName.Value = StateFlagsVarName;
-            Logger.Msg("Created state flags variable", caller);
 
             slot.RunInUpdates(1, () => slot.SetParent(instance.MyMariosSlot));
         }
@@ -434,16 +410,12 @@ public sealed class SM64Mario : ISM64Object
         _initialized = true;
 
         slot.RunInUpdates(3, () => SyncedIsShown = !_wasBypassed);
-        Logger.Msg($"Mario construction complete. ID: {MarioId}");
     }
 
     private void CreateMarioRenderer()
     {
-        Logger.Msg("Starting Mario renderer creation.");
-
         _states[0] = new SM64MarioState();
         _states[1] = new SM64MarioState();
-        Logger.Msg("Initialized Mario states.");
 
         const int bufferSize = 3 * Interop.SM64GeoMaxTriangles;
         _lerpPositionBuffer = new float3[bufferSize];
@@ -453,17 +425,14 @@ public sealed class SM64Mario : ISM64Object
         _colorBuffer = new float3[bufferSize];
         _colorBufferColors = new color[bufferSize];
         _uvBuffer = new float2[bufferSize];
-        Logger.Msg("Buffers initialized.");
 
         if (Config.RenderSlotLocal.Value && Utils.CheckDebug())
         {
             _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
-            Logger.Msg("Added local Mario renderer slot.");
         }
         else
         {
             _marioRendererSlot = MarioSlot.World.AddSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}", false);
-            Logger.Msg("Added global Mario renderer slot.");
         }
 
         _marioMeshRenderer = _marioRendererSlot.AttachComponent<MeshRenderer>();
@@ -472,7 +441,6 @@ public sealed class SM64Mario : ISM64Object
         _marioMaterialClipped = _marioRendererSlot.AttachComponent<PBS_VertexColorMetallic>();
         _marioMaterialMetal = _marioRendererSlot.AttachComponent<XiexeToonMaterial>();
         _marioMaterialVanish = _marioRendererSlot.AttachComponent<PBS_Metallic>();
-        Logger.Msg("Attached mesh renderer and materials.");
 
         StaticTexture2D marioTextureClipped = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTextureClipped.DirectLoad.Value = true;
@@ -483,53 +451,44 @@ public sealed class SM64Mario : ISM64Object
         _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
         _marioMaterialClipped.AlphaClip.Value = 0.25f;
         _marioMaterialClipped.Culling.Value = Culling.Off;
-        Logger.Msg("Loaded clipped Mario texture.");
 
         StaticTexture2D marioTexture = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTexture.DirectLoad.Value = true;
         marioTexture.URL.Value = new Uri("resdb:///f05ee58da859926aa5652bb92a07ad0d5ce5fb33979fd7ead9bc5ed78eb5b7d7.webp");
         marioTexture.WrapModeU.Value = TextureWrapMode.Clamp;
         marioTexture.WrapModeV.Value = TextureWrapMode.Clamp;
-        Logger.Msg("Loaded primary Mario texture.");
 
         _marioMaterial.AlbedoTexture.Target = marioTexture;
         _marioMaterial.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaClip;
         _marioMaterial.AlphaClip.Value = 1f;
         _marioMaterial.Culling.Value = Culling.Off;
         _marioMaterial.OffsetUnits.Value = -1f;
-        Logger.Msg("Configured Base material.");
 
         _marioMaterialVanish.AlbedoTexture.Target = marioTexture;
         _marioMaterialVanish.AlbedoColor.Value = Utils.VanishCapColor;
         _marioMaterialVanish.BlendMode.Value = BlendMode.Alpha;
         _marioMaterialVanish.AlphaCutoff.Value = 1f;
         _marioMaterialVanish.OffsetUnits.Value = -1f;
-        Logger.Msg("Configured Vanish material.");
 
         StaticTexture2D marioTextureMetal = _marioRendererSlot.AttachComponent<StaticTexture2D>();
         marioTextureMetal.DirectLoad.Value = true;
         marioTextureMetal.URL.Value = new Uri("resdb:///648a620d521fdf0c2cfca1d89198155136dbe22051f7e0c64d8787bb7849a8a5.webp");
         marioTextureMetal.WrapModeU.Value = TextureWrapMode.Clamp;
         marioTextureMetal.WrapModeV.Value = TextureWrapMode.Clamp;
-        Logger.Msg("Loaded Metal texture.");
 
         _marioMaterialMetal.Matcap.Target = marioTextureMetal;
         _marioMaterialMetal.Color.Value = colorX.Black;
         _marioMaterialMetal.MatcapTint.Value = colorX.White * 1.5f;
         _marioMaterialMetal.OffsetUnits.Value = -2f;
-        Logger.Msg("Configured Metal material.");
 
         _marioMeshRenderer.Materials.Add();
         _marioMeshRenderer.Materials.Add(_marioMaterial);
-        Logger.Msg("Added materials to mesh renderer.");
 
         _marioMeshRenderer.Mesh.Target = _marioMeshProvider;
         _marioMesh = new MeshX();
-        Logger.Msg("Created MeshX and assigned to mesh provider.");
 
         _marioRendererSlot.LocalScale = new float3(-1, 1, 1) / Interop.ScaleFactor;
         _marioRendererSlot.LocalPosition = float3.Zero;
-        Logger.Msg("Set renderer slot scale and position.");
 
         _marioMesh.AddVertices(_lerpPositionBuffer.Length);
         TriangleSubmesh marioTris = _marioMesh.AddSubmesh<TriangleSubmesh>();
@@ -538,29 +497,19 @@ public sealed class SM64Mario : ISM64Object
             marioTris.AddTriangle(i * 3, i * 3 + 1, i * 3 + 2);
         }
 
-        Logger.Msg("Added vertices and triangles to mesh.");
-
         _marioMeshProvider.Mesh = _marioMesh;
         _marioMeshProvider.LocalManualUpdate = true;
         _marioMeshProvider.HighPriorityIntegration.Value = true;
 
         _enabled = true;
-        Logger.Msg($"Mario renderer creation complete. Vertex count: {_marioMeshProvider.Mesh.VertexCount}");
     }
 
     private void CreateNonModdedRenderer()
     {
-        Logger.Msg("Starting creation of non-modded renderer.");
-
         Uri uri = Config.MarioUrl.Value;
         if (uri == null)
         {
             uri = new Uri("resdb:///4a51849e3d7065641304a06981da62c4177a8b403553b2bf685f1460e3664b05.brson");
-            Logger.Msg("Config MarioUrl not set, using default URI.");
-        }
-        else
-        {
-            Logger.Msg($"Loaded MarioUrl from config: {uri}");
         }
 
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
@@ -569,26 +518,17 @@ public sealed class SM64Mario : ISM64Object
             _marioNonModdedRendererSlot = MarioSlot.AddSlot("Non-Modded Renderer", false);
             _marioNonModdedRendererSlot.Tag = MarioNonMRendererTag;
             _marioNonModdedRendererSlot.LocalScale *= MarioScale;
-            Logger.Msg("Created new non-modded renderer slot.");
 
             Slot tempSlot = _marioNonModdedRendererSlot.AddSlot("TempSlot", false);
             tempSlot.StartTask(async () =>
             {
-                Logger.Msg("Starting async load of non-modded renderer object.");
                 await tempSlot.LoadObjectAsync(uri);
                 tempSlot.GetComponent<InventoryItem>()?.Unpack(true);
-                Logger.Msg("Non-modded renderer object loaded and unpacked.");
 
                 foreach (Slot child in _marioNonModdedRendererSlot.Children)
                     child.SetIdentityTransform();
             });
         }
-        else
-        {
-            Logger.Msg("Non-modded renderer slot already exists or not local user.");
-        }
-
-        Logger.Msg("Finished non-modded renderer setup.");
     }
 
     // Game Tick

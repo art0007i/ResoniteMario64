@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Version>1.0.0</Version>
-    <Authors>art0007i</Authors>
+    <Authors>art0007i, NepuShiro</Authors>
     <TargetFramework>net9.0</TargetFramework>
     <RepositoryUrl>https://github.com/art0007i/ResoniteMario64</RepositoryUrl>
     <PackageId>art0007i.ResoniteMario64</PackageId>
@@ -28,7 +28,6 @@
   <ItemGroup>
     <PackageReference Include="BepInEx.ResonitePluginInfoProps" Version="3.*" />
     <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.8.*" />
-    <PackageReference Include="ResoniteModding.BepisResoniteWrapper" Version="1.*" />
   </ItemGroup>
 
   <!-- NuGet fallback stripped game references -->
@@ -46,10 +45,22 @@
       <HintPath>$(GamePath)BepuPhysics.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Elements.Core">
-      <HintPath>$(GamePath)Elements.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+		<Reference Include="Elements.Core">
+			<HintPath>$(GamePath)Elements.Core.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Elements.Assets">
+			<HintPath>$(GamePath)Elements.Assets.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="SkyFrost.Base.Models">
+			<HintPath>$(GamePath)SkyFrost.Base.Models.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Awwdio">
+			<HintPath>$(GamePath)Awwdio.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
     <Reference Include="Renderite.Shared">
       <HintPath>$(GamePath)Renderite.Shared.dll</HintPath>
       <Private>False</Private>

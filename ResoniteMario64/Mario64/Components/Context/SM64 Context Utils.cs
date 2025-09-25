@@ -16,26 +16,22 @@ public sealed partial class SM64Context
 
         if (currentWorld == null)
         {
-            Logger.Msg("Current world is null, returning null");
             return null;
         }
 
         Slot newSlot = currentWorld.RootSlot?.FindChildOrAdd(TempSlotName, false);
         if (newSlot == null)
         {
-            Logger.Msg($"Could not find or add temp slot '{TempSlotName}'");
             return null;
         }
 
         if (TempSlot != null)
         {
             TempSlot.ChildAdded -= HandleSlotAdded;
-            Logger.Msg("Removed ChildAdded event from previous tempSlot");
         }
 
         TempSlot = newSlot;
         TempSlot.ChildAdded += HandleSlotAdded;
-        Logger.Msg($"New tempSlot set and ChildAdded event subscribed: {TempSlot.Name} ({TempSlot.ReferenceID})");
 
         return TempSlot;
     }
@@ -46,10 +42,9 @@ public sealed partial class SM64Context
         if (Instance != null && world != Instance.World)
         {
             bool destroy = world.Focus == World.WorldFocus.Focused;
-            Logger.Error($"Tried to create instance while one already exists. Replace? - {destroy}");
+            Logger.Info($"Tried to create instance while one already exists. Replace? - {destroy}");
             if (destroy)
             {
-                Logger.Msg("Disposing existing instance");
                 Instance.Dispose();
                 Instance = null;
             }
@@ -68,7 +63,6 @@ public sealed partial class SM64Context
 
         Logger.Msg($"Ensuring SM64Context instance exists for world: {world.Name}");
         Instance = new SM64Context(world);
-        Logger.Msg("Instance Created!");
 
         instance = Instance;
         return true;
@@ -90,7 +84,7 @@ public sealed partial class SM64Context
         {
             if (context.MyMarios.Count >= maxMarios)
             {
-                Logger.Error("You have too many marios for this world!");
+                Logger.Msg("Tried to create mario, but we are at the configured limit!");
                 slot.RunSynchronously(slot.Destroy);
                 return null;
             }
@@ -99,8 +93,6 @@ public sealed partial class SM64Context
         SM64Mario mario = null;
         if (!context.AllMarios.ContainsKey(slot))
         {
-            Logger.Msg($"Adding Mario for Slot: {slot.Name} ({slot.ReferenceID})");
-
             mario = new SM64Mario(slot, context);
             context.AllMarios.Add(slot, mario);
             if (Config.PlayRandomMusic.Value)
@@ -110,11 +102,8 @@ public sealed partial class SM64Context
             
             if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music) && !Interop.IsMusicPlaying(music))
             {
-                Logger.Msg($"Playing World Music - {music}");
                 Interop.PlayMusic(music);
             }
-
-            Logger.Msg($"Added mario for Slot: {slot.Name} ({slot.ReferenceID})");
         }
 
         if (!manual) return mario;
@@ -131,22 +120,13 @@ public sealed partial class SM64Context
                         if (child2.Tag != MarioTag) continue;
                         if (context.AllMarios.ContainsKey(child2)) continue;
 
-                        Logger.Msg($"Adding existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
-
                         SM64Mario mario2 = new SM64Mario(child2, context);
                         context.AllMarios.Add(child2, mario2);
-
-                        Logger.Msg($"Added existing Mario for Slot: {child2.Name} ({child2.ReferenceID})");
                     }
                 }
 
                 context.ReloadAllColliders(false);
-                Logger.Msg("Reloaded all colliders after adding existing Marios");
             });
-        }
-        else
-        {
-            Logger.Msg("MarioContainersSlot is null, skipping adding existing Marios");
         }
 
         return mario;
@@ -154,14 +134,11 @@ public sealed partial class SM64Context
 
     public static void RemoveMario(SM64Mario mario)
     {
-        Logger.Msg($"Removing Mario with ID {mario.MarioId}");
-
         mario.Context.AllMarios.Remove(mario.MarioSlot);
         mario.Context.UpdatePlayerMariosState();
 
         if (mario.Context.AllMarios.Count == 0)
         {
-            Logger.Msg("No more Marios left, stopping music");
             Interop.StopMusic();
         }
     }
@@ -172,14 +149,12 @@ public sealed partial class SM64Context
 
         child.RunSynchronously(() =>
         {
-            Logger.Msg($"A ContextSlot ({child.Name}) was Added - {slot.Name}");
             if (EnsureInstanceExists(child.World, out SM64Context context))
             {
                 context.MarioContainersSlot.ForeachChild(marioSlot =>
                 {
                     if (marioSlot.Tag == MarioTag)
                     {
-                        Logger.Msg($"Found Mario slot in new context: {marioSlot.Name} ({marioSlot.ReferenceID})");
                         TryAddMario(marioSlot, false);
                     }
                 });

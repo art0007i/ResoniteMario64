@@ -38,14 +38,8 @@ public static class Mario64Manager
     {
         try
         {
-            Logger.Info($"Loading {LibName} from embedded resources...");
-            
-            if (File.Exists(LibPath))
-            {
-                Logger.Msg($"{LibName} already exists, overwriting.");
-            }
-
-            Logger.Msg($"Copying {LibName} to {LibPath}");
+            // TODO: package the dll using tcli, instead of embedding it as a resource
+            Logger.Info($"Copying {LibName} to {LibPath} from embedded resources.");
 
             using System.IO.Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(LibName);
             if (resourceStream == null)
@@ -81,14 +75,14 @@ public static class Mario64Manager
             string foundPath = null;
             foreach (string path in candidatePaths)
             {
-                Logger.Info($"Checking for ROM at {path}");
+                Logger.Msg($"Checking for ROM at {path}");
                 if (File.Exists(path))
                 {
                     foundPath = path;
                     break;
                 }
 
-                Logger.Warn($"ROM not found at {path}");
+                Logger.Debug($"ROM not found at {path}");
             }
 
             if (foundPath == null)

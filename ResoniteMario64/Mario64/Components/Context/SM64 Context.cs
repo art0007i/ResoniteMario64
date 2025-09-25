@@ -26,17 +26,11 @@ public sealed partial class SM64Context : IDisposable
             Slot tempSlot = SM64Context.GetTempSlot(World);
             if (_contextSlot != null && (!_contextSlot.IsDestroyed || tempSlot is not { IsDestroyed: false })) return _contextSlot;
             
-            Logger.Msg("ContextSlot is null/destroyed, attempting to refresh from tempSlot");
             _contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
             if (_contextSlot != null)
             {
                 _contextSlot.OnPrepareDestroy -= HandleRemoved;
                 _contextSlot.OnPrepareDestroy += HandleRemoved;
-                Logger.Msg($"ContextSlot found and event subscribed: {_contextSlot.Name} ({_contextSlot.ReferenceID})");
-            }
-            else
-            {
-                Logger.Msg("ContextSlot not found in tempSlot");
             }
 
             return _contextSlot;
@@ -55,7 +49,6 @@ public sealed partial class SM64Context : IDisposable
                 if (_contextSlot != null)
                 {
                     _contextSlot.OnPrepareDestroy -= HandleRemoved;
-                    Logger.Msg("Unsubscribed from old ContextSlot OnPrepareDestroy event");
                 }
             }
 
@@ -65,11 +58,6 @@ public sealed partial class SM64Context : IDisposable
             {
                 _contextSlot.OnPrepareDestroy -= HandleRemoved;
                 _contextSlot.OnPrepareDestroy += HandleRemoved;
-                Logger.Msg($"ContextSlot set and event subscribed: {_contextSlot.Name} ({_contextSlot.ReferenceID})");
-            }
-            else
-            {
-                Logger.Msg("ContextSlot set to null");
             }
         }
     }
@@ -96,7 +84,6 @@ public sealed partial class SM64Context : IDisposable
     private SM64Context(World world)
     {
         const string caller = nameof(SM64Context);
-        Logger.Msg($"Context ctor started for world: {world.Name}", caller);
 
         World = world;
         world.WorldDestroyed += HandleRemoved;
@@ -105,12 +92,8 @@ public sealed partial class SM64Context : IDisposable
 
         if (!Interop.IsGlobalInit)
         {
-            Logger.Msg("Init SM64", caller);
+            Logger.Debug("Init SM64", caller);
             Interop.GlobalInit(Mario64Manager.RomBytes);
-        }
-        else
-        {
-            Logger.Msg("SM64 already globally initialized", caller);
         }
 
         SetAudioSource();
@@ -126,7 +109,6 @@ public sealed partial class SM64Context : IDisposable
 
         world.RunInUpdates(3, () =>
         {
-            Logger.Msg("Running initial collider handling on World.RootSlot children", caller);
             World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c));
         });
     }
@@ -137,7 +119,6 @@ public sealed partial class SM64Context : IDisposable
         {
             if (ContextSlot == null)
             {
-                Logger.Msg("Setting up ContextSlot");
                 Slot contextSlot = SM64Context.GetTempSlot(world).AddSlot(ContextSlotName, false);
                 contextSlot.OrderOffset = -1000;
                 contextSlot.Tag = ContextTag;
@@ -147,15 +128,11 @@ public sealed partial class SM64Context : IDisposable
 
             ContextSlot.GetComponentOrAttach<ObjectRoot>();
 
-            Logger.Msg($"ContextSlot = {ContextSlot.Name} ({ContextSlot.ReferenceID})");
-
             // Variable Space
-            Logger.Msg("Setting up DynVarSpace");
             ContextVariableSpace = ContextSlot.GetComponentOrAttach<DynamicVariableSpace>(out bool spaceAttached);
             if (spaceAttached)
             {
                 ContextVariableSpace.SpaceName.Value = ContextSpaceName;
-                Logger.Msg($"DynamicVariableSpace attached and named {ContextSpaceName}");
             }
             
             WorldVariableSpace = World.RootSlot.GetComponent<DynamicVariableSpace>(x => x.SpaceName.Value == "World");
@@ -166,24 +143,21 @@ public sealed partial class SM64Context : IDisposable
             }
             
             // Context Host
-            Logger.Msg("Setting up Host DynVar");
             DynamicReferenceVariable<User> contextHost = ContextSlot.GetComponentOrAttach<DynamicReferenceVariable<User>>(out bool hostAttached);
             if (hostAttached)
             {
                 contextHost.VariableName.Value = HostVarName;
                 contextHost.Reference.Target = world.LocalUser;
-                Logger.Msg("Host reference variable attached and set to local user");
             }
 
             contextHost.Reference.OnTargetChange += reference =>
             {
                 if (reference.Target != null) return;
 
-                Logger.Error("[HostContext TargetChange] SM64Context host reference was set to null, resetting to local user");
+                Logger.Warn("[HostContext TargetChange] SM64Context host reference was set to null, resetting to local user");
                 ContextSlot.RunInUpdates(ContextSlot.LocalUser.AllocationID * 3, () =>
                 {
                     contextHost.Reference.Target ??= world.LocalUser;
-                    Logger.Msg("Host reference reset to local user");
                 });
             };
 
@@ -192,7 +166,6 @@ public sealed partial class SM64Context : IDisposable
             configSlot.Destroyed += HandleRemoved;
 
             // Scale
-            Logger.Msg("Setting up World Scale DynVar");
             DynamicValueVariable<float> scale = configSlot.GetComponentOrAttach<DynamicValueVariable<float>>(out bool scaleAttached, x => x.VariableName.Value == ScaleVarName);
             if (scaleAttached || contextHost.Reference.Target == null)
             {
@@ -200,31 +173,24 @@ public sealed partial class SM64Context : IDisposable
                 scale.Value.Value = WorldVariableSpace?.TryReadValue(ScaleVarName, out float scaleValue) ?? false
                         ? scaleValue
                         : Config.MarioScaleFactor.Value;
-
-                Logger.Msg($"Scale variable attached/set with value {scale.Value.Value}");
             }
 
             scale.Value.OnValueChange += val =>
             {
-                Logger.Msg("Scale value changed, disposing and reinitializing SM64Context");
                 Dispose();
                 SM64Context.EnsureInstanceExists(val.World, out _);
             };
 
             // Water Level
-            Logger.Msg("Setting up WaterLevel DynVar");
             DynamicValueVariable<float> waterLevel = configSlot.GetComponentOrAttach<DynamicValueVariable<float>>(out bool waterAttached, x => x.VariableName.Value == WaterVarName);
             if (waterAttached)
             {
                 waterLevel.VariableName.Value = WaterVarName;
                 waterLevel.Value.Value = WorldVariableSpace?.TryReadValue(WaterVarName, out float waterLevelValue) ?? false ? waterLevelValue : -100f;
-
-                Logger.Msg($"WaterLevel variable attached/set with value {waterLevel.Value.Value}");
             }
 
             waterLevel.Value.OnValueChange += val =>
             {
-                Logger.Msg($"WaterLevel changed to {val.Value}, updating all Marios");
                 foreach (SM64Mario mario in AllMarios.Values.GetTempList())
                 {
                     Interop.SetWaterLevel(mario.MarioId, val.Value);
@@ -232,19 +198,15 @@ public sealed partial class SM64Context : IDisposable
             };
 
             // Gas Level
-            Logger.Msg("Setting up GasLevel DynVar");
             DynamicValueVariable<float> gasLevel = configSlot.GetComponentOrAttach<DynamicValueVariable<float>>(out bool gasAttached, x => x.VariableName.Value == GasVarName);
             if (gasAttached)
             {
                 gasLevel.VariableName.Value = GasVarName;
                 gasLevel.Value.Value = WorldVariableSpace?.TryReadValue(GasVarName, out float gasLevelValue) ?? false ? gasLevelValue : -100f;
-
-                Logger.Msg($"GasLevel variable attached/set with value {gasLevel.Value.Value}");
             }
 
             gasLevel.Value.OnValueChange += val =>
             {
-                Logger.Msg($"GasLevel changed to {val.Value}, updating all Marios");
                 foreach (SM64Mario mario in AllMarios.Values.GetTempList())
                 {
                     Interop.SetGasLevel(mario.MarioId, val.Value);
@@ -252,7 +214,6 @@ public sealed partial class SM64Context : IDisposable
             };
 
             // Setup Container Slots
-            Logger.Msg("Creating All Mario Container Slot");
             if (MarioContainersSlot != null)
             {
                 MarioContainersSlot.Destroyed -= HandleRemoved;
@@ -264,7 +225,6 @@ public sealed partial class SM64Context : IDisposable
             MarioContainersSlot.Tag = MarioContainersTag;
             MarioContainersSlot.Destroyed += HandleRemoved;
 
-            Logger.Msg("Creating My Mario Container Slot");
             MyMariosSlot = MarioContainersSlot.FindChild(x => x.Name == $"{world.LocalUser.UserName}'s Marios") ?? SM64Context.GetTempSlot(world).AddSlot($"{world.LocalUser.UserName}'s Marios", false);
             MyMariosSlot.OrderOffset = MyMariosSlot.LocalUser.AllocationID * 3;
             MyMariosSlot.Tag = MarioContainerTag;
@@ -272,14 +232,12 @@ public sealed partial class SM64Context : IDisposable
 
             world.RunInUpdates(1, () => MyMariosSlot.SetParent(MarioContainersSlot));
 
-            Logger.Msg($"Subscribing to ChildAdded for {MarioContainersSlot.Name}");
             MarioContainersSlot.ChildAdded += HandleContainerAdded;
 
             MarioContainersSlot.ForeachChild(child =>
             {
                 if (child.Tag != MarioContainerTag || child == MyMariosSlot) return;
                 
-                Logger.Msg($"Found other MarioContainer - {child.Name}");
                 child.ChildAdded -= HandleMarioAdded;
                 child.ChildAdded += HandleMarioAdded;
             });
@@ -302,7 +260,6 @@ public sealed partial class SM64Context : IDisposable
     {
         if (child.Tag != MarioContainerTag) return;
         
-        Logger.Msg($"New Container ({child.Name}) Added - {slot.Name}. Subscribing...");
         child.ChildAdded -= HandleMarioAdded;
         child.ChildAdded += HandleMarioAdded;
 
@@ -310,7 +267,6 @@ public sealed partial class SM64Context : IDisposable
         {
             if (child2.Tag != MarioTag || AllMarios.ContainsKey(child2)) return;
 
-            Logger.Msg($"New Mario ({child2.Name}) Found in new Container - {slot.Name}");
             child2.RunSynchronously(() => SM64Context.TryAddMario(child2, false));
         });
     }
@@ -435,8 +391,6 @@ public sealed partial class SM64Context : IDisposable
 
         if (disposing)
         {
-            Logger.Msg("Disposing managed resources for SM64Context");
-
             // Unsubscribe from all events to prevent memory leaks
             World.WorldDestroyed -= HandleRemoved;
             Config.UseGamepad.SettingChanged -= HandleKeyUseGamepadChanged;
@@ -510,7 +464,6 @@ public sealed partial class SM64Context : IDisposable
         }
 
         // Free unmanaged resources (from the C++ library)
-        Logger.Msg("Terminating libsm64 global instance.");
         Interop.GlobalTerminate();
 
         // Finally, nullify the static instance
@@ -520,6 +473,5 @@ public sealed partial class SM64Context : IDisposable
         }
 
         _disposed = true;
-        Logger.Msg("SM64Context disposed.");
     }
 }
