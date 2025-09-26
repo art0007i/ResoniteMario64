@@ -25,7 +25,7 @@ creating this.
    into your `BepInEx\plugins` folder. This folder should be at
    `C:\Program Files (x86)\Steam\steamapps\common\Resonite\BepInEx\plugins` for a default install. You can create it if it's
    missing, or if you launch the game once with BepisLoader installed it will create the folder for you.
-3. Find `Super Mario 64 [US].z64` with hash `20b854b239203baf6c961b850a4a51a2` rename it to `baserom.us.z64` then place
+3. Find `Super Mario 64 [US].z64` with MD5 hash `20b854b239203baf6c961b850a4a51a2` rename it to `baserom.us.z64` then place
       it next to the `ResoniteMario64.dll`, in the same folder as Resonite, `rml_libs` or `rml_mods`.
 4. Start the game. If you want to verify that the mod is working you can check your Resonite logs.
 
