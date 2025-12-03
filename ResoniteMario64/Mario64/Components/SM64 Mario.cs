@@ -291,6 +291,12 @@ public sealed class SM64Mario : ISM64Object
         set => MarioSpace.TryWriteValue(StateFlagsVarName, value);
     }
 
+    public int SyncedStarCounter
+    {
+        get => MarioSpace.TryReadValue(StarVarName, out int starCounter) ? starCounter : 0;
+        set => MarioSpace.TryWriteValue(StarVarName, value);
+    }
+
     public int SyncedCoinCounter
     {
         get => MarioSpace.TryReadValue(CoinsVarName, out int coinCounter) ? coinCounter : 0;
@@ -305,8 +311,8 @@ public sealed class SM64Mario : ISM64Object
 
     public uint CurrentActionFlags => CurrentState.ActionFlags;
     public uint CurrentStateFlags => CurrentState.StateFlags;
-    private uint _lastActionFlags;
 
+    private uint _lastActionFlags;
     // private uint _lastStateFlags;
 
 #endregion
@@ -419,6 +425,9 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<int> redCoinCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             redCoinCounter.VariableName.Value = RedCoinVarName;
+            
+            DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            starCounter.VariableName.Value = StarVarName;
 
             slot.RunInUpdates(1, () => slot.SetParent(instance.MyMariosSlot));
         }
@@ -1075,6 +1084,7 @@ public sealed class SM64Mario : ISM64Object
                 break;
             case SM64InteractableType.Star:
                 Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
+                SyncedStarCounter++;
                 Heal(8);
                 SetForwardVelocity(0f);
                 SetAction(ActionFlag.Freefall);
