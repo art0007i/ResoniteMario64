@@ -194,8 +194,10 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
     public class MarioInputBlocker
     {
+        private static bool _blockedInputs;
         public static void Postfix(InteractionHandler __instance)
         {
+            
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
             
             bool isIndex = __instance.Controller is IndexController;
@@ -226,8 +228,10 @@ public sealed partial class SM64Context
                 {
                     __instance.Inputs.Axis.RegisterBlocks = true;
                 }
+
+                _blockedInputs = true;
             }
-            else
+            else if (_blockedInputs)
             {
                 if (isIndex)
                 {
@@ -262,6 +266,8 @@ public sealed partial class SM64Context
                 {
                     __instance.Inputs.Axis.RegisterBlocks = true;
                 }
+
+                _blockedInputs = false;
             }
             /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
             {

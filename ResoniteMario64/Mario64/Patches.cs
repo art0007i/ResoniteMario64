@@ -29,10 +29,10 @@ public class Patches
     {
         public static void Prefix(UpdateManager __instance)
         {
-            if (SM64Context.Instance?.World == __instance.World)
-            {
-                SM64Context.Instance?.OnCommonUpdate();
-            }
+            SM64Context instance = SM64Context.Instance;
+            if (instance == null || instance.World != __instance.World) return;
+            
+            instance.OnCommonUpdate();
         }
     }
 
@@ -180,7 +180,7 @@ public class Patches
                 {
                     if (SM64Context.Instance != null)
                     {
-                        __instance.RunSynchronously(() => { SM64Context.Instance?.Dispose(); });
+                        __instance.RunSynchronously(() => SM64Context.Instance.Dispose());
                     }
 
                     return false;
