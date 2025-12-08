@@ -27,6 +27,9 @@ public static class Constants
     public const string CrouchVarName = "Crouch";
     public const string IsShownVarName = "IsShown";
     public const string HealthPointsVarName = "HealthPoints";
+    public const string CoinsVarName = "Coins";
+    public const string RedCoinVarName = "RedCoins";
+    public const string StarVarName = "Stars";
     public const string ActionFlagsVarName = "ActionFlags";
     public const string StateFlagsVarName = "StateFlags";
 

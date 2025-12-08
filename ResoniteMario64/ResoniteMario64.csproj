@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Version>1.0.0</Version>
     <Authors>art0007i, NepuShiro</Authors>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RepositoryUrl>https://github.com/art0007i/ResoniteMario64</RepositoryUrl>
     <PackageId>art0007i.ResoniteMario64</PackageId>
     <Product>ResoniteMario64</Product>
@@ -27,12 +27,12 @@
   <!-- Modding dependencies -->
   <ItemGroup>
     <PackageReference Include="BepInEx.ResonitePluginInfoProps" Version="3.*" />
-    <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.8.*" />
+    <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.9.*" />
   </ItemGroup>
 
   <!-- NuGet fallback stripped game references -->
   <ItemGroup Condition="!Exists('$(GamePath)')">
-    <PackageReference Include="Resonite.GameLibs" Version="2025.*" />
+    <PackageReference Include="Resonite.GameLibs" Version="2025.*" PrivateAssets="all"/>
   </ItemGroup>
 
   <!-- Local game references -->

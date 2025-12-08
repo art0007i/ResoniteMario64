@@ -110,6 +110,7 @@ public sealed partial class SM64Context
                     if (overrideForUser != null)
                     {
                         overrideForUser.Default.Value = defaultVolume;
+                        overrideForUser.CreateOverrideOnWrite.Value = true;
                     }
                 });
 

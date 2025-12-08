@@ -291,10 +291,28 @@ public sealed class SM64Mario : ISM64Object
         set => MarioSpace.TryWriteValue(StateFlagsVarName, value);
     }
 
+    public int SyncedStarCounter
+    {
+        get => MarioSpace.TryReadValue(StarVarName, out int starCounter) ? starCounter : 0;
+        set => MarioSpace.TryWriteValue(StarVarName, value);
+    }
+
+    public int SyncedCoinCounter
+    {
+        get => MarioSpace.TryReadValue(CoinsVarName, out int coinCounter) ? coinCounter : 0;
+        set => MarioSpace.TryWriteValue(CoinsVarName, value);
+    }
+
+    public int SyncedRedCoinCounter
+    {
+        get => MarioSpace.TryReadValue(RedCoinVarName, out int redCoinCounter) ? redCoinCounter : 0;
+        set => MarioSpace.TryWriteValue(RedCoinVarName, value);
+    }
+
     public uint CurrentActionFlags => CurrentState.ActionFlags;
     public uint CurrentStateFlags => CurrentState.StateFlags;
-    private uint _lastActionFlags;
 
+    private uint _lastActionFlags;
     // private uint _lastStateFlags;
 
 #endregion
@@ -401,6 +419,15 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<uint> stateFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             stateFlags.VariableName.Value = StateFlagsVarName;
+
+            DynamicValueVariable<int> coinCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            coinCounter.VariableName.Value = CoinsVarName;
+
+            DynamicValueVariable<int> redCoinCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            redCoinCounter.VariableName.Value = RedCoinVarName;
+            
+            DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            starCounter.VariableName.Value = StarVarName;
 
             slot.RunInUpdates(1, () => slot.SetParent(instance.MyMariosSlot));
         }
@@ -1024,26 +1051,23 @@ public sealed class SM64Mario : ISM64Object
         {
             case SM64InteractableType.GoldCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+                SyncedCoinCounter++;
                 Heal(1);
                 break;
             case SM64InteractableType.BlueCoin:
                 Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+                SyncedCoinCounter += 5;
                 Heal(5);
                 break;
             case SM64InteractableType.RedCoin:
-                Sounds redCoinSound = typeId switch
-                {
-                    0 => Sounds.Menu_CollectRedCoin0,
-                    1 => Sounds.Menu_CollectRedCoin1,
-                    2 => Sounds.Menu_CollectRedCoin2,
-                    3 => Sounds.Menu_CollectRedCoin3,
-                    4 => Sounds.Menu_CollectRedCoin4,
-                    5 => Sounds.Menu_CollectRedCoin5,
-                    6 => Sounds.Menu_CollectRedCoin6,
-                    7 => Sounds.Menu_CollectRedCoin7,
-                    _ => Sounds.SOUND_GENERAL_RED_COIN
-                };
-                Interop.PlaySoundGlobal(redCoinSound);
+                int currentRedIndex = SyncedRedCoinCounter;
+
+                Sounds redSound = GetRedCoinSound(typeId == -1 ? currentRedIndex : typeId);
+
+                Interop.PlaySoundGlobal(redSound);
+
+                SyncedRedCoinCounter = currentRedIndex == 7 ? 0 : currentRedIndex + 1;
+                SyncedCoinCounter += 2;
                 Heal(2);
                 break;
             case SM64InteractableType.VanishCap:
@@ -1060,6 +1084,7 @@ public sealed class SM64Mario : ISM64Object
                 break;
             case SM64InteractableType.Star:
                 Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
+                SyncedStarCounter++;
                 Heal(8);
                 SetForwardVelocity(0f);
                 SetAction(ActionFlag.Freefall);
@@ -1087,6 +1112,28 @@ public sealed class SM64Mario : ISM64Object
         }
 
         interactableCollider.Slot.ActiveSelf = !disable;
+    }
+
+    private static Sounds GetRedCoinSound(int redIndex)
+    {
+        if (redIndex < 0 || redIndex > 7)
+        {
+            return Sounds.SOUND_GENERAL_RED_COIN;
+        }
+
+        Sounds[] sounds = new Sounds[]
+        {
+            Sounds.Menu_CollectRedCoin0,
+            Sounds.Menu_CollectRedCoin1,
+            Sounds.Menu_CollectRedCoin2,
+            Sounds.Menu_CollectRedCoin3,
+            Sounds.Menu_CollectRedCoin4,
+            Sounds.Menu_CollectRedCoin5,
+            Sounds.Menu_CollectRedCoin6,
+            Sounds.Menu_CollectRedCoin7
+        };
+
+        return sounds[redIndex];
     }
 
     public void SetMarioAsNuked(bool delete = false)
