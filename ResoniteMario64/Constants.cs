@@ -21,6 +21,7 @@ public static class Constants
     public const string GasVarName = "GasLevel";
 
     // Tags for Mario Instances
+    public const string MarioOwnerVarName = "Owner";
     public const string JoystickVarName = "Joystick";
     public const string JumpVarName = "Jump";
     public const string PunchVarName = "Punch";

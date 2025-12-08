@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -31,7 +32,7 @@ public class Patches
         {
             SM64Context instance = SM64Context.Instance;
             if (instance == null || instance.World != __instance.World) return;
-            
+
             instance.OnCommonUpdate();
         }
     }
@@ -201,7 +202,7 @@ public class Patches
             Slot compView = inspector?.ComponentView?.Target;
             if (compView?.Tag == ContextTag || compView?.FindParent(x => x.Tag == ContextTag) == null) return;
 
-            // ui.Button("Button Label").LocalPressed += (b, _) => { b.RunSynchronously(() => { /* Do things here */ }) };
+            // ui.Button("Button Label").LocalPressed += (b, _) => { b.RunSynchronously(() => { /* Do things here */ }); };
 
             ui.Button("Spawn Mario").LocalPressed += (b, _) =>
             {
@@ -224,8 +225,33 @@ public class Patches
 
             try
             {
-                if ((compView.Tag == MarioTag || compView.FindParent(x => x.Tag == MarioTag) != null) && SM64Context.Instance.AllMarios.TryGetValue(compView, out SM64Mario mario) && mario.IsLocal)
+                SM64Context.Instance.AllMarios.TryGetValue(compView, out SM64Mario mario);
+                if (mario == null)
                 {
+                    SM64Context.Instance.AllMarios.TryGetValue(compView.FindParent(x => x.Tag == MarioTag), out mario);
+                }
+
+                if (mario != null && mario.IsLocal)
+                {
+                    ui.Spacer(8);
+                    
+                    ui.Button("Goto Mario").LocalPressed += (b, _) =>
+                    {
+                        b.RunSynchronously(() =>
+                        {
+                            __instance.LocalUser.Root.Slot.GlobalPosition = mario.MarioSlot.GlobalPosition;
+                        });
+                    };
+
+                    ui.Button("Bring Mario").LocalPressed += (b, _) =>
+                    {
+                        b.RunSynchronously(() =>
+                        {
+                            __instance.LocalUser.GetPointInFrontOfUser(out float3 point, out floatQ _, float3.Forward, distance: 2f);
+                            mario.TeleportTo(point);
+                        });
+                    };
+
                     ui.Spacer(8);
 
                     foreach (SM64Constants.MarioCapType capType in Enum.GetValues(typeof(SM64Constants.MarioCapType)))

@@ -15,6 +15,7 @@ public sealed partial class SM64Context
     internal readonly Dictionary<Collider, SM64StaticCollider> StaticColliders = new Dictionary<Collider, SM64StaticCollider>();
     internal readonly Dictionary<Collider, SM64DynamicCollider> DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
+    internal readonly Dictionary<Collider, SM64Teleporter> Teleporters = new Dictionary<Collider, SM64Teleporter>();
     internal readonly Dictionary<Collider, SM64WaterBox> WaterBoxes = new Dictionary<Collider, SM64WaterBox>();
 
     public void HandleCollider(Collider collider, bool log = true)
@@ -73,6 +74,11 @@ public sealed partial class SM64Context
             return RegisterWaterBox(collider);
         }
 
+        if (Utils.IsTeleporter(collider))
+        {
+            return RegisterTeleporter(collider);
+        }
+
         return null;
     }
 
@@ -95,11 +101,17 @@ public sealed partial class SM64Context
             interactable.Dispose();
             return 3;
         }
-
+        
         if (WaterBoxes.TryGetValue(collider, out SM64WaterBox waterBox))
         {
             waterBox.Dispose();
             return 4;
+        }
+
+        if (Teleporters.TryGetValue(collider, out SM64Teleporter teleporter))
+        {
+            teleporter.Dispose();
+            return 5;
         }
 
         return null;
@@ -204,6 +216,24 @@ public sealed partial class SM64Context
     {
         WaterBoxes.Remove(collider);
     }
+    
+    // Teleporters
+    private int RegisterTeleporter(Collider collider)
+    {
+        if (Teleporters.ContainsKey(collider))
+        {
+            return 50;
+        }
+
+        SM64Teleporter col = new SM64Teleporter(collider, this);
+        Teleporters.Add(collider, col);
+        return 5;
+    }
+
+    internal void UnregisterTeleporter(Collider collider)
+    {
+        Teleporters.Remove(collider);
+    }
 
     // Patches
     [HarmonyPatch(typeof(Collider))]
@@ -232,13 +262,14 @@ public sealed partial class SM64Context
         if (obj is not Collider collider) return;
         if (!Config.LogColliderChanges.Value || !Utils.CheckDebug()) return;
         
-        bool isNewlyAdded = added is 1 or 2 or 3 or 4;
+        bool isNewlyAdded = added is 1 or 2 or 3 or 4 or 5;
         string name = added switch
         {
             1 or 10 => "Static Collider",
             2 or 20 => "Dynamic Collider",
             3 or 30 => "Interactable",
             4 or 40 => "WaterBox",
+            5 or 50 => "Teleporter",
             _       => "Collider"
         };
 
@@ -250,14 +281,15 @@ public sealed partial class SM64Context
             out SM64Constants.SM64SurfaceType surfaceType,
             out SM64Constants.SM64TerrainType terrainType,
             out SM64Constants.SM64InteractableType interactableType,
-            out int interactableId
+            out int interactableId,
+            out int group
         );
 
         string state = "Already Added";
         if (isNewlyAdded) state = "Added";
         if (destroyed) state = "Destroyed";
 
-        string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}";
+        string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
 
         if (destroyed)
             Logger.Error(message, caller, line);
@@ -274,7 +306,8 @@ public sealed partial class SM64Context
             ["Static Collider"] = (10, StaticColliders.Values),
             ["Dynamic Collider"] = (20, DynamicColliders.Values),
             ["Interactable"] = (30, Interactables.Values),
-            ["Waterbox"] = (40, WaterBoxes.Values)
+            ["Waterbox"] = (40, WaterBoxes.Values),
+            ["Teleporter"] = (50, Teleporters.Values)
         };
 
         colliders = sources.ToDictionary(

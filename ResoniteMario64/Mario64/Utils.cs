@@ -5,6 +5,7 @@ using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
+using Microsoft.VisualBasic;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Mario64.libsm64.SM64Constants;
@@ -13,10 +14,10 @@ namespace ResoniteMario64.Mario64;
 
 public static class Utils
 {
-    internal static readonly List<Collider> StaticSurfaces = new List<Collider>(); 
-    
+    internal static readonly List<Collider> StaticSurfaces = new List<Collider>();
+
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
-    
+
     public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
@@ -26,24 +27,26 @@ public static class Utils
             Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType, force);
         }
     }
-    
+
     public enum ColliderCategory
     {
         None,
         Static,
         Dynamic,
+        Interactable,
         WaterBox,
-        Interactable
+        Teleporter
     }
 
     private static ColliderCategory GetColliderCategory(Collider col)
     {
         string tag = col.Slot.Tag ?? string.Empty;
-        
+
         bool isStatic = tag.Contains("SM64 StaticCollider") || tag.Contains("SM64 Collider");
         bool isDynamic = tag.Contains("SM64 DynamicCollider");
-        bool isWaterBox = tag.Contains("SM64 WaterBox");
         bool isInteractable = tag.Contains("SM64 Interactable");
+        bool isWaterBox = tag.Contains("SM64 WaterBox");
+        bool isTeleporter = tag.Contains("SM64 Teleporter");
         bool isValid = col.Enabled && col.Slot.IsActive;
 
         if ((isStatic || ((ICollider)col).CollidesWithCharacters) && !isDynamic && isValid)
@@ -52,24 +55,32 @@ public static class Utils
         if (isDynamic && isValid)
             return ColliderCategory.Dynamic;
 
+        if (isInteractable && col.Enabled)
+            return ColliderCategory.Interactable;
+
         if (isWaterBox && isValid)
             return ColliderCategory.WaterBox;
 
-        if (isInteractable && col.Enabled)
-            return ColliderCategory.Interactable;
+        if (isTeleporter && isValid)
+            return ColliderCategory.Teleporter;
 
         return ColliderCategory.None;
     }
 
     public static bool IsStaticCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Static;
+
     public static bool IsDynamicCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Dynamic && col.Type.Value != ColliderType.Trigger;
-    public static bool IsWaterBox(Collider col) => GetColliderCategory(col) == ColliderCategory.WaterBox;
+
     public static bool IsInteractable(Collider col) => GetColliderCategory(col) == ColliderCategory.Interactable;
-    
+
+    public static bool IsWaterBox(Collider col) => GetColliderCategory(col) == ColliderCategory.WaterBox;
+
+    public static bool IsTeleporter(Collider col) => GetColliderCategory(col) == ColliderCategory.Teleporter;
+
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
         StaticSurfaces.Clear();
-        
+
         List<SM64Surface> surfaces = new List<SM64Surface>();
         List<(MeshCollider collider, SM64SurfaceType, SM64TerrainType, int)> meshColliders = new List<(MeshCollider, SM64SurfaceType, SM64TerrainType, int)>();
 
@@ -78,7 +89,7 @@ public static class Utils
             if (!IsStaticCollider(col)) continue;
 
             string[] tagParts = col.Slot.Tag?.Split(',');
-            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force);
+            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
 
             if (col is MeshCollider meshCollider)
             {
@@ -88,7 +99,7 @@ public static class Utils
             {
                 GetTransformedSurfaces(col, surfaces, surfaceType, terrainType, force);
             }
-            
+
             StaticSurfaces.Add(col);
         }
 
@@ -153,13 +164,14 @@ public static class Utils
     {
         TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
     }
-    
-    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx)
+
+    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx, out int ext)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;
         interactableType = SM64InteractableType.None;
         idx = -1;
+        ext = -1;
 
         if (tagParts == null) return;
 
@@ -206,6 +218,19 @@ public static class Utils
                     }
                 }
             }
+            else if (trimmed.StartsWith("Delete_", StringComparison.OrdinalIgnoreCase))
+            {
+                string boolName = trimmed.Substring("Delete_".Length);
+
+                if (boolName.Length == 1 && char.IsDigit(boolName[0]))
+                {
+                    ext = boolName[0] - '0';
+                }
+                else if (bool.TryParse(boolName, out bool parsedBool))
+                {
+                    ext = parsedBool ? 1 : 0;
+                }
+            }
             else if (trimmed.StartsWith("Force_", StringComparison.OrdinalIgnoreCase))
             {
                 string idxString = trimmed.Substring("Force_".Length);
@@ -220,7 +245,45 @@ public static class Utils
                     idx = forceIndex;
                 }
             }
+            else if (trimmed.StartsWith("Teleporter_", StringComparison.OrdinalIgnoreCase))
+            {
+                string idxString = trimmed.Substring("Teleporter_".Length);
+                if (int.TryParse(idxString, out int parsedIndex))
+                {
+                    idx = parsedIndex;
+                }
+            }
+            else if (trimmed.StartsWith("Group_", StringComparison.OrdinalIgnoreCase))
+            {
+                string groupString = trimmed.Substring("Group_".Length);
+                if (int.TryParse(groupString, out int parsedGroup))
+                {
+                    ext = parsedGroup;
+                }
+            }
         }
+    }
+
+    public static Sounds GetRedCoinSound(int redIndex)
+    {
+        if (redIndex < 0 || redIndex > 7)
+        {
+            return Sounds.SOUND_GENERAL_RED_COIN;
+        }
+
+        Sounds[] sounds = new Sounds[]
+        {
+            Sounds.Menu_CollectRedCoin0,
+            Sounds.Menu_CollectRedCoin1,
+            Sounds.Menu_CollectRedCoin2,
+            Sounds.Menu_CollectRedCoin3,
+            Sounds.Menu_CollectRedCoin4,
+            Sounds.Menu_CollectRedCoin5,
+            Sounds.Menu_CollectRedCoin6,
+            Sounds.Menu_CollectRedCoin7
+        };
+
+        return sounds[redIndex];
     }
 
     public static bool CheckDebug()
@@ -237,7 +300,7 @@ public static class Utils
     public static List<T> GetTempList<T>(this List<T> source) => new List<T>(source);
 
     public static List<T> GetTempList<T>(this IEnumerable<T> source) => new List<T>(source);
-    
+
     public static List<TValue> GetFilteredSortedList<TKey, TValue, TSortKey>(this Dictionary<TKey, TValue> source, Func<TValue, bool> filter = null, Func<TValue, TSortKey> sortKeySelector = null, bool ascending = true)
     {
         IEnumerable<TValue> query = source.Values;

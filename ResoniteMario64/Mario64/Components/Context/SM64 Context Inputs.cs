@@ -197,7 +197,6 @@ public sealed partial class SM64Context
         private static bool _blockedInputs;
         public static void Postfix(InteractionHandler __instance)
         {
-            
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
             
             bool isIndex = __instance.Controller is IndexController;
@@ -209,11 +208,12 @@ public sealed partial class SM64Context
                     switch (module)
                     {
                         case PhysicalLocomotion phys:
-                            if (phys.CharacterController.Gravity == float3.Zero)
+                            
+                            if (phys.Archetype.Value == LocomotionArchetype.Fly)
                             {
                                 phys.CharacterController.AirSpeed.Value = 0f;
                             }
-                            else
+                            else if (phys.Archetype.Value == LocomotionArchetype.Walk)
                             {
                                 phys.CharacterController.Speed.Value = 0f;
                             }
@@ -241,14 +241,14 @@ public sealed partial class SM64Context
                     {
                         case PhysicalLocomotion phys:
 
-                            if (phys.CharacterController.Gravity == float3.Zero && phys.CharacterController.AirSpeed.Value == 0f)
+                            if (phys.Archetype.Value == LocomotionArchetype.Fly && phys.CharacterController.AirSpeed.Value == 0f)
                             {
-                                var fly = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity == float3.Zero);
+                                var fly = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.Archetype.Value == LocomotionArchetype.Fly);
                                 phys.CharacterController.AirSpeed.Value = fly?.CharacterController.AirSpeed.Value ?? 10f;
                             }
                             else if (phys.CharacterController.Speed.Value == 0f)
                             {
-                                var walk = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity != float3.Zero);
+                                var walk = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.Archetype.Value == LocomotionArchetype.Walk);
                                 phys.CharacterController.Speed.Value = walk?.CharacterController.Speed.Value ?? 4f;
                             }
 

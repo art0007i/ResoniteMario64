@@ -25,7 +25,7 @@ public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
         Collider = col;
         
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force);
+        Utils.TryParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force, out _);
         
         SurfaceType = surfaceType;
         TerrainType = terrainType;

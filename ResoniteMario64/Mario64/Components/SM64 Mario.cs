@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -60,6 +58,10 @@ public sealed class SM64Mario : ISM64Object
 
     private bool _wasPickedUp;
     public bool IsBeingGrabbed => _marioGrabbable.IsGrabbed;
+
+    public bool IsTeleporting;
+
+    internal SM64Teleporter LastTeleportDestination;
 
 #endregion
 
@@ -410,6 +412,10 @@ public sealed class SM64Mario : ISM64Object
 
             Slot varsSlot = MarioSlot.AddSlot("Vars");
             varsSlot.Tag = null;
+            
+            DynamicReferenceVariable<User> owner = varsSlot.AttachComponent<DynamicReferenceVariable<User>>();
+            owner.VariableName.Value = MarioOwnerVarName;
+            owner.Reference.Target = MarioUser;
 
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
@@ -425,11 +431,15 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<int> redCoinCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             redCoinCounter.VariableName.Value = RedCoinVarName;
-            
+
             DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             starCounter.VariableName.Value = StarVarName;
 
-            slot.RunInUpdates(1, () => slot.SetParent(instance.MyMariosSlot));
+            slot.RunInUpdates(1, () =>
+            {
+                slot.SetParent(instance.MyMariosSlot);
+                slot.GlobalScale = float3.One;
+            });
         }
 
         Context.UpdatePlayerMariosState();
@@ -616,7 +626,7 @@ public sealed class SM64Mario : ISM64Object
 
             foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
             {
-                HandleInteractable(interactable);
+                interactable.Handle(this);
             }
 
             // Check for deaths, so we delete mario
@@ -666,14 +676,14 @@ public sealed class SM64Mario : ISM64Object
             {
                 WearCap(MarioCapType.NormalCap);
             }
-
-            // Trigger teleport for remotes
-            // if (Utils.IsTeleporting(SyncedStateFlags) && Time.time > _startedTeleporting + 5 * SM64Teleporter.TeleportDuration)
-            // {
-            //     _startedTeleporting = Time.time;
-            // }
+        }
+        
+        foreach (SM64Teleporter teleporter in Context.Teleporters.Values.GetTempList())
+        {
+            teleporter.Handle(this);
         }
 
+        float3 oldPos = MarioSlot.GlobalPosition;
         if (_marioGrabbable is { IsRemoved: false })
         {
             bool pickup = IsBeingGrabbed;
@@ -687,6 +697,15 @@ public sealed class SM64Mario : ISM64Object
                 else
                 {
                     Hold();
+                    MarioSlot.RunInUpdates(3, () =>
+                    {
+                        if (!IsLocal) return;
+
+                        if ((oldPos - MarioSlot.GlobalPosition).Magnitude > 0.01f)
+                        {
+                            MarioSlot.Position_Field.Value = float3.Zero;
+                        }
+                    });
                 }
             }
 
@@ -698,32 +717,14 @@ public sealed class SM64Mario : ISM64Object
 
         foreach (SM64WaterBox waterBox in Context.WaterBoxes.Values.GetTempList())
         {
-            Collider collider = waterBox?.Collider;
-            if (collider == null || collider.IsRemoved || collider.IsDisposed) continue;
-
-            if (collider is BoxCollider box)
-            {
-                float3 localMarioPos = collider.Slot.GlobalPointToLocal(marioPos);
-                var localWaterBox = box.LocalBoundingBox;
-
-                if (localWaterBox.Contains(localMarioPos))
-                {
-                    waterSurface = collider.GlobalBoundingBox.max.y;
-                    break;
-                }
-            }
-            else if (collider.GlobalBoundingBox.Contains(marioPos))
-            {
-                waterSurface = collider.GlobalBoundingBox.max.y;
-                break;
-            }
+            waterSurface = waterBox.Handle(marioPos);
         }
 
         float newWaterLevel = Context.ContextVariableSpace.TryReadValue(WaterVarName, out float fallbackLevel) ? fallbackLevel : -100f;
 
         if (waterSurface.IsValid())
         {
-            newWaterLevel = MathX.Min(marioPos.y + 0.2f, waterSurface);
+            newWaterLevel = MathX.Min(marioPos.y + 0.5f, waterSurface);
         }
 
         if (!MathX.Approximately(_waterLevel, newWaterLevel))
@@ -761,7 +762,7 @@ public sealed class SM64Mario : ISM64Object
                 CurrentFaceMaterial = _marioMaterialVanish;
             }
         }
-        else
+        else if (!IsTeleporting)
         {
             if (_marioMaterialClipped.AlbedoColor.Value != colorX.White)
             {
@@ -786,6 +787,16 @@ public sealed class SM64Mario : ISM64Object
             if (CurrentFaceMaterial != _marioMaterial)
             {
                 CurrentFaceMaterial = _marioMaterial;
+            }
+
+            if (_marioMaterialVanish.AlbedoColor.Value != Utils.VanishCapColor)
+            {
+                _marioMaterialVanish.AlbedoColor.Value = Utils.VanishCapColor;
+            }
+            
+            if (_marioMaterialClipped.Smoothness.Value == 0f)
+            {
+                _marioMaterialClipped.Smoothness.Value = 0.25f;
             }
         }
 
@@ -1008,28 +1019,68 @@ public sealed class SM64Mario : ISM64Object
         }
     }
 
-    // TODO: Implement Teleporters
-    /*public void TeleportStart()
+    public void TeleportTo(float3 position)
+    {
+        TeleportStart();
+        MarioSlot.RunInSeconds(1f, () => _marioMeshRenderer.Enabled = false);
+        _marioMaterialClipped.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
+        _marioMaterialVanish.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
+        MarioSlot.RunInSeconds(1.5f, () =>
+        {
+            if (IsLocal) SetPosition(position);
+
+            MarioSlot.RunInSeconds(0.5f, TeleportEnd);
+        });
+    }
+
+    private void TeleportStart()
     {
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.TeleportFadeOut);
+        IsTeleporting = true;
+
+        if (_marioMaterialClipped.AlbedoColor.Value != Utils.VanishCapColor)
+        {
+            _marioMaterialClipped.AlbedoColor.Value = Utils.VanishCapColor;
+        }
+
+        if (_marioMaterialClipped.AlphaHandling.Value != FrooxEngine.AlphaHandling.AlphaBlend)
+        {
+            _marioMaterialClipped.AlphaHandling.Value = FrooxEngine.AlphaHandling.AlphaBlend;
+        }
+
+        if (Math.Abs(_marioMaterialClipped.Smoothness.Value - 0.25f) < 0.001f)
+        {
+            _marioMaterialClipped.Smoothness.Value = 0f;
+        }
+
+        if (CurrentFaceMaterial != _marioMaterialVanish)
+        {
+            CurrentFaceMaterial = _marioMaterialVanish;
+        }
     }
 
-    public void TeleportEnd()
+    private void TeleportEnd()
     {
         if (CurrentState.IsDead) return;
         SetAction(ActionFlag.TeleportFadeIn);
-    }*/
 
-    private void HandleInteractable(SM64Interactable interactable)
+        _marioMeshRenderer.Enabled = true;
+        _marioMaterialClipped.AlbedoColor.TweenTo(colorX.White, 1f);
+        _marioMaterialVanish.AlbedoColor.TweenTo(colorX.White, 1f);
+
+        MarioSlot.RunInSeconds(0.5f, () => IsTeleporting = false);
+    }
+
+    public bool IsInCollider(ISM64Object obj)
     {
-        if (interactable?.Collider?.Slot is not { IsActive: true }) return;
+        if (obj?.Collider == null) return false;
 
-        Collider interactableCollider = interactable.Collider;
-        BoundingBox interactableBox = interactableCollider.LocalBoundingBox;
+        Collider col = obj.Collider;
+        BoundingBox colliderBox = col.LocalBoundingBox;
 
-        float3 localMarioCenterPos = interactableCollider.Slot.GlobalPointToLocal(_marioCollider.GlobalBoundingBox.Center);
-        float3 localMarioFootPos = interactableCollider.Slot.GlobalPointToLocal(MarioSlot.GlobalPosition);
+        float3 localMarioCenterPos = col.Slot.GlobalPointToLocal(_marioCollider.GlobalBoundingBox.Center);
+        float3 localMarioFootPos = col.Slot.GlobalPointToLocal(MarioSlot.GlobalPosition);
         float3 localMarioHeadPos = localMarioCenterPos + (localMarioCenterPos - localMarioFootPos);
 
         bool anyPointInside = false;
@@ -1037,103 +1088,13 @@ public sealed class SM64Mario : ISM64Object
         {
             float t = i / (float)_marioCollisionSampleCount;
             float3 pointOnLine = MathX.Lerp(localMarioFootPos, localMarioHeadPos, t);
-            if (!interactableBox.Contains(pointOnLine)) continue;
+            if (!colliderBox.Contains(pointOnLine)) continue;
 
             anyPointInside = true;
             break;
         }
 
-        if (!anyPointInside) return;
-
-        int typeId = interactable.TypeId;
-        bool disable = true;
-        switch (interactable.Type)
-        {
-            case SM64InteractableType.GoldCoin:
-                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                SyncedCoinCounter++;
-                Heal(1);
-                break;
-            case SM64InteractableType.BlueCoin:
-                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
-                SyncedCoinCounter += 5;
-                Heal(5);
-                break;
-            case SM64InteractableType.RedCoin:
-                int currentRedIndex = SyncedRedCoinCounter;
-
-                Sounds redSound = GetRedCoinSound(typeId == -1 ? currentRedIndex : typeId);
-
-                Interop.PlaySoundGlobal(redSound);
-
-                SyncedRedCoinCounter = currentRedIndex == 7 ? 0 : currentRedIndex + 1;
-                SyncedCoinCounter += 2;
-                Heal(2);
-                break;
-            case SM64InteractableType.VanishCap:
-                WearCap(MarioCapType.VanishCap);
-                break;
-            case SM64InteractableType.MetalCap:
-                WearCap(MarioCapType.MetalCap);
-                break;
-            case SM64InteractableType.WingCap:
-                WearCap(MarioCapType.WingCap);
-                break;
-            case SM64InteractableType.NormalCap:
-                WearCap(MarioCapType.NormalCap);
-                break;
-            case SM64InteractableType.Star:
-                Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
-                SyncedStarCounter++;
-                Heal(8);
-                SetForwardVelocity(0f);
-                SetAction(ActionFlag.Freefall);
-                break;
-            case SM64InteractableType.Damage:
-                bool isLocalMarioCollider = interactableCollider.Slot.IsChildOf(MarioSlot);
-                if (!isLocalMarioCollider)
-                {
-                    uint damage = typeId switch
-                    {
-                        -1 or >= 10 => 1,
-                        _           => (uint)typeId
-                    };
-
-                    TakeDamage(interactableCollider.Slot.GlobalPosition, damage);
-                }
-
-                disable = false;
-                break;
-            case SM64InteractableType.None:
-                disable = false;
-                break;
-            default:
-                throw new ArgumentOutOfRangeException();
-        }
-
-        interactableCollider.Slot.ActiveSelf = !disable;
-    }
-
-    private static Sounds GetRedCoinSound(int redIndex)
-    {
-        if (redIndex < 0 || redIndex > 7)
-        {
-            return Sounds.SOUND_GENERAL_RED_COIN;
-        }
-
-        Sounds[] sounds = new Sounds[]
-        {
-            Sounds.Menu_CollectRedCoin0,
-            Sounds.Menu_CollectRedCoin1,
-            Sounds.Menu_CollectRedCoin2,
-            Sounds.Menu_CollectRedCoin3,
-            Sounds.Menu_CollectRedCoin4,
-            Sounds.Menu_CollectRedCoin5,
-            Sounds.Menu_CollectRedCoin6,
-            Sounds.Menu_CollectRedCoin7
-        };
-
-        return sounds[redIndex];
+        return anyPointInside;
     }
 
     public void SetMarioAsNuked(bool delete = false)
@@ -1170,7 +1131,7 @@ public sealed class SM64Mario : ISM64Object
         _wasBypassed = isBypassed;
 
         // Enable/Disable the mario's mesh renderer
-        _marioMeshRenderer.Enabled = !isBypassed;
+        if (!IsTeleporting) _marioMeshRenderer.Enabled = !isBypassed;
         SyncedIsShown = !isBypassed;
     }
 

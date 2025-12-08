@@ -10,6 +10,7 @@ public class Config
     public static ConfigEntry<int> MarioScaleFactor;
     public static ConfigEntry<int> MarioCollisionChecks;
     public static ConfigEntry<Uri> MarioUrl;
+    public static ConfigEntry<bool> ClampedSurfaces;
     
     // CONTROLS
     public static ConfigEntry<bool> UseGamepad;
@@ -43,6 +44,7 @@ public class Config
             MarioScaleFactor = config.Bind("Engine", "Mario Scale Factor", 200, "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.");                    // slider 1, 1000, 0
             MarioCollisionChecks = config.Bind("Engine", "Mario Collision Checks", 10, "The number of evenly spaced points to check along Mario's body for collisions. Higher values increase accuracy but cost more performance."); // slider 1, 100, 0
             MarioUrl = config.Bind<Uri>("Engine", "Mario Url", null, "The URL for the Non-Modded Renderer for Mario - Null = Default Mario");
+            ClampedSurfaces = config.Bind("Engine", "Clapped Surfaces", true, "Whether to clamp the colliders to the max mario64 size or not.");
             
             UseGamepad = config.Bind("Controls", "Use Gamepad", false, "Whether to use gamepads for input or not.");
             BlockDashWithMarios = config.Bind("Controls", "Block Dash with Marios", true, "Whether to Block opening the dash with marios or not. !VR-Only!");

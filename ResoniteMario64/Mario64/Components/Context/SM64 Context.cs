@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -25,7 +26,7 @@ public sealed partial class SM64Context : IDisposable
         {
             Slot tempSlot = SM64Context.GetTempSlot(World);
             if (_contextSlot != null && (!_contextSlot.IsDestroyed || tempSlot is not { IsDestroyed: false })) return _contextSlot;
-            
+
             _contextSlot = tempSlot.FindChild(x => x.Tag == ContextTag);
             if (_contextSlot != null)
             {
@@ -61,16 +62,16 @@ public sealed partial class SM64Context : IDisposable
             }
         }
     }
-    
+
     public Slot MarioContainersSlot { get; private set; }
     public Slot MyMariosSlot { get; private set; }
-    
+
     public readonly Dictionary<Slot, SM64Mario> AllMarios = new Dictionary<Slot, SM64Mario>();
-    
+
     public List<SM64Mario> MyMarios => AllMarios.Values.Where(x => x.IsLocal).GetTempList();
 
     private bool AnyControlledMarios => AllMarios.Values.Any(x => x.IsLocal);
-    
+
     public World World { get; }
     public DynamicVariableSpace WorldVariableSpace { get; private set; }
 
@@ -107,10 +108,7 @@ public sealed partial class SM64Context : IDisposable
 
         Config.UseGamepad.SettingChanged += HandleKeyUseGamepadChanged;
 
-        world.RunInUpdates(3, () =>
-        {
-            World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c));
-        });
+        world.RunInUpdates(3, () => { World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c)); });
     }
 
     private void InitContextWorld(World world)
@@ -134,14 +132,14 @@ public sealed partial class SM64Context : IDisposable
             {
                 ContextVariableSpace.SpaceName.Value = ContextSpaceName;
             }
-            
+
             WorldVariableSpace = World.RootSlot.GetComponent<DynamicVariableSpace>(x => x.SpaceName.Value == "World");
             if (WorldVariableSpace == null)
             {
                 WorldVariableSpace = World.RootSlot.AttachComponent<DynamicVariableSpace>();
                 WorldVariableSpace.SpaceName.Value = "World";
             }
-            
+
             // Context Host
             DynamicReferenceVariable<User> contextHost = ContextSlot.GetComponentOrAttach<DynamicReferenceVariable<User>>(out bool hostAttached);
             if (hostAttached)
@@ -155,10 +153,7 @@ public sealed partial class SM64Context : IDisposable
                 if (reference.Target != null) return;
 
                 Logger.Warn("[HostContext TargetChange] SM64Context host reference was set to null, resetting to local user");
-                ContextSlot.RunInUpdates(ContextSlot.LocalUser.AllocationID * 3, () =>
-                {
-                    contextHost.Reference.Target ??= world.LocalUser;
-                });
+                ContextSlot.RunInUpdates(ContextSlot.LocalUser.AllocationID * 3, () => { contextHost.Reference.Target ??= world.LocalUser; });
             };
 
             Slot configSlot = ContextSlot.FindChildOrAdd(ConfigSlotName, false);
@@ -228,7 +223,8 @@ public sealed partial class SM64Context : IDisposable
             MyMariosSlot = MarioContainersSlot.FindChild(x => x.Name == $"{world.LocalUser.UserName}'s Marios") ?? SM64Context.GetTempSlot(world).AddSlot($"{world.LocalUser.UserName}'s Marios", false);
             MyMariosSlot.OrderOffset = MyMariosSlot.LocalUser.AllocationID * 3;
             MyMariosSlot.Tag = MarioContainerTag;
-            MyMariosSlot.DestroyWhenUserLeaves(world.LocalUser);
+
+            MyMariosSlot.GetComponentOrAttach<DestroyOnUserLeave>().TargetUser.Target = world.LocalUser;
 
             world.RunInUpdates(1, () => MyMariosSlot.SetParent(MarioContainersSlot));
 
@@ -237,7 +233,7 @@ public sealed partial class SM64Context : IDisposable
             MarioContainersSlot.ForeachChild(child =>
             {
                 if (child.Tag != MarioContainerTag || child == MyMariosSlot) return;
-                
+
                 child.ChildAdded -= HandleMarioAdded;
                 child.ChildAdded += HandleMarioAdded;
             });
@@ -259,7 +255,7 @@ public sealed partial class SM64Context : IDisposable
     private void HandleContainerAdded(Slot slot, Slot child)
     {
         if (child.Tag != MarioContainerTag) return;
-        
+
         child.ChildAdded -= HandleMarioAdded;
         child.ChildAdded += HandleMarioAdded;
 
@@ -321,7 +317,7 @@ public sealed partial class SM64Context : IDisposable
             mario?.ContextFixedUpdateSynced();
         }
     }
-    
+
     private void HandleRemoved(Slot slot)
     {
         if (_disposed) return;
@@ -362,7 +358,7 @@ public sealed partial class SM64Context : IDisposable
         _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
         UpdatePlayerMariosState();
     }
-    
+
     public void UpdatePlayerMariosState()
     {
         int maxPerPerson = _maxMariosAnimatedPerPerson;
@@ -410,12 +406,12 @@ public sealed partial class SM64Context : IDisposable
             {
                 mario?.Dispose();
             }
-            
+
             foreach (var col in DynamicColliders.Values.GetTempList())
             {
                 col?.Dispose();
             }
-            
+
             foreach (var interactable in Interactables.Values.GetTempList())
             {
                 interactable?.Dispose();

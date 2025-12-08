@@ -38,7 +38,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
         InitScale = col.Slot.GlobalScale;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force);
+        Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
         
         SurfaceType = surfaceType;
         TerrainType = terrainType;

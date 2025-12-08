@@ -1,4 +1,5 @@
 ﻿using System;
+using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -18,6 +19,29 @@ public sealed class SM64WaterBox : ISM64Object
         World = col.World;
         Context = instance;
         Collider = col;
+    }
+    
+    public float Handle(float3 marioPos)
+    {
+        Collider collider = Collider;
+        if (collider == null || collider.IsRemoved || collider.IsDisposed) return float.NaN;
+
+        if (collider is BoxCollider box)
+        {
+            float3 localMarioPos = collider.Slot.GlobalPointToLocal(marioPos);
+            BoundingBox localWaterBox = box.LocalBoundingBox;
+
+            if (localWaterBox.Contains(localMarioPos))
+            {
+                return collider.GlobalBoundingBox.max.y;
+            }
+        }
+        else if (collider.GlobalBoundingBox.Contains(marioPos))
+        {
+            return collider.GlobalBoundingBox.max.y;
+        }
+
+        return float.NaN;
     }
 
     ~SM64WaterBox()

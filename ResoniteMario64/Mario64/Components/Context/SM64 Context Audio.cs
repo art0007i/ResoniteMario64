@@ -148,6 +148,7 @@ public sealed partial class SM64Context
                     {
                         await Task.Delay(10);
                     }
+
                     SetAudioSource();
                 });
             }
@@ -196,13 +197,15 @@ public sealed partial class SM64Context
         {
             return;
         }
+
         if (_audioSlot.IsLocalElement)
         {
             _audioSlot.Destroy();
         }
+
         SetAudioSource();
     }
-    
+
     private void ProcessAudio()
     {
         if (_marioAudioStream == null || Config.DisableAudio.Value)
@@ -214,6 +217,12 @@ public sealed partial class SM64Context
         _audioStopwatch.Restart();
         _audioAccumulator += elapsed;
 
+        float bufferFullness = (float)_marioAudioStream.UnreadSamples / _marioAudioStream.CurrentBufferSize;
+        if (bufferFullness > 0.75f)
+        {
+            _audioAccumulator = Math.Min(_audioAccumulator, AudioTickInterval);
+        }
+
         if (_audioAccumulator > AudioTickInterval * 4)
         {
             _audioAccumulator = AudioTickInterval * 4;
@@ -222,7 +231,7 @@ public sealed partial class SM64Context
         if (_audioAccumulator < AudioTickInterval) return;
         _audioAccumulator -= AudioTickInterval;
 
-        Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.FrameSize);
+        Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.CurrentBufferSize, (uint)_marioAudioStream.UnreadSamples);
 
         int written = DownmixAndResampleStereo(
             _audioBuffer,
@@ -232,17 +241,7 @@ public sealed partial class SM64Context
         );
 
         if (written <= 0) return;
-        if (written > _marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode) return;
-
-        const double rate = (double)TargetSampleRate / NativeSampleRate;
-        int available = _marioAudioStream.CurrentBufferSize - _marioAudioStream.SamplesAvailableForEncode;
-
-        int estimatedPutCount = (int)Math.Ceiling(_convertedBuffer.Length / rate);
-        if (estimatedPutCount > available)
-        {
-            Logger.Debug($"[Audio] Skipping write. Needed {estimatedPutCount}, available {available}");
-            return;
-        }
+        if (written > _marioAudioStream.CurrentBufferSize - _marioAudioStream.UnreadSamples) return;
 
         Span<StereoSample> writeSpan = _convertedBuffer.AsSpan(0, written);
         _marioAudioStream.Write(writeSpan, ref _writeState);
@@ -250,28 +249,36 @@ public sealed partial class SM64Context
 
     private static int DownmixAndResampleStereo(short[] input, float inputRate, float outputRate, StereoSample[] output)
     {
+        if (input == null || output == null)
+            throw new ArgumentNullException();
+
+        if (input.Length < 2)
+            return 0;
+
         float ratio = inputRate / outputRate;
-        float pos = 0.0f;
-        int outputIndex = 0;
+        float pos = 0f;
+        int outIndex = 0;
+        int inputFrames = input.Length / 2;
+        const float invShortMax = 1f / 32768f;
 
-        while ((int)pos * 2 + 3 < input.Length && outputIndex < output.Length)
+        while (outIndex < output.Length)
         {
-            int i = (int)pos * 2;
+            int frameIndex = (int)pos;
 
-            float l1 = input[i] / 32768.0f;
-            float r1 = input[i + 1] / 32768.0f;
-            float l2 = input[i + 2] / 32768.0f;
-            float r2 = input[i + 3] / 32768.0f;
+            if (frameIndex + 1 >= inputFrames)
+                break;
 
-            float t = pos - (int)pos;
+            int i = frameIndex * 2;
+            float t = pos - frameIndex;
+            float oneMinusT = 1f - t;
 
-            float left = l1 * (1 - t) + l2 * t;
-            float right = r1 * (1 - t) + r2 * t;
+            float l = (input[i] * oneMinusT + input[i + 2] * t) * invShortMax;
+            float r = (input[i + 1] * oneMinusT + input[i + 3] * t) * invShortMax;
 
-            output[outputIndex++] = new StereoSample(left, right);
+            output[outIndex++] = new StereoSample(l, r);
             pos += ratio;
         }
 
-        return outputIndex;
+        return outIndex;
     }
 }
