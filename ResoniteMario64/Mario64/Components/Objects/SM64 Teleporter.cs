@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
@@ -18,7 +19,7 @@ public sealed class SM64Teleporter : ISM64Object
 
     public bool IsDisposed { get; private set; }
 
-    private readonly Stopwatch _teleporterWatch = new Stopwatch();
+    private readonly ConditionalWeakTable<SM64Mario, Stopwatch> _marioWatches = new ConditionalWeakTable<SM64Mario, Stopwatch>();
 
     public SM64Teleporter(Collider col, SM64Context instance)
     {
@@ -34,32 +35,36 @@ public sealed class SM64Teleporter : ISM64Object
     {
         if (mario.IsTeleporting || Collider?.Slot is not { IsActive: true }) return;
 
+        Stopwatch teleporterWatch = _marioWatches.GetOrCreateValue(mario);
+        if (teleporterWatch == null) return;
+
         if (!mario.IsInCollider(this))
         {
             if (mario.LastTeleportDestination == this)
             {
+                Logger.Warn("Resetting teleport destination");
                 mario.LastTeleportDestination = null;
             }
 
-            _teleporterWatch.Reset();
+            teleporterWatch.Reset();
             return;
         }
 
         if (mario.LastTeleportDestination == this || (mario.CurrentActionFlags & (uint)SM64Constants.ActionFlag.Stationary) == 0)
         {
-            _teleporterWatch.Reset();
+            teleporterWatch.Reset();
             return;
         }
 
-        if (!_teleporterWatch.IsRunning)
+        if (!teleporterWatch.IsRunning)
         {
-            _teleporterWatch.Start();
+            teleporterWatch.Start();
             return;
         }
 
-        if (_teleporterWatch.Elapsed.TotalSeconds < 1f) return;
+        if (teleporterWatch.Elapsed.TotalSeconds < 1f) return;
 
-        _teleporterWatch.Reset();
+        teleporterWatch.Reset();
 
         List<SM64Teleporter> group = Context.Teleporters.Values.Where(x => x.Group == Group).GetTempList();
         group.Sort((a, b) => a.ID.CompareTo(b.ID));

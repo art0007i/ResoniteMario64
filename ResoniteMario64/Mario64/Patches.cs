@@ -248,7 +248,7 @@ public class Patches
                         b.RunSynchronously(() =>
                         {
                             __instance.LocalUser.GetPointInFrontOfUser(out float3 point, out floatQ _, float3.Forward, distance: 2f);
-                            mario.TeleportTo(point);
+                            mario.SetPosition(point);
                         });
                     };
 

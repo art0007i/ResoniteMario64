@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
-using Microsoft.VisualBasic;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Mario64.libsm64.SM64Constants;
@@ -335,6 +331,11 @@ public static class Utils
             MarioCapType.NormalCap => (flags & (uint)StateFlag.NormalCap) != 0,
             _                      => throw new ArgumentOutOfRangeException(nameof(capType), capType, null)
         };
+    }
+
+    public static bool IsTeleporting(uint flags)
+    {
+        return (flags & (uint)StateFlag.Teleporting) != 0;
     }
 
     public static User GetAllocatingUser(this Slot slot) => slot.World.GetUserByAllocationID(slot.ReferenceID.User);

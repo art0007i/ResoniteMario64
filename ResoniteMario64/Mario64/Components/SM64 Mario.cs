@@ -412,7 +412,7 @@ public sealed class SM64Mario : ISM64Object
 
             Slot varsSlot = MarioSlot.AddSlot("Vars");
             varsSlot.Tag = null;
-            
+
             DynamicReferenceVariable<User> owner = varsSlot.AttachComponent<DynamicReferenceVariable<User>>();
             owner.VariableName.Value = MarioOwnerVarName;
             owner.Reference.Target = MarioUser;
@@ -629,6 +629,11 @@ public sealed class SM64Mario : ISM64Object
                 interactable.Handle(this);
             }
 
+            foreach (SM64Teleporter teleporter in Context.Teleporters.Values.GetTempList())
+            {
+                teleporter.Handle(this);
+            }
+
             // Check for deaths, so we delete mario
             float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
             bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
@@ -676,14 +681,14 @@ public sealed class SM64Mario : ISM64Object
             {
                 WearCap(MarioCapType.NormalCap);
             }
-        }
-        
-        foreach (SM64Teleporter teleporter in Context.Teleporters.Values.GetTempList())
-        {
-            teleporter.Handle(this);
+
+            if (Utils.IsTeleporting(SyncedStateFlags)/* && !Utils.IsTeleporting(CurrentStateFlags)*/ && !IsTeleporting)
+            {
+                TeleportTo(float3.Zero);
+            }
         }
 
-        float3 oldPos = MarioSlot.GlobalPosition;
+        // Grabbable
         if (_marioGrabbable is { IsRemoved: false })
         {
             bool pickup = IsBeingGrabbed;
@@ -697,21 +702,13 @@ public sealed class SM64Mario : ISM64Object
                 else
                 {
                     Hold();
-                    MarioSlot.RunInUpdates(3, () =>
-                    {
-                        if (!IsLocal) return;
-
-                        if ((oldPos - MarioSlot.GlobalPosition).Magnitude > 0.01f)
-                        {
-                            MarioSlot.Position_Field.Value = float3.Zero;
-                        }
-                    });
                 }
             }
 
             _wasPickedUp = pickup;
         }
 
+        // Water Level
         float waterSurface = float.NaN;
         float3 marioPos = _marioCollider.GlobalBoundingBox.Center;
 
@@ -733,14 +730,15 @@ public sealed class SM64Mario : ISM64Object
             Interop.SetWaterLevel(MarioId, _waterLevel);
         }
 
-        if (Utils.HasCapType(SyncedStateFlags, MarioCapType.MetalCap))
+        // Materials
+        if (Utils.HasCapType(CurrentStateFlags, MarioCapType.MetalCap))
         {
             if (CurrentMaterial != _marioMaterialMetal)
             {
                 CurrentMaterial = _marioMaterialMetal;
             }
         }
-        else if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
+        else if (Utils.HasCapType(CurrentStateFlags, MarioCapType.VanishCap))
         {
             if (_marioMaterialClipped.AlbedoColor.Value != Utils.VanishCapColor)
             {
@@ -793,7 +791,7 @@ public sealed class SM64Mario : ISM64Object
             {
                 _marioMaterialVanish.AlbedoColor.Value = Utils.VanishCapColor;
             }
-            
+
             if (_marioMaterialClipped.Smoothness.Value == 0f)
             {
                 _marioMaterialClipped.Smoothness.Value = 0.25f;
@@ -807,6 +805,7 @@ public sealed class SM64Mario : ISM64Object
             TakeDamage(attackingMario.MarioSlot.GlobalPosition, 1);
         }
 
+        // Mario Mesh Colors
         for (int i = 0; i < _colorBuffer.Length; ++i)
         {
             _colorBufferColors[i] = new color(_colorBuffer[i].x, _colorBuffer[i].y, _colorBuffer[i].z);
@@ -956,6 +955,8 @@ public sealed class SM64Mario : ISM64Object
         {
             playMusic = Config.PlayCapMusic.Value;
         }
+        
+        if (Utils.HasCapType(CurrentStateFlags, capType)) return;
 
         switch (capType)
         {
@@ -967,11 +968,6 @@ public sealed class SM64Mario : ISM64Object
                 if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
                 {
                     break;
-                }
-
-                if (capType == MarioCapType.NormalCap)
-                {
-                    if (Utils.HasCapType(SyncedStateFlags, MarioCapType.NormalCap)) break;
                 }
 
                 Interop.MarioCap(MarioId, (uint)capType, duration, playMusic);
@@ -1022,9 +1018,6 @@ public sealed class SM64Mario : ISM64Object
     public void TeleportTo(float3 position)
     {
         TeleportStart();
-        MarioSlot.RunInSeconds(1f, () => _marioMeshRenderer.Enabled = false);
-        _marioMaterialClipped.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
-        _marioMaterialVanish.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
         MarioSlot.RunInSeconds(1.5f, () =>
         {
             if (IsLocal) SetPosition(position);
@@ -1036,9 +1029,9 @@ public sealed class SM64Mario : ISM64Object
     private void TeleportStart()
     {
         if (CurrentState.IsDead) return;
-        SetAction(ActionFlag.TeleportFadeOut);
         IsTeleporting = true;
-
+        SetAction(ActionFlag.TeleportFadeOut);
+        
         if (_marioMaterialClipped.AlbedoColor.Value != Utils.VanishCapColor)
         {
             _marioMaterialClipped.AlbedoColor.Value = Utils.VanishCapColor;
@@ -1058,6 +1051,10 @@ public sealed class SM64Mario : ISM64Object
         {
             CurrentFaceMaterial = _marioMaterialVanish;
         }
+
+        MarioSlot.RunInSeconds(1f, () => _marioMeshRenderer.Enabled = false);
+        _marioMaterialClipped.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
+        _marioMaterialVanish.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
     }
 
     private void TeleportEnd()
@@ -1068,8 +1065,7 @@ public sealed class SM64Mario : ISM64Object
         _marioMeshRenderer.Enabled = true;
         _marioMaterialClipped.AlbedoColor.TweenTo(colorX.White, 1f);
         _marioMaterialVanish.AlbedoColor.TweenTo(colorX.White, 1f);
-
-        MarioSlot.RunInSeconds(0.5f, () => IsTeleporting = false);
+        MarioSlot.RunInSeconds(1f, () => IsTeleporting = false);
     }
 
     public bool IsInCollider(ISM64Object obj)

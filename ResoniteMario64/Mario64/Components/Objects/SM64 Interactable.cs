@@ -80,7 +80,7 @@ public sealed class SM64Interactable : ISM64Object
                 mario.WearCap(MarioCapType.MetalCap);
                 break;
             case SM64InteractableType.WingCap:
-                mario.WearCap(MarioCapType.WingCap);
+                mario.WearCap(MarioCapType.WingCap, 40f);
                 break;
             case SM64InteractableType.NormalCap:
                 mario.WearCap(MarioCapType.NormalCap);

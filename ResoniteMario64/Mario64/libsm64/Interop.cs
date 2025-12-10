@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Elements.Core;
 using ResoniteMario64.Mario64.Components.Context;
@@ -61,6 +58,8 @@ public static class Interop
     public const float SM64Deg2Angle = 182.04459f;
 
     // public static Bitmap2D MarioTexture { get; private set; }
+    // public static Texture2D MarioTexture2D { get; private set; }
+    // public static Uri MarioTextureUri { get; private set; }
     public static bool IsGlobalInit;
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -242,26 +241,31 @@ public static class Interop
             sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
             sm64_audio_init(romHandle.AddrOfPinnedObject());
 
-            /*MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false);
-            for (int ix = 0; ix < SM64TextureWidth; ix++)
-            for (int iy = 0; iy < SM64TextureHeight; iy++)
-            {
-                color32 color = new color32(
-                    textureData[4 * (ix + SM64TextureWidth * iy) + 0],
-                    textureData[4 * (ix + SM64TextureWidth * iy) + 1],
-                    textureData[4 * (ix + SM64TextureWidth * iy) + 2],
-                    textureData[4 * (ix + SM64TextureWidth * iy) + 3]
-                );
-                // Make the 100% transparent colors white. so we can multiply with the vertex colors.
-                if (color.a == 0)
-                {
-                    color = new color32(255, 255, 255, 0);
-                }
+            // MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false, null, Engine.Current.AssetManager.TextureAllocator);
+            // for (int ix = 0; ix < SM64TextureWidth; ix++)
+            // for (int iy = 0; iy < SM64TextureHeight; iy++)
+            // {
+            //     color32 color = new color32(
+            //         textureData[4 * (ix + SM64TextureWidth * iy) + 0],
+            //         textureData[4 * (ix + SM64TextureWidth * iy) + 1],
+            //         textureData[4 * (ix + SM64TextureWidth * iy) + 2],
+            //         textureData[4 * (ix + SM64TextureWidth * iy) + 3]
+            //     );
+            //     // Make the 100% transparent colors white. so we can multiply with the vertex colors.
+            //     if (color.a == 0)
+            //     {
+            //         color = new color32(255, 255, 255, 0);
+            //     }
+            //
+            //     MarioTexture.SetPixel32(ix, iy, color);
+            // }
+            //
+            // MarioTexture2D = new Texture2D();
+            // MarioTexture2D.InitializeDynamic(Engine.Current.AssetManager);
+            // MarioTexture2D.SetFromBitmap2D(Interop.MarioTexture, new TextureUploadHint { readable = true }, TextureFilterMode.Point, 0, TextureWrapMode.Clamp, TextureWrapMode.Clamp, 0, delegate { });
+            // MarioTextureUri = Engine.Current.LocalDB.SaveAssetAsync(MarioTexture2D.Data).Result;
 
-                MarioTexture.SetPixel32(ix, iy, color);
-            }
-
-            // MarioTexture.Save("mario.png");*/
+            // MarioTexture.Save("mario.png");
         }
         finally
         {
