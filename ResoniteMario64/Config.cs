@@ -40,7 +40,7 @@ public class Config
     {
         try
         {
-            GameTickMs = config.Bind("Engine", "Game Tick Ms", 25, "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.");                                                       // slider 1, 100, 0
+            GameTickMs = config.Bind("Engine", "Game Tick Ms", 30, "How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.");                                                       // slider 1, 100, 0
             MarioScaleFactor = config.Bind("Engine", "Mario Scale Factor", 200, "The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.");                    // slider 1, 1000, 0
             MarioCollisionChecks = config.Bind("Engine", "Mario Collision Checks", 10, "The number of evenly spaced points to check along Mario's body for collisions. Higher values increase accuracy but cost more performance."); // slider 1, 100, 0
             MarioUrl = config.Bind<Uri>("Engine", "Mario Url", null, "The URL for the Non-Modded Renderer for Mario - Null = Default Mario");
@@ -63,7 +63,7 @@ public class Config
             MaxMeshColliderTris = config.Bind("Performance", "Max Mesh Collider Tris", 50000, "Maximum total number of triangles of automatically generated from mesh colliders allowed.");   // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.
 
             DebugEnabled = config.Bind("Debug", "Debug Enabled", false, "Whether to enable debug mode or not.");
-            RenderSlotPublic = config.Bind("Debug", "Render Slot Public", true, "When true the renderer slot will not be a local slot.");
+            RenderSlotPublic = config.Bind("Debug", "Render Slot Public", false, "When true the renderer slot will not be a local slot.");
             LogColliderChanges = config.Bind("Debug", "Log Collider Changes", false, "Whether to Log Collider changes or not.");
 
             return true;

@@ -1,5 +1,4 @@
-﻿using System;
-using Elements.Core;
+﻿using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;

@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Timers;
+﻿using System.Runtime.CompilerServices;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -21,7 +18,7 @@ public sealed partial class SM64Context
     public void HandleCollider(Collider collider, bool log = true)
     {
         if (collider == null) return;
-        
+
         if (collider.World != World) return;
         if (collider.IsDestroyed)
         {
@@ -29,89 +26,72 @@ public sealed partial class SM64Context
             return;
         }
 
-        int? added = TryAddCollider(collider);
+        ColliderOp added = TryAddCollider(collider);
         if (added != null)
         {
             collider.Destroyed -= HandleColliderDestroyed;
             collider.Destroyed += HandleColliderDestroyed;
         }
 
-        if (log) LogCollider(collider, added, collider.IsDestroyed);
+        if (log) LogCollider(collider, added);
     }
 
     private void HandleColliderDestroyed(IDestroyable instance)
     {
         if (instance is not Collider collider) return;
 
-        int? removed = TryRemoveCollider(collider);
+        ColliderOp removed = TryRemoveCollider(collider);
         if (removed != null)
         {
             collider.Destroyed -= HandleColliderDestroyed;
         }
 
-        LogCollider(collider, removed, true);
+        LogCollider(collider, removed);
     }
 
-    private int? TryAddCollider(Collider collider)
+    private ColliderOp TryAddCollider(Collider collider)
     {
-        if (Utils.IsStaticCollider(collider))
+        return Utils.GetColliderCategory(collider) switch
         {
-            return RegisterStaticCollider(collider);
-        }
-
-        if (Utils.IsDynamicCollider(collider))
-        {
-            return RegisterDynamicCollider(collider);
-        }
-
-        if (Utils.IsInteractable(collider))
-        {
-            return RegisterInteractable(collider);
-        }
-
-        if (Utils.IsWaterBox(collider))
-        {
-            return RegisterWaterBox(collider);
-        }
-
-        if (Utils.IsTeleporter(collider))
-        {
-            return RegisterTeleporter(collider);
-        }
-
-        return null;
+            ColliderCategory.Static => RegisterStaticCollider(collider),
+            ColliderCategory.Dynamic => RegisterDynamicCollider(collider),
+            ColliderCategory.Interactable => RegisterInteractable(collider),
+            ColliderCategory.WaterBox => RegisterWaterBox(collider),
+            ColliderCategory.Teleporter => RegisterTeleporter(collider),
+            _ => null
+        };
     }
 
-    private int? TryRemoveCollider(Collider collider)
+    private ColliderOp TryRemoveCollider(Collider collider)
     {
-        if (StaticColliders.TryGetValue(collider, out SM64StaticCollider staticCollider))
+        if (StaticColliders.Remove(collider, out SM64StaticCollider staticCollider))
         {
             staticCollider.Dispose();
-            return 1;
+            return new ColliderOp(ColliderCategory.Static, ColliderOpResult.Removed);
         }
 
-        if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
+        if (DynamicColliders.Remove(collider, out SM64DynamicCollider dynamicCollider))
         {
             dynamicCollider.Dispose();
-            return 2;
+            return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.Removed);
         }
 
-        if (Interactables.TryGetValue(collider, out SM64Interactable interactable))
+        if (Interactables.Remove(collider, out SM64Interactable interactable))
         {
             interactable.Dispose();
-            return 3;
-        }
-        
-        if (WaterBoxes.TryGetValue(collider, out SM64WaterBox waterBox))
-        {
-            waterBox.Dispose();
-            return 4;
+            return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.Removed);
         }
 
-        if (Teleporters.TryGetValue(collider, out SM64Teleporter teleporter))
+        if (WaterBoxes.Remove(collider, out SM64WaterBox waterBox))
+        {
+            waterBox.Dispose();
+            return new ColliderOp(ColliderCategory.WaterBox, ColliderOpResult.Removed);
+        }
+
+        if (Teleporters.Remove(collider, out SM64Teleporter teleporter))
         {
             teleporter.Dispose();
-            return 5;
+            return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.Removed);
         }
 
         return null;
@@ -137,18 +117,18 @@ public sealed partial class SM64Context
     }
 
     // Static Colliders
-    private int RegisterStaticCollider(Collider collider)
+    private ColliderOp RegisterStaticCollider(Collider collider)
     {
         QueueStaticCollidersUpdate();
-        
+
         if (StaticColliders.ContainsKey(collider))
         {
-            return 10;
+            return new ColliderOp(ColliderCategory.Static, ColliderOpResult.AlreadyExists);
         }
 
         SM64StaticCollider col = new SM64StaticCollider(collider, this);
         StaticColliders.Add(collider, col);
-        return 1;
+        return new ColliderOp(ColliderCategory.Static, ColliderOpResult.Added);
     }
 
     internal void UnregisterStaticCollider(Collider collider)
@@ -157,23 +137,25 @@ public sealed partial class SM64Context
 
         StaticColliders.Remove(collider);
     }
-    
+
     // Dynamic Colliders
-    private int RegisterDynamicCollider(Collider collider)
+    private ColliderOp RegisterDynamicCollider(Collider collider)
     {
         if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
         {
             if (dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f))
             {
-                return 20;
+                return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.AlreadyExists);
             }
 
             dynamicCollider.Dispose();
+            DynamicColliders.Remove(collider);
         }
 
         SM64DynamicCollider col = new SM64DynamicCollider(collider, this);
         DynamicColliders.Add(collider, col);
-        return 2;
+
+        return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.Added);
     }
 
     internal void UnregisterDynamicCollider(Collider collider)
@@ -182,16 +164,16 @@ public sealed partial class SM64Context
     }
 
     // Interactables
-    private int RegisterInteractable(Collider collider)
+    private ColliderOp RegisterInteractable(Collider collider)
     {
         if (Interactables.ContainsKey(collider))
         {
-            return 30;
+            return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.AlreadyExists);
         }
 
         SM64Interactable col = new SM64Interactable(collider, this);
         Interactables.Add(collider, col);
-        return 3;
+        return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.Added);
     }
 
     internal void UnregisterInteractable(Collider collider)
@@ -200,34 +182,34 @@ public sealed partial class SM64Context
     }
 
     // WaterBoxes
-    private int RegisterWaterBox(Collider collider)
+    private ColliderOp RegisterWaterBox(Collider collider)
     {
         if (WaterBoxes.ContainsKey(collider))
         {
-            return 40;
+            return new ColliderOp(ColliderCategory.WaterBox, ColliderOpResult.AlreadyExists);
         }
 
         SM64WaterBox col = new SM64WaterBox(collider, this);
         WaterBoxes.Add(collider, col);
-        return 4;
+        return new ColliderOp(ColliderCategory.WaterBox, ColliderOpResult.Added);
     }
 
     internal void UnregisterWaterBox(Collider collider)
     {
         WaterBoxes.Remove(collider);
     }
-    
+
     // Teleporters
-    private int RegisterTeleporter(Collider collider)
+    private ColliderOp RegisterTeleporter(Collider collider)
     {
         if (Teleporters.ContainsKey(collider))
         {
-            return 50;
+            return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.AlreadyExists);
         }
 
         SM64Teleporter col = new SM64Teleporter(collider, this);
         Teleporters.Add(collider, col);
-        return 5;
+        return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.Added);
     }
 
     internal void UnregisterTeleporter(Collider collider)
@@ -256,22 +238,32 @@ public sealed partial class SM64Context
         }
     }
 
-    private static void LogCollider(object obj, int? added, bool destroyed, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
+    private static void LogCollider(object obj, ColliderOp added, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
         if (added == null) return;
         if (obj is not Collider collider) return;
-        if (!Config.LogColliderChanges.Value || !Utils.CheckDebug()) return;
-        
-        bool isNewlyAdded = added is 1 or 2 or 3 or 4 or 5;
-        string name = added switch
+        if (!Config.LogColliderChanges.Value) return;
+
+        string name = added.Category switch
         {
-            1 or 10 => "Static Collider",
-            2 or 20 => "Dynamic Collider",
-            3 or 30 => "Interactable",
-            4 or 40 => "WaterBox",
-            5 or 50 => "Teleporter",
-            _       => "Collider"
+            ColliderCategory.Static => "Static Collider",
+            ColliderCategory.Dynamic => "Dynamic Collider",
+            ColliderCategory.Interactable => "Interactable",
+            ColliderCategory.WaterBox => "WaterBox",
+            ColliderCategory.Teleporter => "Teleporter",
+            _ => "Collider"
         };
+
+        string state = added.Result switch
+        {
+            ColliderOpResult.Added => "Added",
+            ColliderOpResult.AlreadyExists => "Already Added",
+            ColliderOpResult.Removed => "Destroyed",
+            ColliderOpResult.Updated => "Updated",
+            _ => "Unknown"
+        };
+
+        if (collider.IsRemoved) state = "Destroyed";
 
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
@@ -285,15 +277,11 @@ public sealed partial class SM64Context
             out int group
         );
 
-        string state = "Already Added";
-        if (isNewlyAdded) state = "Added";
-        if (destroyed) state = "Destroyed";
-
         string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
 
-        if (destroyed)
+        if (added.Result == ColliderOpResult.Removed || collider.IsRemoved)
             Logger.Error(message, caller, line);
-        else if (isNewlyAdded)
+        else if (added.Result == ColliderOpResult.Added)
             Logger.Msg(message, caller, line);
         else
             Logger.Warn(message, caller, line);
@@ -301,27 +289,33 @@ public sealed partial class SM64Context
 
     public void GetAllColliders(bool log, out Dictionary<string, List<ISM64Object>> colliders)
     {
-        Dictionary<string, (int Key, IEnumerable<ISM64Object> Source)> sources = new Dictionary<string, (int, IEnumerable<ISM64Object>)>
+        List<(string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source)> entries = new List<(string, ColliderCategory, IEnumerable<ISM64Object>)>
         {
-            ["Static Collider"] = (10, StaticColliders.Values),
-            ["Dynamic Collider"] = (20, DynamicColliders.Values),
-            ["Interactable"] = (30, Interactables.Values),
-            ["Waterbox"] = (40, WaterBoxes.Values),
-            ["Teleporter"] = (50, Teleporters.Values)
+            ("Static Collider", ColliderCategory.Static, StaticColliders.Values),
+            ("Dynamic Collider", ColliderCategory.Dynamic, DynamicColliders.Values),
+            ("Interactable", ColliderCategory.Interactable, Interactables.Values),
+            ("Waterbox", ColliderCategory.WaterBox, WaterBoxes.Values),
+            ("Teleporter", ColliderCategory.Teleporter, Teleporters.Values)
         };
 
-        colliders = sources.ToDictionary(
-            kvp => kvp.Key,
-            kvp => kvp.Value.Source.GetTempList()
-        );
+        colliders = new Dictionary<string, List<ISM64Object>>(entries.Count);
+
+        foreach ((string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source) entry in entries)
+        {
+            colliders.Add(entry.Name, entry.Source.GetTempList());
+        }
 
         if (!log) return;
 
-        foreach (KeyValuePair<string, (int Key, IEnumerable<ISM64Object> Source)> kvp in sources)
+        foreach ((string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source) entry in entries)
         {
-            foreach (ISM64Object obj in kvp.Value.Source)
+            foreach (ISM64Object obj in entry.Source)
             {
-                LogCollider(obj.Collider, kvp.Value.Key, obj.Collider.IsDestroyed);
+                ColliderOpResult result = obj.Collider.IsDestroyed
+                    ? ColliderOpResult.Removed
+                    : ColliderOpResult.AlreadyExists;
+
+                LogCollider(obj.Collider, new ColliderOp(entry.Category, result));
             }
         }
     }

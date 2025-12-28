@@ -435,7 +435,7 @@ public sealed class SM64Mario : ISM64Object
             DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             starCounter.VariableName.Value = StarVarName;
 
-            slot.RunInUpdates(1, () =>
+            slot.RunInUpdates(2, () =>
             {
                 slot.SetParent(instance.MyMariosSlot);
                 slot.GlobalScale = float3.One;
@@ -463,7 +463,7 @@ public sealed class SM64Mario : ISM64Object
         _colorBufferColors = new color[bufferSize];
         _uvBuffer = new float2[bufferSize];
 
-        if (!Config.RenderSlotPublic.Value && !Utils.CheckDebug())
+        if (!Config.RenderSlotPublic.Value)
         {
             _marioRendererSlot = MarioSlot.World.AddLocalSlot($"{MarioSlot.Name} Renderer - {MarioSlot.LocalUser.UserName}");
         }

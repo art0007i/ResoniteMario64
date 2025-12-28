@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Http.Headers;
-using System.Threading;
 using FrooxEngine;
 using Renderite.Shared;
 using ResoniteMario64.Mario64.Components.Objects;
@@ -226,7 +220,7 @@ public sealed partial class SM64Context : IDisposable
 
             MyMariosSlot.GetComponentOrAttach<DestroyOnUserLeave>().TargetUser.Target = world.LocalUser;
 
-            world.RunInUpdates(1, () => MyMariosSlot.SetParent(MarioContainersSlot));
+            world.RunInUpdates(2, () => MyMariosSlot.SetParent(MarioContainersSlot));
 
             MarioContainersSlot.ChildAdded += HandleContainerAdded;
 

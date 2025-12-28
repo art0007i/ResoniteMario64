@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;

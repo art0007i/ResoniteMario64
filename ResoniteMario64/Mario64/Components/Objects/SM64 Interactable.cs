@@ -1,6 +1,4 @@
-﻿using System;
-using Elements.Core;
-using FrooxEngine;
+﻿using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;
 using ResoniteMario64.Mario64.libsm64;
@@ -38,7 +36,7 @@ public sealed class SM64Interactable : ISM64Object
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {
-            if (Utils.CheckDebug()) Logger.Warn($"[Interactable{mc.GetType()}] {mc.Slot.Name} ({mc.ReferenceID}) Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}");
+            if (Config.DebugEnabled.Value) Logger.Warn($"[Interactable{mc.GetType()}] {mc.Slot.Name} ({mc.ReferenceID}) Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}");
             Dispose();
         }
     }

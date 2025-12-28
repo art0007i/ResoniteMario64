@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Elements.Core;
+﻿using Elements.Core;
 using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -46,7 +44,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
 
         if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
         {
-            if (Utils.CheckDebug()) Logger.Warn($"{mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
+            if (Config.DebugEnabled.Value) Logger.Warn($"{mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
             Dispose();
             return;
         }

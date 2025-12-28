@@ -8,6 +8,23 @@ using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.Mario64;
 
+public enum ColliderCategory
+{
+    Static,
+    Dynamic,
+    Interactable,
+    WaterBox,
+    Teleporter
+}
+
+internal enum ColliderOpResult
+{
+    Added,
+    AlreadyExists,
+    Updated,
+    Removed
+}
+
 public static class Utils
 {
     internal static readonly List<Collider> StaticSurfaces = new List<Collider>();
@@ -24,17 +41,7 @@ public static class Utils
         }
     }
 
-    public enum ColliderCategory
-    {
-        None,
-        Static,
-        Dynamic,
-        Interactable,
-        WaterBox,
-        Teleporter
-    }
-
-    private static ColliderCategory GetColliderCategory(Collider col)
+    public static ColliderCategory? GetColliderCategory(Collider col)
     {
         string tag = col.Slot.Tag ?? string.Empty;
 
@@ -48,7 +55,7 @@ public static class Utils
         if ((isStatic || ((ICollider)col).CollidesWithCharacters) && !isDynamic && isValid)
             return ColliderCategory.Static;
 
-        if (isDynamic && isValid)
+        if (isDynamic && isValid && col.Type.Value != ColliderType.Trigger)
             return ColliderCategory.Dynamic;
 
         if (isInteractable && col.Enabled)
@@ -60,18 +67,8 @@ public static class Utils
         if (isTeleporter && isValid)
             return ColliderCategory.Teleporter;
 
-        return ColliderCategory.None;
+        return null;
     }
-
-    public static bool IsStaticCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Static;
-
-    public static bool IsDynamicCollider(Collider col) => GetColliderCategory(col) == ColliderCategory.Dynamic && col.Type.Value != ColliderType.Trigger;
-
-    public static bool IsInteractable(Collider col) => GetColliderCategory(col) == ColliderCategory.Interactable;
-
-    public static bool IsWaterBox(Collider col) => GetColliderCategory(col) == ColliderCategory.WaterBox;
-
-    public static bool IsTeleporter(Collider col) => GetColliderCategory(col) == ColliderCategory.Teleporter;
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
     {
@@ -82,7 +79,7 @@ public static class Utils
 
         foreach (Collider col in wld.RootSlot.GetComponentsInChildren<Collider>())
         {
-            if (!IsStaticCollider(col)) continue;
+            if (GetColliderCategory(col) != ColliderCategory.Static) continue;
 
             string[] tagParts = col.Slot.Tag?.Split(',');
             Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
@@ -100,14 +97,12 @@ public static class Utils
         }
 
         // Print all MeshColliders that are Null or Non-Readable
-        if (Utils.CheckDebug())
+        
+        meshColliders.Where(InvalidCollider).Do(invalid =>
         {
-            meshColliders.Where(InvalidCollider).Do(invalid =>
-            {
-                Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}");
-                StaticSurfaces.Remove(invalid.collider);
-            });
-        }
+            if (Config.DebugEnabled.Value) Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}");
+            StaticSurfaces.Remove(invalid.collider);
+        });
 
         // Remove all MeshColliders that are Null or Non-Readable
         meshColliders.RemoveAll(InvalidCollider);
@@ -125,7 +120,7 @@ public static class Utils
             int newTotalMeshColliderTris = totalMeshColliderTris + meshTrisCount;
             if (newTotalMeshColliderTris > maxTris)
             {
-                if (Utils.CheckDebug()) Logger.Warn($"[{meshCollider.GetType()}] {meshCollider.Slot.Name} ({meshCollider.ReferenceID}) Mesh has too many triangles.");
+                if (Config.DebugEnabled.Value) Logger.Warn($"[{meshCollider.GetType()}] {meshCollider.Slot.Name} ({meshCollider.ReferenceID}) Mesh has too many triangles.");
                 StaticSurfaces.Remove(meshCollider);
                 continue;
             }
@@ -282,15 +277,6 @@ public static class Utils
         return sounds[redIndex];
     }
 
-    public static bool CheckDebug()
-    {
-        bool debug = false;
-#if DEBUG
-        debug = true;
-#endif
-        return debug || Config.DebugEnabled.Value;
-    }
-
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);
 
     public static List<T> GetTempList<T>(this List<T> source) => new List<T>(source);
@@ -316,11 +302,6 @@ public static class Utils
         return query.ToList();
     }
 
-    public static floatQ LookAt(this Slot target, float3 targetPoint)
-    {
-        return floatQ.LookRotation(target.Parent.GlobalPointToLocal(in targetPoint) - target.LocalPosition, float3.Up);
-    }
-
     public static bool HasCapType(uint flags, MarioCapType capType)
     {
         return capType switch
@@ -340,3 +321,5 @@ public static class Utils
 
     public static User GetAllocatingUser(this Slot slot) => slot.World.GetUserByAllocationID(slot.ReferenceID.User);
 }
+
+internal record ColliderOp(ColliderCategory Category, ColliderOpResult Result);

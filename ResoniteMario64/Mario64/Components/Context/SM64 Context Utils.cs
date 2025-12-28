@@ -1,5 +1,4 @@
-﻿using System;
-using FrooxEngine;
+﻿using FrooxEngine;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
 

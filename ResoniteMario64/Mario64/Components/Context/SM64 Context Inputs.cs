@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using Elements.Core;
+﻿using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using Renderite.Shared;
@@ -25,7 +20,7 @@ public sealed partial class SM64Context
     private void HandleInputs()
     {
         InputInterface inp = World.InputInterface;
-        if(!Config.UnlockMovementKeyToggle.Value)
+        if (!Config.UnlockMovementKeyToggle.Value)
         {
             _movementBlocked = !inp.GetKey(Config.UnlockMovementKey.Value);
         }
@@ -124,14 +119,14 @@ public sealed partial class SM64Context
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
         return length > 1.0f
-                ? new float2(input.x / length, input.y / length)
-                : input;
+            ? new float2(input.x / length, input.y / length)
+            : input;
     }
 
     private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => ShouldBlockInit() && c.Side.Value == hand;
     private static bool ShouldBlockInputs() => ShouldBlockInit() && Config.BlockDashWithMarios.Value;
     private static bool ShouldBlockInit() => Instance?.World != null && Instance.AnyControlledMarios && Instance.World.InputInterface.VR_Active && !Instance.World.LocalUser.HasActiveFocus();
-    
+
     [HarmonyPatch(typeof(UserspaceRadiantDash), nameof(UserspaceRadiantDash.Open), MethodType.Setter)]
     public class DashInputBlocker
     {
@@ -194,80 +189,33 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
     public class MarioInputBlocker
     {
-        private static bool _blockedInputs;
+        private static bool _reset;
         public static void Postfix(InteractionHandler __instance)
         {
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
-            
+
             bool isIndex = __instance.Controller is IndexController;
+            Slot locomotionModules = isIndex ? __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule?.Slot.Parent : null;
             if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
             {
-                if (isIndex)
+                if (isIndex && locomotionModules?.ActiveSelf != false)
                 {
-                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
-                    switch (module)
-                    {
-                        case PhysicalLocomotion phys:
-                            
-                            if (phys.Archetype.Value == LocomotionArchetype.Fly)
-                            {
-                                phys.CharacterController.AirSpeed.Value = 0f;
-                            }
-                            else if (phys.Archetype.Value == LocomotionArchetype.Walk)
-                            {
-                                phys.CharacterController.Speed.Value = 0f;
-                            }
-
-                            break;
-                        case NoclipLocomotion noclip:
-                            noclip.MaxSpeed.Value = 0f;
-                            break;
-                    }
+                    locomotionModules?.ActiveSelf = false;
+                    _reset = false;
                 }
                 else
                 {
                     __instance.Inputs.Axis.RegisterBlocks = true;
                 }
-
-                _blockedInputs = true;
             }
-            else if (_blockedInputs)
+            else
             {
-                if (isIndex)
+                if (isIndex && locomotionModules?.ActiveSelf != true)
                 {
-                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
-                    var builder = __instance.World.RootSlot.GetComponentInChildren<CommonAvatarBuilder>();
-                    switch (module)
-                    {
-                        case PhysicalLocomotion phys:
-
-                            if (phys.Archetype.Value == LocomotionArchetype.Fly && phys.CharacterController.AirSpeed.Value == 0f)
-                            {
-                                var fly = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.Archetype.Value == LocomotionArchetype.Fly);
-                                phys.CharacterController.AirSpeed.Value = fly?.CharacterController.AirSpeed.Value ?? 10f;
-                            }
-                            else if (phys.CharacterController.Speed.Value == 0f)
-                            {
-                                var walk = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.Archetype.Value == LocomotionArchetype.Walk);
-                                phys.CharacterController.Speed.Value = walk?.CharacterController.Speed.Value ?? 4f;
-                            }
-
-                            break;
-                        case NoclipLocomotion noclip:
-                            if (noclip.MaxSpeed.Value == 0f)
-                            {
-                                var noclip2 = builder?.LocomotionModules.Target?.GetComponentInChildren<NoclipLocomotion>();
-                                noclip.MaxSpeed.Value = noclip2?.MaxSpeed.Value ?? 15f;
-                            }
-                            break;
-                    }
+                    if (_reset) return;
+                    locomotionModules?.ActiveSelf = true;
+                    _reset = true;
                 }
-                else
-                {
-                    __instance.Inputs.Axis.RegisterBlocks = true;
-                }
-
-                _blockedInputs = false;
             }
             /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
             {
@@ -281,6 +229,13 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(StandardGamepad), nameof(StandardGamepad.Bind))]
     public class GamepadInputBlocker
     {
-        public static bool Prefix() => !Config.UseGamepad.Value;
+        public static bool Prefix()
+        {
+            if (!Config.UseGamepad.Value) return true;
+
+            Logger.Warn("Blocking StandardGamepad binding because SM64 is using gamepad input.");
+            return false;
+
+        }
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
 using Elements.Assets;
 using FrooxEngine;
 using FrooxEngine.CommonAvatar;
@@ -22,7 +18,7 @@ public sealed partial class SM64Context
 
     private readonly short[] _audioBuffer = new short[NativeBufferSize];
 
-    private readonly Stopwatch _audioStopwatch = Stopwatch.StartNew();
+    private readonly Stopwatch _audioStopwatch = new Stopwatch();
     private readonly StereoSample[] _convertedBuffer = new StereoSample[(int)(NativeBufferSize * (TargetSampleRate / (float)NativeSampleRate))];
     private double _audioAccumulator;
     private AudioOutput _marioAudioOutput;
