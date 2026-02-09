@@ -727,12 +727,12 @@ public unsafe struct SM64MarioState
 {
     public fixed float Position[3];
     public fixed float Velocity[3];
-
     public float FacingAngle;
-
+    public float ForwardVelocity;
     public short Health;
-
     public uint ActionFlags;
+    public int AnimID;
+    public short AnimFrame;
     public uint StateFlags;
     public uint ParticleFlags;
     public short InvincibleTimer;

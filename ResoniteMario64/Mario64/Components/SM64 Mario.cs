@@ -280,6 +280,18 @@ public sealed class SM64Mario : ISM64Object
         get => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
         set => MarioSpace.TryWriteValue(HealthPointsVarName, value);
     }
+    
+    public int SyncedAnimID
+    {
+        get => MarioSpace.TryReadValue(AnimIDVarName, out int animId) ? animId : 0;
+        set => MarioSpace.TryWriteValue(AnimIDVarName, value);
+    }
+    
+    public short SyncedAnimFrame
+    {
+        get => MarioSpace.TryReadValue(AnimFrameVarName, out short animId) ? animId : (short)0;
+        set => MarioSpace.TryWriteValue(AnimFrameVarName, value);
+    }
 
     public uint SyncedActionFlags
     {
@@ -419,6 +431,9 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
+
+            DynamicValueVariable<int> animId = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            animId.VariableName.Value = AnimIDVarName;
 
             DynamicValueVariable<uint> actionFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             actionFlags.VariableName.Value = ActionFlagsVarName;
@@ -623,6 +638,8 @@ public sealed class SM64Mario : ISM64Object
         {
             SyncedStateFlags = CurrentStateFlags;
             SyncedActionFlags = CurrentActionFlags;
+            SyncedAnimID = CurrentState.AnimID;
+            SyncedAnimFrame = CurrentState.AnimFrame;
 
             foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
             {

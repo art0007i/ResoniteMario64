@@ -7,15 +7,15 @@
 
 #if defined(_WIN32)
 #ifdef SM64_LIB_EXPORT
-        #define SM64_LIB_FN __declspec(dllexport)
+#define SM64_LIB_FN __declspec(dllexport)
 #else
-        #define SM64_LIB_FN __declspec(dllimport)
+#define SM64_LIB_FN __declspec(dllimport)
 #endif
 #elif defined(__GNUC__) && __GNUC__ >= 4
 #ifdef SM64_LIB_EXPORT
-        #define SM64_LIB_FN __attribute__ ((visibility("default")))
+#define SM64_LIB_FN __attribute__ ((visibility("default")))
 #else
-        #define SM64_LIB_FN
+#define SM64_LIB_FN
 #endif
 #else
 #define SM64_LIB_FN
@@ -23,6 +23,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 struct SM64Surface
@@ -58,8 +59,11 @@ struct SM64MarioState
     float position[3];
     float velocity[3];
     float faceAngle;
+    float forwardVelocity;
     int16_t health;
     uint32_t action;
+    int32_t animID;
+    int16_t animFrame;
     uint32_t flags;
     uint32_t particleFlags;
     int16_t invincTimer;

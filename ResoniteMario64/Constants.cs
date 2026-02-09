@@ -31,6 +31,8 @@ public static class Constants
     public const string CoinsVarName = "Coins";
     public const string RedCoinVarName = "RedCoins";
     public const string StarVarName = "Stars";
+    public const string AnimIDVarName = "AnimID";
+    public const string AnimFrameVarName = "AnimFrame";
     public const string ActionFlagsVarName = "ActionFlags";
     public const string StateFlagsVarName = "StateFlags";
 
