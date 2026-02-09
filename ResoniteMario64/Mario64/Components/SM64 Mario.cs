@@ -432,6 +432,9 @@ public sealed class SM64Mario : ISM64Object
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
 
+            DynamicValueVariable<short> animFrame = varsSlot.AttachComponent<DynamicValueVariable<short>>();
+            animFrame.VariableName.Value = AnimFrameVarName;
+            
             DynamicValueVariable<int> animId = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             animId.VariableName.Value = AnimIDVarName;
 
