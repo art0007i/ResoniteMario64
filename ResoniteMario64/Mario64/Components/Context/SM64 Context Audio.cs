@@ -48,12 +48,14 @@ public sealed partial class SM64Context
                 float defaultVolume = (float)Config.AudioVolume.DefaultValue;
 
 
+                Slot localSlot = null;
+                AudioOutput localAudio = null;
                 if (useLocalAudio)
                 {
-                    Slot localSlot = World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
+                    localSlot = World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
                     localSlot.Tag = AudioTag;
 
-                    AudioOutput localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
+                    localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
                     if (localAttached || localAudio.Source.Target == null)
                     {
                         localAudio.Source.Target = _marioAudioStream;
@@ -109,6 +111,28 @@ public sealed partial class SM64Context
                         overrideForUser.CreateOverrideOnWrite.Value = true;
                     }
                 });
+
+                DynamicReferenceVariable<IField<float>> floatField = globalSlot?.GetComponentOrAttach<DynamicReferenceVariable<IField<float>>>();
+                if (floatField != null)
+                {
+                    floatField.VariableName.Value = "VolumeLevel";
+                    floatField.Reference.Target = globalAudio?.Volume;
+                }
+
+                ValueEqualityDriver<float> valEqual = globalSlot?.GetComponentOrAttach<ValueEqualityDriver<float>>();
+                if (valEqual != null)
+                {
+                    valEqual.TargetValue.Target = globalAudio.Volume;
+                    valEqual.Target.Target = globalAudio.EnabledField;
+                    valEqual.Invert.Value = true;
+                }
+
+                ValueEqualityDriver<float> localValEqual = localSlot?.GetComponentOrAttach<ValueEqualityDriver<float>>();
+                if (localValEqual != null)
+                {
+                    localValEqual.TargetValue.Target = globalAudio?.Volume;
+                    localValEqual.Target.Target = localAudio.EnabledField;
+                }
 
                 if (_audioSlot != null)
                 {

@@ -319,7 +319,19 @@ public static class Utils
         return (flags & (uint)StateFlag.Teleporting) != 0;
     }
 
-    public static User GetAllocatingUser(this Slot slot) => slot.World.GetUserByAllocationID(slot.ReferenceID.User);
+    public static User GetAllocatingUser(this Slot slot)
+    {
+        Slot element = slot.FilterWorldElement();
+        if (element == null) return null;
+
+        element.ReferenceID.ExtractIDs(out ulong position, out byte allocationId);
+        User user = element.World.GetUserByAllocationID(allocationId);
+
+        if (user == null) return null;
+        if (position < user.AllocationIDStart) return null;
+
+        return user;
+    }
 }
 
 internal record ColliderOp(ColliderCategory Category, ColliderOpResult Result);

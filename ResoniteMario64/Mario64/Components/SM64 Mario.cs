@@ -187,7 +187,7 @@ public sealed class SM64Mario : ISM64Object
         {
             if (_joystickStream == null || _joystickStream.IsRemoved)
             {
-                _joystickStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickVarName}", out bool created);
+                _joystickStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
                     _joystickStream.Group = "SM64";
@@ -208,7 +208,7 @@ public sealed class SM64Mario : ISM64Object
         {
             if (_jumpStream == null || _jumpStream.IsRemoved)
             {
-                _jumpStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpVarName}", out bool created);
+                _jumpStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
                     _jumpStream.Group = "SM64";
@@ -229,7 +229,7 @@ public sealed class SM64Mario : ISM64Object
         {
             if (_punchStream == null || _punchStream.IsRemoved)
             {
-                _punchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchVarName}", out bool created);
+                _punchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
                     _punchStream.Group = "SM64";
@@ -250,7 +250,7 @@ public sealed class SM64Mario : ISM64Object
         {
             if (_crouchStream == null || _crouchStream.IsRemoved)
             {
-                _crouchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchVarName}", out bool created);
+                _crouchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
                     _crouchStream.Group = "SM64";
@@ -268,6 +268,10 @@ public sealed class SM64Mario : ISM64Object
 #endregion
 
 #region Synced Variables & State
+
+    public bool IsControlled => !Context.MyMarios.Any(x => x.SyncedControlled) || SyncedControlled;
+
+    public bool SyncedControlled => MarioSpace.TryReadValue("IsControlled", out bool isControlled) && isControlled;
 
     public bool SyncedIsShown
     {
@@ -564,7 +568,7 @@ public sealed class SM64Mario : ISM64Object
         Uri uri = Config.MarioUrl.Value;
         if (uri == null)
         {
-            uri = new Uri("resdb:///4a51849e3d7065641304a06981da62c4177a8b403553b2bf685f1460e3664b05.brson");
+            uri = new Uri("resdb:///ac7d686dec35e073d39f9d33c40f7386f1e140bababe8c244fdc6efc2b26987d.brson");
         }
 
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
@@ -603,11 +607,13 @@ public sealed class SM64Mario : ISM64Object
 
         if (IsLocal)
         {
+            bool isControlled = IsControlled;
+
             // Send Data to the streams
-            Joystick = GetJoystickAxes();
-            Jump = GetButtonHeld(Button.Jump);
-            Punch = GetButtonHeld(Button.Kick);
-            Crouch = GetButtonHeld(Button.Stomp);
+            Joystick = isControlled ? GetJoystickAxes() : float2.Zero;
+            Jump = isControlled && GetButtonHeld(Button.Jump);
+            Punch = isControlled && GetButtonHeld(Button.Kick);
+            Crouch = isControlled && GetButtonHeld(Button.Stomp);
         }
 
         inputs.stickX = Joystick.x;

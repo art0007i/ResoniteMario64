@@ -134,6 +134,10 @@ public sealed partial class SM64Context : IDisposable
                 WorldVariableSpace.SpaceName.Value = "World";
             }
 
+            DynamicReferenceVariable<Slot> contextWorldVeriable = ContextSlot.GetComponentOrAttach<DynamicReferenceVariable<Slot>>();
+            contextWorldVeriable.Reference.Target = ContextSlot;
+            contextWorldVeriable.VariableName.Value = $"World/{ContextSpaceName}";
+
             // Context Host
             DynamicReferenceVariable<User> contextHost = ContextSlot.GetComponentOrAttach<DynamicReferenceVariable<User>>(out bool hostAttached);
             if (hostAttached)
@@ -159,9 +163,7 @@ public sealed partial class SM64Context : IDisposable
             if (scaleAttached || contextHost.Reference.Target == null)
             {
                 scale.VariableName.Value = ScaleVarName;
-                scale.Value.Value = WorldVariableSpace?.TryReadValue(ScaleVarName, out float scaleValue) ?? false
-                        ? scaleValue
-                        : Config.MarioScaleFactor.Value;
+                scale.Value.Value = WorldVariableSpace?.TryReadValue(ScaleVarName, out float scaleValue) ?? false ? scaleValue : Config.MarioScaleFactor.Value;
             }
 
             scale.Value.OnValueChange += val =>
@@ -219,6 +221,10 @@ public sealed partial class SM64Context : IDisposable
             MyMariosSlot.Tag = MarioContainerTag;
 
             MyMariosSlot.GetComponentOrAttach<DestroyOnUserLeave>().TargetUser.Target = world.LocalUser;
+
+            DynamicReferenceVariable<Slot> myMarioDynvar = MyMariosSlot.GetComponentOrAttach<DynamicReferenceVariable<Slot>>();
+            myMarioDynvar.VariableName.Value = $"{world.LocalUser.UserID}-Marios";
+            myMarioDynvar.Reference.Target = MyMariosSlot;
 
             world.RunInUpdates(2, () => MyMariosSlot.SetParent(MarioContainersSlot));
 
