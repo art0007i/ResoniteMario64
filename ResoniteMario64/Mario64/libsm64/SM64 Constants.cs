@@ -4,7 +4,7 @@ namespace ResoniteMario64.Mario64.libsm64;
 
 public static class SM64Constants
 {
-    public enum SM64TerrainType
+    public enum SM64TerrainType : ushort
     {
         Grass = 0x0000,
         Stone = 0x0001,
@@ -15,7 +15,7 @@ public static class SM64Constants
         Slide = 0x0006
     }
 
-    public enum SM64SurfaceType
+    public enum SM64SurfaceType : short
     {
         Default = 0x0000,                // Environment default
         Burning = 0x0001,                // Lava / Frostbite (in SL), but is used mostly for Lava
@@ -86,7 +86,7 @@ public static class SM64Constants
         Damage = 8
     }
 
-#region Music
+    #region Music
 
     // seq_ids.h
     private const ushort SequenceVariation = 0x80;
@@ -237,9 +237,9 @@ public static class SM64Constants
     /// <returns>A 32-bit unsigned integer encoding the sound parameters</returns>
     private static uint SoundArgLoad(uint bank, uint playFlags, uint soundID, uint priority, uint flags2) => bank << 28 | playFlags << 24 | soundID << 16 | priority << 8 | flags2 << 4 | (uint)SoundPlaybackStatus.Starting;
 
-#endregion
+    #endregion
 
-#region Sounds
+    #region Sounds
 
     [Flags]
     [SuppressMessage("ReSharper", "InconsistentNaming")]
@@ -1225,13 +1225,13 @@ public static class SM64Constants
         { Sounds.Object2_MriSpinning, SoundArgLoad(9, 0, 0x6B, 0x00, 8) },
     };
 
-#endregion
+    #endregion
 
     // mario_animation_ids.h
     /// <summary>
     /// Represents all of Mario's animation IDs.
     /// </summary>
-    public enum MarioAnimationId : int
+    public enum SM64MarioAnimationID : short
     {
         SlowLedgeGrab,                  // 0x00 
         FallOverBackwards,              // 0x01 
@@ -1442,6 +1442,20 @@ public static class SM64Constants
         ReturnFromStarDance,            // 0xCE 
         ForwardSpinningFlip,            // 0xCF 
         TripleJumpFly                   // 0xD0
+    }
+
+    [Flags]
+    public enum SM64AnimationFlags : short
+    {
+        Loop = 0,             // 0x00
+        NoLoop = (1 << 0),    // 0x01
+        Forward = (1 << 1),   // 0x02
+        _2 = (1 << 2),        // 0x04
+        HorTrans = (1 << 3),  // 0x08
+        VertTrans = (1 << 4), // 0x10
+        _5 = (1 << 5),        // 0x20
+        _6 = (1 << 6),        // 0x40
+        _7 = (1 << 7),        // 0x80
     }
 
     // sm64.h
@@ -1808,267 +1822,266 @@ public static class SM64Constants
         ActionFlag.Mario_Throwing
     };
 
-    public static readonly Dictionary<ActionGroup, List<ActionFlag>> GroupedFlags =
-            new Dictionary<ActionGroup, List<ActionFlag>>
-            {
-                [ActionGroup.Stationary] = new List<ActionFlag>
-                {
-                    ActionFlag.Idle,
-                    ActionFlag.StartSleeping,
-                    ActionFlag.Sleeping,
-                    ActionFlag.WakingUp,
-                    ActionFlag.Panting,
-                    ActionFlag.HoldPantingUnused,
-                    ActionFlag.HoldIdle,
-                    ActionFlag.HoldHeavyIdle,
-                    ActionFlag.StandingAgainstWall,
-                    ActionFlag.Coughing,
-                    ActionFlag.Shivering,
-                    ActionFlag.InQuicksand,
-                    ActionFlag.Unknown_0002020E,
-                    ActionFlag.Crouching,
-                    ActionFlag.StartCrouching,
-                    ActionFlag.StopCrouching,
-                    ActionFlag.StartCrawling,
-                    ActionFlag.StopCrawling,
-                    ActionFlag.SlideKickSlideStop,
-                    ActionFlag.ShockwaveBounce,
-                    ActionFlag.FirstPerson,
-                    ActionFlag.BackflipLandStop,
-                    ActionFlag.JumpLandStop,
-                    ActionFlag.DoubleJumpLandStop,
-                    ActionFlag.FreefallLandStop,
-                    ActionFlag.SideFlipLandStop,
-                    ActionFlag.HoldJumpLandStop,
-                    ActionFlag.HoldFreefallLandStop,
-                    ActionFlag.AirThrowLand,
-                    ActionFlag.TwirlLand,
-                    ActionFlag.LavaBoostLand,
-                    ActionFlag.TripleJumpLandStop,
-                    ActionFlag.LongJumpLandStop,
-                    ActionFlag.GroundPoundLand,
-                    ActionFlag.BrakingStop,
-                    ActionFlag.ButtSlideStop,
-                    ActionFlag.HoldButtSlideStop
-                },
+    public static readonly Dictionary<ActionGroup, List<ActionFlag>> GroupedFlags = new Dictionary<ActionGroup, List<ActionFlag>>
+    {
+        [ActionGroup.Stationary] = new List<ActionFlag>
+        {
+            ActionFlag.Idle,
+            ActionFlag.StartSleeping,
+            ActionFlag.Sleeping,
+            ActionFlag.WakingUp,
+            ActionFlag.Panting,
+            ActionFlag.HoldPantingUnused,
+            ActionFlag.HoldIdle,
+            ActionFlag.HoldHeavyIdle,
+            ActionFlag.StandingAgainstWall,
+            ActionFlag.Coughing,
+            ActionFlag.Shivering,
+            ActionFlag.InQuicksand,
+            ActionFlag.Unknown_0002020E,
+            ActionFlag.Crouching,
+            ActionFlag.StartCrouching,
+            ActionFlag.StopCrouching,
+            ActionFlag.StartCrawling,
+            ActionFlag.StopCrawling,
+            ActionFlag.SlideKickSlideStop,
+            ActionFlag.ShockwaveBounce,
+            ActionFlag.FirstPerson,
+            ActionFlag.BackflipLandStop,
+            ActionFlag.JumpLandStop,
+            ActionFlag.DoubleJumpLandStop,
+            ActionFlag.FreefallLandStop,
+            ActionFlag.SideFlipLandStop,
+            ActionFlag.HoldJumpLandStop,
+            ActionFlag.HoldFreefallLandStop,
+            ActionFlag.AirThrowLand,
+            ActionFlag.TwirlLand,
+            ActionFlag.LavaBoostLand,
+            ActionFlag.TripleJumpLandStop,
+            ActionFlag.LongJumpLandStop,
+            ActionFlag.GroundPoundLand,
+            ActionFlag.BrakingStop,
+            ActionFlag.ButtSlideStop,
+            ActionFlag.HoldButtSlideStop
+        },
 
-                [ActionGroup.Moving] = new List<ActionFlag>
-                {
-                    ActionFlag.Walking,
-                    ActionFlag.HoldWalking,
-                    ActionFlag.TurningAround,
-                    ActionFlag.FinishTurningAround,
-                    ActionFlag.Braking,
-                    ActionFlag.RidingShellGround,
-                    ActionFlag.HoldHeavyWalking,
-                    ActionFlag.Crawling,
-                    ActionFlag.BurningGround,
-                    ActionFlag.Decelerating,
-                    ActionFlag.HoldDecelerating,
-                    ActionFlag.BeginSliding,
-                    ActionFlag.HoldBeginSliding,
-                    ActionFlag.ButtSlide,
-                    ActionFlag.StomachSlide,
-                    ActionFlag.HoldButtSlide,
-                    ActionFlag.HoldStomachSlide,
-                    ActionFlag.DiveSlide,
-                    ActionFlag.MovePunching,
-                    ActionFlag.CrouchSlide,
-                    ActionFlag.SlideKickSlide,
-                    ActionFlag.HardBackwardGroundKb,
-                    ActionFlag.HardForwardGroundKb,
-                    ActionFlag.BackwardGroundKb,
-                    ActionFlag.ForwardGroundKb,
-                    ActionFlag.SoftBackwardGroundKb,
-                    ActionFlag.SoftForwardGroundKb,
-                    ActionFlag.GroundBonk,
-                    ActionFlag.DeathExitLand,
-                    ActionFlag.JumpLand,
-                    ActionFlag.FreefallLand,
-                    ActionFlag.DoubleJumpLand,
-                    ActionFlag.SideFlipLand,
-                    ActionFlag.HoldJumpLand,
-                    ActionFlag.HoldFreefallLand,
-                    ActionFlag.QuicksandJumpLand,
-                    ActionFlag.HoldQuicksandJumpLand,
-                    ActionFlag.TripleJumpLand,
-                    ActionFlag.LongJumpLand,
-                    ActionFlag.BackflipLand
-                },
+        [ActionGroup.Moving] = new List<ActionFlag>
+        {
+            ActionFlag.Walking,
+            ActionFlag.HoldWalking,
+            ActionFlag.TurningAround,
+            ActionFlag.FinishTurningAround,
+            ActionFlag.Braking,
+            ActionFlag.RidingShellGround,
+            ActionFlag.HoldHeavyWalking,
+            ActionFlag.Crawling,
+            ActionFlag.BurningGround,
+            ActionFlag.Decelerating,
+            ActionFlag.HoldDecelerating,
+            ActionFlag.BeginSliding,
+            ActionFlag.HoldBeginSliding,
+            ActionFlag.ButtSlide,
+            ActionFlag.StomachSlide,
+            ActionFlag.HoldButtSlide,
+            ActionFlag.HoldStomachSlide,
+            ActionFlag.DiveSlide,
+            ActionFlag.MovePunching,
+            ActionFlag.CrouchSlide,
+            ActionFlag.SlideKickSlide,
+            ActionFlag.HardBackwardGroundKb,
+            ActionFlag.HardForwardGroundKb,
+            ActionFlag.BackwardGroundKb,
+            ActionFlag.ForwardGroundKb,
+            ActionFlag.SoftBackwardGroundKb,
+            ActionFlag.SoftForwardGroundKb,
+            ActionFlag.GroundBonk,
+            ActionFlag.DeathExitLand,
+            ActionFlag.JumpLand,
+            ActionFlag.FreefallLand,
+            ActionFlag.DoubleJumpLand,
+            ActionFlag.SideFlipLand,
+            ActionFlag.HoldJumpLand,
+            ActionFlag.HoldFreefallLand,
+            ActionFlag.QuicksandJumpLand,
+            ActionFlag.HoldQuicksandJumpLand,
+            ActionFlag.TripleJumpLand,
+            ActionFlag.LongJumpLand,
+            ActionFlag.BackflipLand
+        },
 
-                [ActionGroup.Airborne] = new List<ActionFlag>
-                {
-                    ActionFlag.Jump,
-                    ActionFlag.DoubleJump,
-                    ActionFlag.TripleJump,
-                    ActionFlag.Backflip,
-                    ActionFlag.SteepJump,
-                    ActionFlag.WallKickAir,
-                    ActionFlag.SideFlip,
-                    ActionFlag.LongJump,
-                    ActionFlag.WaterJump,
-                    ActionFlag.Dive,
-                    ActionFlag.Freefall,
-                    ActionFlag.TopOfPoleJump,
-                    ActionFlag.ButtSlideAir,
-                    ActionFlag.FlyingTripleJump,
-                    ActionFlag.ShotFromCannon,
-                    ActionFlag.Flying,
-                    ActionFlag.RidingShellJump,
-                    ActionFlag.RidingShellFall,
-                    ActionFlag.VerticalWind,
-                    ActionFlag.HoldJump,
-                    ActionFlag.HoldFreefall,
-                    ActionFlag.HoldButtSlideAir,
-                    ActionFlag.HoldWaterJump,
-                    ActionFlag.Twirling,
-                    ActionFlag.ForwardRollout,
-                    ActionFlag.AirHitWall,
-                    ActionFlag.RidingHoot,
-                    ActionFlag.GroundPound,
-                    ActionFlag.SlideKick,
-                    ActionFlag.AirThrow,
-                    ActionFlag.JumpKick,
-                    ActionFlag.BackwardRollout,
-                    ActionFlag.CrazyBoxBounce,
-                    ActionFlag.SpecialTripleJump,
-                    ActionFlag.BackwardAirKb,
-                    ActionFlag.ForwardAirKb,
-                    ActionFlag.HardForwardAirKb,
-                    ActionFlag.HardBackwardAirKb,
-                    ActionFlag.BurningJump,
-                    ActionFlag.BurningFall,
-                    ActionFlag.SoftBonk,
-                    ActionFlag.LavaBoost,
-                    ActionFlag.GettingBlown,
-                    ActionFlag.ThrownForward,
-                    ActionFlag.ThrownBackward
-                },
+        [ActionGroup.Airborne] = new List<ActionFlag>
+        {
+            ActionFlag.Jump,
+            ActionFlag.DoubleJump,
+            ActionFlag.TripleJump,
+            ActionFlag.Backflip,
+            ActionFlag.SteepJump,
+            ActionFlag.WallKickAir,
+            ActionFlag.SideFlip,
+            ActionFlag.LongJump,
+            ActionFlag.WaterJump,
+            ActionFlag.Dive,
+            ActionFlag.Freefall,
+            ActionFlag.TopOfPoleJump,
+            ActionFlag.ButtSlideAir,
+            ActionFlag.FlyingTripleJump,
+            ActionFlag.ShotFromCannon,
+            ActionFlag.Flying,
+            ActionFlag.RidingShellJump,
+            ActionFlag.RidingShellFall,
+            ActionFlag.VerticalWind,
+            ActionFlag.HoldJump,
+            ActionFlag.HoldFreefall,
+            ActionFlag.HoldButtSlideAir,
+            ActionFlag.HoldWaterJump,
+            ActionFlag.Twirling,
+            ActionFlag.ForwardRollout,
+            ActionFlag.AirHitWall,
+            ActionFlag.RidingHoot,
+            ActionFlag.GroundPound,
+            ActionFlag.SlideKick,
+            ActionFlag.AirThrow,
+            ActionFlag.JumpKick,
+            ActionFlag.BackwardRollout,
+            ActionFlag.CrazyBoxBounce,
+            ActionFlag.SpecialTripleJump,
+            ActionFlag.BackwardAirKb,
+            ActionFlag.ForwardAirKb,
+            ActionFlag.HardForwardAirKb,
+            ActionFlag.HardBackwardAirKb,
+            ActionFlag.BurningJump,
+            ActionFlag.BurningFall,
+            ActionFlag.SoftBonk,
+            ActionFlag.LavaBoost,
+            ActionFlag.GettingBlown,
+            ActionFlag.ThrownForward,
+            ActionFlag.ThrownBackward
+        },
 
-                [ActionGroup.Submerged] = new List<ActionFlag>
-                {
-                    ActionFlag.WaterIdle,
-                    ActionFlag.HoldWaterIdle,
-                    ActionFlag.WaterActionEnd,
-                    ActionFlag.HoldWaterActionEnd,
-                    ActionFlag.Drowning,
-                    ActionFlag.BackwardWaterKb,
-                    ActionFlag.ForwardWaterKb,
-                    ActionFlag.WaterDeath,
-                    ActionFlag.WaterShocked,
-                    ActionFlag.Breaststroke,
-                    ActionFlag.SwimmingEnd,
-                    ActionFlag.FlutterKick,
-                    ActionFlag.HoldBreaststroke,
-                    ActionFlag.HoldSwimmingEnd,
-                    ActionFlag.HoldFlutterKick,
-                    ActionFlag.WaterShellSwimming,
-                    ActionFlag.WaterThrow,
-                    ActionFlag.WaterPunch,
-                    ActionFlag.WaterPlunge,
-                    ActionFlag.CaughtInWhirlpool,
-                    ActionFlag.MetalWaterStanding,
-                    ActionFlag.HoldMetalWaterStanding,
-                    ActionFlag.MetalWaterWalking,
-                    ActionFlag.HoldMetalWaterWalking,
-                    ActionFlag.MetalWaterFalling,
-                    ActionFlag.HoldMetalWaterFalling,
-                    ActionFlag.MetalWaterFallLand,
-                    ActionFlag.HoldMetalWaterFallLand,
-                    ActionFlag.MetalWaterJump,
-                    ActionFlag.HoldMetalWaterJump,
-                    ActionFlag.MetalWaterJumpLand,
-                    ActionFlag.HoldMetalWaterJumpLand
-                },
+        [ActionGroup.Submerged] = new List<ActionFlag>
+        {
+            ActionFlag.WaterIdle,
+            ActionFlag.HoldWaterIdle,
+            ActionFlag.WaterActionEnd,
+            ActionFlag.HoldWaterActionEnd,
+            ActionFlag.Drowning,
+            ActionFlag.BackwardWaterKb,
+            ActionFlag.ForwardWaterKb,
+            ActionFlag.WaterDeath,
+            ActionFlag.WaterShocked,
+            ActionFlag.Breaststroke,
+            ActionFlag.SwimmingEnd,
+            ActionFlag.FlutterKick,
+            ActionFlag.HoldBreaststroke,
+            ActionFlag.HoldSwimmingEnd,
+            ActionFlag.HoldFlutterKick,
+            ActionFlag.WaterShellSwimming,
+            ActionFlag.WaterThrow,
+            ActionFlag.WaterPunch,
+            ActionFlag.WaterPlunge,
+            ActionFlag.CaughtInWhirlpool,
+            ActionFlag.MetalWaterStanding,
+            ActionFlag.HoldMetalWaterStanding,
+            ActionFlag.MetalWaterWalking,
+            ActionFlag.HoldMetalWaterWalking,
+            ActionFlag.MetalWaterFalling,
+            ActionFlag.HoldMetalWaterFalling,
+            ActionFlag.MetalWaterFallLand,
+            ActionFlag.HoldMetalWaterFallLand,
+            ActionFlag.MetalWaterJump,
+            ActionFlag.HoldMetalWaterJump,
+            ActionFlag.MetalWaterJumpLand,
+            ActionFlag.HoldMetalWaterJumpLand
+        },
 
-                [ActionGroup.Cutscene] = new List<ActionFlag>
-                {
-                    ActionFlag.Disappeared,
-                    ActionFlag.IntroCutscene,
-                    ActionFlag.StarDanceExit,
-                    ActionFlag.StarDanceWater,
-                    ActionFlag.FallAfterStarGrab,
-                    ActionFlag.ReadingAutomaticDialog,
-                    ActionFlag.ReadingNpcDialog,
-                    ActionFlag.StarDanceNoExit,
-                    ActionFlag.ReadingSign,
-                    ActionFlag.JumboStarCutscene,
-                    ActionFlag.WaitingForDialog,
-                    ActionFlag.DebugFreeMove,
-                    ActionFlag.StandingDeath,
-                    ActionFlag.QuicksandDeath,
-                    ActionFlag.Electrocution,
-                    ActionFlag.Suffocation,
-                    ActionFlag.DeathOnStomach,
-                    ActionFlag.DeathOnBack,
-                    ActionFlag.EatenByBubba,
-                    ActionFlag.EndPeachCutscene,
-                    ActionFlag.CreditsCutscene,
-                    ActionFlag.EndWavingCutscene,
-                    ActionFlag.PullingDoor,
-                    ActionFlag.PushingDoor,
-                    ActionFlag.WarpDoorSpawn,
-                    ActionFlag.EmergeFromPipe,
-                    ActionFlag.SpawnSpinAirborne,
-                    ActionFlag.SpawnSpinLanding,
-                    ActionFlag.ExitAirborne,
-                    ActionFlag.ExitLandSaveDialog,
-                    ActionFlag.DeathExit,
-                    ActionFlag.UnusedDeathExit,
-                    ActionFlag.FallingDeathExit,
-                    ActionFlag.SpecialExitAirborne,
-                    ActionFlag.SpecialDeathExit,
-                    ActionFlag.FallingExitAirborne,
-                    ActionFlag.UnlockingKeyDoor,
-                    ActionFlag.UnlockingStarDoor,
-                    ActionFlag.EnteringStarDoor,
-                    ActionFlag.SpawnNoSpinAirborne,
-                    ActionFlag.SpawnNoSpinLanding,
-                    ActionFlag.BbhEnterJump,
-                    ActionFlag.BbhEnterSpin,
-                    ActionFlag.TeleportFadeOut,
-                    ActionFlag.TeleportFadeIn,
-                    ActionFlag.Shocked,
-                    ActionFlag.Squished,
-                    ActionFlag.HeadStuckInGround,
-                    ActionFlag.ButtStuckInGround,
-                    ActionFlag.FeetStuckInGround,
-                    ActionFlag.PuttingOnCap
-                },
+        [ActionGroup.Cutscene] = new List<ActionFlag>
+        {
+            ActionFlag.Disappeared,
+            ActionFlag.IntroCutscene,
+            ActionFlag.StarDanceExit,
+            ActionFlag.StarDanceWater,
+            ActionFlag.FallAfterStarGrab,
+            ActionFlag.ReadingAutomaticDialog,
+            ActionFlag.ReadingNpcDialog,
+            ActionFlag.StarDanceNoExit,
+            ActionFlag.ReadingSign,
+            ActionFlag.JumboStarCutscene,
+            ActionFlag.WaitingForDialog,
+            ActionFlag.DebugFreeMove,
+            ActionFlag.StandingDeath,
+            ActionFlag.QuicksandDeath,
+            ActionFlag.Electrocution,
+            ActionFlag.Suffocation,
+            ActionFlag.DeathOnStomach,
+            ActionFlag.DeathOnBack,
+            ActionFlag.EatenByBubba,
+            ActionFlag.EndPeachCutscene,
+            ActionFlag.CreditsCutscene,
+            ActionFlag.EndWavingCutscene,
+            ActionFlag.PullingDoor,
+            ActionFlag.PushingDoor,
+            ActionFlag.WarpDoorSpawn,
+            ActionFlag.EmergeFromPipe,
+            ActionFlag.SpawnSpinAirborne,
+            ActionFlag.SpawnSpinLanding,
+            ActionFlag.ExitAirborne,
+            ActionFlag.ExitLandSaveDialog,
+            ActionFlag.DeathExit,
+            ActionFlag.UnusedDeathExit,
+            ActionFlag.FallingDeathExit,
+            ActionFlag.SpecialExitAirborne,
+            ActionFlag.SpecialDeathExit,
+            ActionFlag.FallingExitAirborne,
+            ActionFlag.UnlockingKeyDoor,
+            ActionFlag.UnlockingStarDoor,
+            ActionFlag.EnteringStarDoor,
+            ActionFlag.SpawnNoSpinAirborne,
+            ActionFlag.SpawnNoSpinLanding,
+            ActionFlag.BbhEnterJump,
+            ActionFlag.BbhEnterSpin,
+            ActionFlag.TeleportFadeOut,
+            ActionFlag.TeleportFadeIn,
+            ActionFlag.Shocked,
+            ActionFlag.Squished,
+            ActionFlag.HeadStuckInGround,
+            ActionFlag.ButtStuckInGround,
+            ActionFlag.FeetStuckInGround,
+            ActionFlag.PuttingOnCap
+        },
 
-                [ActionGroup.Automatic] = new List<ActionFlag>
-                {
-                    ActionFlag.HoldingPole,
-                    ActionFlag.GrabPoleSlow,
-                    ActionFlag.GrabPoleFast,
-                    ActionFlag.ClimbingPole,
-                    ActionFlag.TopOfPoleTransition,
-                    ActionFlag.TopOfPole,
-                    ActionFlag.StartHanging,
-                    ActionFlag.Hanging,
-                    ActionFlag.HangMoving,
-                    ActionFlag.LedgeGrab,
-                    ActionFlag.LedgeClimbSlow1,
-                    ActionFlag.LedgeClimbSlow2,
-                    ActionFlag.LedgeClimbDown,
-                    ActionFlag.LedgeClimbFast,
-                    ActionFlag.Grabbed,
-                    ActionFlag.InCannon,
-                    ActionFlag.TornadoTwirling
-                },
+        [ActionGroup.Automatic] = new List<ActionFlag>
+        {
+            ActionFlag.HoldingPole,
+            ActionFlag.GrabPoleSlow,
+            ActionFlag.GrabPoleFast,
+            ActionFlag.ClimbingPole,
+            ActionFlag.TopOfPoleTransition,
+            ActionFlag.TopOfPole,
+            ActionFlag.StartHanging,
+            ActionFlag.Hanging,
+            ActionFlag.HangMoving,
+            ActionFlag.LedgeGrab,
+            ActionFlag.LedgeClimbSlow1,
+            ActionFlag.LedgeClimbSlow2,
+            ActionFlag.LedgeClimbDown,
+            ActionFlag.LedgeClimbFast,
+            ActionFlag.Grabbed,
+            ActionFlag.InCannon,
+            ActionFlag.TornadoTwirling
+        },
 
-                [ActionGroup.Object] = new List<ActionFlag>
-                {
-                    ActionFlag.Punching,
-                    ActionFlag.PickingUp,
-                    ActionFlag.DivePickingUp,
-                    ActionFlag.StomachSlideStop,
-                    ActionFlag.PlacingDown,
-                    ActionFlag.Throwing,
-                    ActionFlag.HeavyThrow,
-                    ActionFlag.PickingUpBowser,
-                    ActionFlag.HoldingBowser,
-                    ActionFlag.ReleasingBowser
-                }
-            };
+        [ActionGroup.Object] = new List<ActionFlag>
+        {
+            ActionFlag.Punching,
+            ActionFlag.PickingUp,
+            ActionFlag.DivePickingUp,
+            ActionFlag.StomachSlideStop,
+            ActionFlag.PlacingDown,
+            ActionFlag.Throwing,
+            ActionFlag.HeavyThrow,
+            ActionFlag.PickingUpBowser,
+            ActionFlag.HoldingBowser,
+            ActionFlag.ReleasingBowser
+        }
+    };
 }

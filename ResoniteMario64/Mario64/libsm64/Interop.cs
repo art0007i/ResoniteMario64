@@ -53,7 +53,7 @@ public static class Interop
     */
     // public static int SM64MaxVertexDistance => 250000 * (int)ScaleFactor;
 
-    private const float SM64MaxVertexDistance = 23170f; // 32767f / sqrt(2) -- We need to figure out if we need to change this based on scale...
+    private static float SM64MaxVertexDistance = float.MaxValue;
 
     public const float SM64Deg2Angle = 182.04459f;
 
@@ -113,81 +113,81 @@ public static class Interop
 
     // Mario Lifecycle
     [DllImport("sm64")]
-    private static extern uint sm64_mario_create(float x, float y, float z);
+    private static extern int sm64_mario_create(float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_tick(uint marioId, ref SM64MarioInputs inputs, ref SM64MarioState outState, ref SM64MarioGeometryBuffers outBuffers);
+    private static extern void sm64_mario_tick(int marioId, ref SM64MarioInputs inputs, ref SM64MarioState outState, ref SM64MarioGeometryBuffers outBuffers);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_delete(uint marioId);
+    private static extern void sm64_mario_delete(int marioId);
 
     // Mario Actions & Status
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_action(uint marioId, uint action);
+    private static extern void sm64_set_mario_action(int marioId, uint action);
 
     [DllImport("sm64", EntryPoint = "sm64_set_mario_action")]
-    private static extern void sm64_set_mario_action_with_arg(uint marioId, uint action, uint actionArg);
+    private static extern void sm64_set_mario_action_with_arg(int marioId, uint action, uint actionArg);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_state(uint marioId, uint flags);
+    private static extern void sm64_set_mario_state(int marioId, uint flags);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_health(uint marioId, ushort health);
+    private static extern void sm64_set_mario_health(int marioId, ushort health);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_invincibility(uint marioId, short timer);
+    private static extern void sm64_set_mario_invincibility(int marioId, short timer);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_take_damage(uint marioId, uint damage, uint subtype, float x, float y, float z);
+    private static extern void sm64_mario_take_damage(int marioId, uint damage, uint subtype, float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_heal(uint marioId, byte healCounter);
+    private static extern void sm64_mario_heal(int marioId, byte healCounter);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_kill(uint marioId);
+    private static extern void sm64_mario_kill(int marioId);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_interact_cap(uint marioId, uint capFlag, ushort capTime, byte playMusic);
+    private static extern void sm64_mario_interact_cap(int marioId, uint capFlag, ushort capTime, byte playMusic);
 
     [DllImport("sm64")]
-    private static extern void sm64_mario_extend_cap(uint marioId, ushort capTime);
+    private static extern void sm64_mario_extend_cap(int marioId, ushort capTime);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_animation(uint marioId, ushort animId);
+    private static extern void sm64_set_mario_animation(int marioId, ushort animId);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_anim_frame(uint marioId, short frame);
+    private static extern void sm64_set_mario_anim_frame(int marioId, short frame);
 
     [DllImport("sm64")]
     [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool sm64_mario_attack(uint marioId, float x, float y, float z, float hitboxHeight);
+    private static extern bool sm64_mario_attack(int marioId, float x, float y, float z, float hitboxHeight);
 
     // Mario Transform 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_position(uint marioId, float x, float y, float z);
+    private static extern void sm64_set_mario_position(int marioId, float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_angle(uint marioId, float x, float y, float z);
+    private static extern void sm64_set_mario_angle(int marioId, float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_faceangle(uint marioId, float y);
+    private static extern void sm64_set_mario_faceangle(int marioId, float y);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_velocity(uint marioId, float x, float y, float z);
+    private static extern void sm64_set_mario_velocity(int marioId, float x, float y, float z);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_forward_velocity(uint marioId, float vel);
+    private static extern void sm64_set_mario_forward_velocity(int marioId, float vel);
 
     /* Mario Environmental Effects */
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_water_level(uint marioId, int level);
+    private static extern void sm64_set_mario_water_level(int marioId, int level);
 
     [DllImport("sm64")]
-    private static extern void sm64_set_mario_gas_level(uint marioId, int level);
+    private static extern void sm64_set_mario_gas_level(int marioId, int level);
 
     // Static & Dynamic Surfaces
     [DllImport("sm64")]
-    private static extern void sm64_static_surfaces_load(SM64Surface[] surfaces, ulong numSurfaces);
+    private static extern void sm64_static_surfaces_load(SM64Surface[] surfaces, uint numSurfaces);
 
     [DllImport("sm64")]
     private static extern uint sm64_surface_object_create(ref SM64SurfaceObject surfaceObject);
@@ -326,12 +326,12 @@ public static class Interop
     public static void StaticSurfacesLoad(SM64Surface[] surfaces)
     {
         Logger.Debug($"Reloading all static collider surfaces - Total Polygons: {surfaces.Length}");
-        sm64_static_surfaces_load(surfaces, (ulong)surfaces.Length);
+        sm64_static_surfaces_load(surfaces, (uint)surfaces.Length);
     }
 
-    public static uint MarioCreate(float3 marioPos) => sm64_mario_create(marioPos.x, marioPos.y, marioPos.z);
+    public static int MarioCreate(float3 marioPos) => sm64_mario_create(marioPos.x, marioPos.y, marioPos.z);
 
-    public static SM64MarioState MarioTick(uint marioId, SM64MarioInputs inputs, float3[] positionBuffer, float3[] normalBuffer, float3[] colorBuffer, float2[] uvBuffer, out ushort numTrianglesUsed)
+    public static SM64MarioState MarioTick(int marioId, SM64MarioInputs inputs, float3[] positionBuffer, float3[] normalBuffer, float3[] colorBuffer, float2[] uvBuffer, out ushort numTrianglesUsed)
     {
         SM64MarioState outState = new SM64MarioState();
 
@@ -400,24 +400,24 @@ public static class Interop
         }
     }
 
-    public static void MarioDelete(uint marioId)
+    public static void MarioDelete(int marioId)
     {
         sm64_mario_delete(marioId);
     }
 
-    public static bool MarioAttack(uint marioId, float3 frooxPosition, float hitboxHeight)
+    public static bool MarioAttack(int marioId, float3 frooxPosition, float hitboxHeight)
     {
         float3 marioPos = frooxPosition.ToMarioPosition();
         return sm64_mario_attack(marioId, marioPos.x, marioPos.y, marioPos.z, hitboxHeight.ToMarioFloat());
     }
 
-    public static void MarioTakeDamage(uint marioId, float3 frooxPosition, uint damage, uint subtype = 0)
+    public static void MarioTakeDamage(int marioId, float3 frooxPosition, uint damage, uint subtype = 0)
     {
         float3 marioPos = frooxPosition.ToMarioPosition();
         sm64_mario_take_damage(marioId, damage, subtype, marioPos.x, marioPos.y, marioPos.z);
     }
 
-    public static unsafe void MarioSetVelocity(uint marioId, SM64MarioState previousState, SM64MarioState currentState)
+    public static unsafe void MarioSetVelocity(int marioId, SM64MarioState previousState, SM64MarioState currentState)
     {
         sm64_set_mario_velocity(marioId,
                                 currentState.Position[0] - previousState.Position[0],
@@ -425,13 +425,13 @@ public static class Interop
                                 currentState.Position[2] - previousState.Position[2]);
     }
 
-    public static void MarioSetVelocity(uint marioId, float3 frooxVelocity)
+    public static void MarioSetVelocity(int marioId, float3 frooxVelocity)
     {
         float3 marioVelocity = frooxVelocity.ToMarioPosition();
         sm64_set_mario_velocity(marioId, marioVelocity.x, marioVelocity.y, marioVelocity.z);
     }
 
-    public static void MarioSetForwardVelocity(uint marioId, float frooxVelocity)
+    public static void MarioSetForwardVelocity(int marioId, float frooxVelocity)
     {
         sm64_set_mario_forward_velocity(marioId, frooxVelocity * ScaleFactor);
     }
@@ -477,8 +477,8 @@ public static class Interop
         return new SM64Surface
         {
             Force = (short)(force == -1 ? 0 : force),
-            Type = (short)surfaceType,
-            Terrain = (ushort)terrainType,
+            Type = surfaceType,
+            Terrain = terrainType,
 
             v0x = ClampToSm64(p0.x),
             v0y = ClampToSm64(p0.y),
@@ -494,10 +494,10 @@ public static class Interop
         };
     }
 
-    private static int ClampToSm64(float value)
+    private static float ClampToSm64(float value)
     {
         float scaled = ScaleFactor * value;
-        return (int)Math.Clamp(scaled, -SM64MaxVertexDistance, SM64MaxVertexDistance);
+        return Math.Clamp(scaled, -SM64MaxVertexDistance, SM64MaxVertexDistance);
     }
 
     public static SM64Surface NonClampedSurface(int i, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
@@ -505,29 +505,29 @@ public static class Interop
         return new SM64Surface
         {
             Force = (short)(force == -1 ? 0 : force),
-            Type = (short)surfaceType,
-            Terrain = (ushort)terrainType,
+            Type = surfaceType,
+            Terrain = terrainType,
 
-            v0x = (int)(ScaleFactor * -vertices[triangles[i]].x),
-            v0y = (int)(ScaleFactor * vertices[triangles[i]].y),
-            v0z = (int)(ScaleFactor * vertices[triangles[i]].z),
+            v0x = ScaleFactor * -vertices[triangles[i]].x,
+            v0y = ScaleFactor * vertices[triangles[i]].y,
+            v0z = ScaleFactor * vertices[triangles[i]].z,
 
-            v1x = (int)(ScaleFactor * -vertices[triangles[i + 2]].x),
-            v1y = (int)(ScaleFactor * vertices[triangles[i + 2]].y),
-            v1z = (int)(ScaleFactor * vertices[triangles[i + 2]].z),
+            v1x = ScaleFactor * -vertices[triangles[i + 2]].x,
+            v1y = ScaleFactor * vertices[triangles[i + 2]].y,
+            v1z = ScaleFactor * vertices[triangles[i + 2]].z,
 
-            v2x = (int)(ScaleFactor * -vertices[triangles[i + 1]].x),
-            v2y = (int)(ScaleFactor * vertices[triangles[i + 1]].y),
-            v2z = (int)(ScaleFactor * vertices[triangles[i + 1]].z)
+            v2x = ScaleFactor * -vertices[triangles[i + 1]].x,
+            v2y = ScaleFactor * vertices[triangles[i + 1]].y,
+            v2z = ScaleFactor * vertices[triangles[i + 1]].z
         };
     }
 
-    public static void SetWaterLevel(uint marioId, float waterLevel)
+    public static void SetWaterLevel(int marioId, float waterLevel)
     {
         sm64_set_mario_water_level(marioId, (int)waterLevel.ToMarioFloat());
     }
 
-    public static void SetGasLevel(uint marioId, float gasLevel)
+    public static void SetGasLevel(int marioId, float gasLevel)
     {
         sm64_set_mario_gas_level(marioId, (int)gasLevel.ToMarioFloat());
     }
@@ -608,28 +608,28 @@ public static class Interop
         sm64_surface_object_delete(id);
     }
 
-    public static void MarioCap(uint marioId, StateFlag stateFlag, float durationSeconds, bool playCapMusic)
+    public static void MarioCap(int marioId, StateFlag stateFlag, float durationSeconds, bool playCapMusic)
     {
         sm64_mario_interact_cap(marioId, (uint)stateFlag, (ushort)(durationSeconds * SecondsMultiplier), (byte)(playCapMusic ? 1 : 0));
     }
 
-    public static void MarioCap(uint marioId, uint flag, float durationSeconds, bool playCapMusic)
+    public static void MarioCap(int marioId, uint flag, float durationSeconds, bool playCapMusic)
     {
         sm64_mario_interact_cap(marioId, flag, (ushort)(durationSeconds * SecondsMultiplier), (byte)(playCapMusic ? 1 : 0));
     }
 
-    public static void MarioCapExtend(uint marioId, float durationSeconds)
+    public static void MarioCapExtend(int marioId, float durationSeconds)
     {
         sm64_mario_extend_cap(marioId, (ushort)(durationSeconds * SecondsMultiplier));
     }
 
-    public static void MarioSetPosition(uint marioId, float3 pos)
+    public static void MarioSetPosition(int marioId, float3 pos)
     {
         float3 marioPos = pos.ToMarioPosition();
         sm64_set_mario_position(marioId, marioPos.x, marioPos.y, marioPos.z);
     }
 
-    public static void MarioSetFaceAngle(uint marioId, floatQ rot)
+    public static void MarioSetFaceAngle(int marioId, floatQ rot)
     {
         float angleInDegrees = rot.EulerAngles.y;
         if (angleInDegrees > 180f)
@@ -640,64 +640,64 @@ public static class Interop
         sm64_set_mario_faceangle(marioId, -MathX.Deg2Rad * angleInDegrees);
     }
 
-    public static void MarioSetRotation(uint marioId, floatQ rotation)
+    public static void MarioSetRotation(int marioId, floatQ rotation)
     {
         float3 marioRotation = rotation.EulerAngles.ToMarioRotation();
         sm64_set_mario_angle(marioId, marioRotation.x, marioRotation.y, marioRotation.z);
     }
 
-    public static void MarioSetHealthPoints(uint marioId, float healthPoints)
+    public static void MarioSetHealthPoints(int marioId, float healthPoints)
     {
         sm64_set_mario_health(marioId, (ushort)(healthPoints * SM64HealthPerHealthPoint));
     }
 
-    public static void MarioSetInvincibility(uint marioId, short timer)
+    public static void MarioSetInvincibility(int marioId, short timer)
     {
         sm64_set_mario_invincibility(marioId, timer);
     }
 
-    public static void MarioHeal(uint marioId, byte healthPoints)
+    public static void MarioHeal(int marioId, byte healthPoints)
     {
         // It was healing 0.25 with 1, so we multiplied by 4 EZ FIX
         sm64_mario_heal(marioId, (byte)(healthPoints * HealPointMultiplier));
     }
 
-    public static void MarioKill(uint marioId)
+    public static void MarioKill(int marioId)
     {
         sm64_mario_kill(marioId);
     }
 
-    public static void MarioSetAction(uint marioId, ActionFlag actionFlag)
+    public static void MarioSetAction(int marioId, ActionFlag actionFlag)
     {
         sm64_set_mario_action(marioId, (uint)actionFlag);
     }
 
-    public static void MarioSetAction(uint marioId, uint actionFlags)
+    public static void MarioSetAction(int marioId, uint actionFlags)
     {
         sm64_set_mario_action(marioId, actionFlags);
     }
 
-    public static void MarioSetAction(uint marioId, ActionFlag actionFlag, uint actionArg)
+    public static void MarioSetAction(int marioId, ActionFlag actionFlag, uint actionArg)
     {
         sm64_set_mario_action_with_arg(marioId, (uint)actionFlag, actionArg);
     }
 
-    public static void MarioSetState(uint marioId, StateFlag stateFlag)
+    public static void MarioSetState(int marioId, StateFlag stateFlag)
     {
         sm64_set_mario_state(marioId, (uint)stateFlag);
     }
 
-    public static void MarioSetState(uint marioId, uint stateFlags)
+    public static void MarioSetState(int marioId, uint stateFlags)
     {
         sm64_set_mario_state(marioId, stateFlags);
     }
 
-    public static void MarioSetAnimation(uint marioId, ushort animId)
+    public static void MarioSetAnimation(int marioId, ushort animId)
     {
         sm64_set_mario_animation(marioId, animId);
     }
 
-    public static void MarioSetAnimFrame(uint marioId, short frame)
+    public static void MarioSetAnimFrame(int marioId, short frame)
     {
         sm64_set_mario_anim_frame(marioId, frame);
     }
@@ -706,12 +706,12 @@ public static class Interop
 [StructLayout(LayoutKind.Sequential)]
 public struct SM64Surface
 {
-    public short Type;
+    public SM64SurfaceType Type;
     public short Force;
-    public ushort Terrain;
-    public int v0x, v0y, v0z;
-    public int v1x, v1y, v1z;
-    public int v2x, v2y, v2z;
+    public SM64TerrainType Terrain;
+    public float v0x, v0y, v0z;
+    public float v1x, v1y, v1z;
+    public float v2x, v2y, v2z;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -723,6 +723,37 @@ public struct SM64MarioInputs
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct Animation
+{
+    public SM64AnimationFlags Flags;
+    public short AnimYTransDivisor;
+    public short StartFrame;
+    public short LoopStart;
+    public short LoopEnd;
+    public short UnusedBoneCount;
+
+    public IntPtr Values;
+    public IntPtr Index;
+
+    public uint Length;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct AnimInfo
+{
+    public SM64MarioAnimationID AnimID;
+    public short AnimYTrans;
+    public IntPtr CurAnimPtr;
+    public Animation CurrentAnim => CurAnimPtr == nint.Zero ? default(Animation) : Marshal.PtrToStructure<Animation>(CurAnimPtr);
+
+    public short AnimFrame;
+    public ushort AnimTimer;
+
+    public int AnimFrameAccelAssist;
+    public int AnimAccel;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public unsafe struct SM64MarioState
 {
     public fixed float Position[3];
@@ -730,10 +761,10 @@ public unsafe struct SM64MarioState
     public float FacingAngle;
     public float ForwardVelocity;
     public short Health;
-    public uint ActionFlags;
-    public int AnimID;
-    public short AnimFrame;
-    public uint StateFlags;
+    public ActionFlag ActionFlags;
+    public IntPtr AnimInfoPtr;
+    public AnimInfo AnimInfo => AnimInfoPtr == nint.Zero ? default(AnimInfo) : Marshal.PtrToStructure<AnimInfo>(AnimInfoPtr);
+    public StateFlag StateFlags;
     public uint ParticleFlags;
     public short InvincibleTimer;
 
@@ -742,13 +773,13 @@ public unsafe struct SM64MarioState
 
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
 
-    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint || (ActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
-    public bool IsAttacking => (ActionFlags & (uint)ActionFlag.Attacking) != 0;
+    public bool IsDead => Health < 1 * Interop.SM64HealthPerHealthPoint || (ActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
+    public bool IsAttacking => (ActionFlags & ActionFlag.Attacking) != 0;
     public bool IsFirstPerson => IsFlyingOrSwimming;
-    public bool IsFlyingOrSwimming => (ActionFlags & (uint)ActionFlag.SwimmingOrFlying) != 0;
-    public bool IsSwimming => (ActionFlags & (uint)ActionFlag.Swimming) != 0;
-    public bool IsFlying => (ActionFlags & (uint)ActionFlag.Flying) == (uint)ActionFlag.Flying;
-    public bool IsTeleporting => (StateFlags & (uint)StateFlag.Teleporting) != 0;
+    public bool IsFlyingOrSwimming => (ActionFlags & ActionFlag.SwimmingOrFlying) != 0;
+    public bool IsSwimming => (ActionFlags & ActionFlag.Swimming) != 0;
+    public bool IsFlying => (ActionFlags & ActionFlag.Flying) == ActionFlag.Flying;
+    public bool IsTeleporting => (StateFlags & StateFlag.Teleporting) != 0;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -820,12 +851,12 @@ public unsafe struct SM64SurfaceCollisionData
     public short force;
     public byte flags;
     public byte room;
-    public int lowerY;
-    public int upperY;
+    public float lowerY;
+    public float upperY;
 
-    public fixed int vertex1[3];
-    public fixed int vertex2[3];
-    public fixed int vertex3[3];
+    public fixed float vertex1[3];
+    public fixed float vertex2[3];
+    public fixed float vertex3[3];
 
     public float3 normal;
     public float originOffset;

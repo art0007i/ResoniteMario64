@@ -30,7 +30,7 @@ struct SM64Surface
     int16_t type;
     int16_t force;
     uint16_t terrain;
-    int32_t vertices[3][3];
+    float vertices[3][3]; // world-space coordinates
 };
 
 struct SM64MarioInputs
@@ -61,8 +61,7 @@ struct SM64MarioState
     float forwardVelocity;
     int16_t health;
     uint32_t action;
-    int32_t animID;
-    int16_t animFrame;
+    struct AnimInfo* animInfo;
     uint32_t flags;
     uint32_t particleFlags;
     int16_t invincTimer;
@@ -116,11 +115,11 @@ struct SM64SurfaceCollisionData
     int16_t force;
     int8_t flags;
     int8_t room;
-    int32_t lowerY; // libsm64: 32 bit
-    int32_t upperY; // libsm64: 32 bit
-    int32_t vertex1[3]; // libsm64: 32 bit
-    int32_t vertex2[3]; // libsm64: 32 bit
-    int32_t vertex3[3]; // libsm64: 32 bit
+    float lowerY;
+    float upperY;
+    float vertex1[3];
+    float vertex2[3];
+    float vertex3[3];
     struct {
         float x;
         float y;

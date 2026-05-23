@@ -187,15 +187,18 @@ public sealed partial class SM64Context
         }
 
         float volume = Config.AudioVolume.Value;
-
-        if (_audioSlot.IsLocalElement)
+        
+        _audioSlot.RunSynchronously(() =>
         {
-            _marioAudioOutput.Volume.Value = volume;
-        }
-        else
-        {
-            _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, volume);
-        }
+            if (_audioSlot.IsLocalElement)
+            {
+                _marioAudioOutput.Volume.Value = volume;
+            }
+            else
+            {
+                _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, volume);
+            }
+        }, true);
     }
 
     private void HandleDisableChange(object value, EventArgs args)

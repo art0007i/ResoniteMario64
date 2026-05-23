@@ -8,24 +8,26 @@ using ResoniteMario64.Mario64.Components.Objects;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
 using static ResoniteMario64.Mario64.libsm64.SM64Constants;
+using Animation = ResoniteMario64.Mario64.libsm64.Animation;
 
 namespace ResoniteMario64.Mario64.Components;
 
 public sealed class SM64Mario : ISM64Object
 {
-#region Fields & Properties
 
-#region Constants & Static Members
+    #region Fields & Properties
+
+    #region Constants & Static Members
 
     private static float MarioScale => 1000.0f / Interop.ScaleFactor;
     private static float _skipFarMarioDistance;
     private static int _marioCollisionSampleCount;
 
-#endregion
+    #endregion
 
-#region State Flags & Core Properties
+    #region State Flags & Core Properties
 
-    public readonly uint MarioId;
+    public int MarioId { get; }
     private bool _enabled;
     private bool _isDying;
     private bool _isNuked;
@@ -34,9 +36,9 @@ public sealed class SM64Mario : ISM64Object
 
     public bool IsDisposed { get; private set; }
 
-#endregion
+    #endregion
 
-#region Resonite Components & Properties
+    #region Resonite Components & Properties
 
     public Slot MarioSlot { get; private set; }
     public User MarioUser { get; private set; }
@@ -44,13 +46,13 @@ public sealed class SM64Mario : ISM64Object
     public World World { get; private set; }
     public SM64Context Context { get; private set; }
     public bool IsLocal => MarioUser.IsLocalUser;
-    private readonly Grabbable _marioGrabbable;
+    private readonly Slider _marioGrabbable;
     private readonly CapsuleCollider _marioCollider;
     public Collider Collider => _marioCollider;
 
-#endregion
+    #endregion
 
-#region Mario State & Physics
+    #region Mario State & Physics
 
     private readonly SM64MarioState[] _states = new SM64MarioState[2];
     public SM64MarioState CurrentState => _states[1 - _buffIndex];
@@ -59,28 +61,28 @@ public sealed class SM64Mario : ISM64Object
     private bool _wasPickedUp;
     public bool IsBeingGrabbed => _marioGrabbable.IsGrabbed;
 
-    public bool IsTeleporting;
+    public bool IsTeleporting { get; set; }
 
     internal SM64Teleporter LastTeleportDestination;
 
-#endregion
+    #endregion
 
-#region Environment Interaction
+    #region Environment Interaction
 
     private float _waterLevel;
     private float _gasLevel;
 
-#endregion
+    #endregion
 
-#region Culling & Optimization
+    #region Culling & Optimization
 
     private bool _isOverMaxCount;
     private bool _isOverMaxDistance;
     private bool _wasBypassed;
 
-#endregion
+    #endregion
 
-#region Rendering & Mesh Buffers
+    #region Rendering & Mesh Buffers
 
     // Renderer Slots
     private Slot _marioRendererSlot;
@@ -110,21 +112,21 @@ public sealed class SM64Mario : ISM64Object
     private ushort _numTrianglesUsed;
     private ushort _previousNumTrianglesUsed;
 
-#endregion
+    #endregion
 
-#region Material Properties
+    #region Material Properties
 
     private IAssetProvider<Material> CurrentMaterial
     {
         get => _marioMeshRenderer.Materials.Count > 0 ? _marioMeshRenderer.Materials[0] : null;
         set
         {
-            if (_isMatSwitching) return;
+            SyncAssetList<Material> mats = _marioMeshRenderer.Materials;
+            if (_isMatSwitching || mats.Count <= 0 || mats[0] == value) return;
             _isMatSwitching = true;
             _marioMeshRenderer.RunInUpdates(2, () =>
             {
-                if (_marioMeshRenderer.Materials.Count > 0 && _marioMeshRenderer.Materials[0] != value)
-                    _marioMeshRenderer.Materials[0] = value;
+                _marioMeshRenderer.Materials[0] = value;
                 _isMatSwitching = false;
             });
         }
@@ -135,20 +137,20 @@ public sealed class SM64Mario : ISM64Object
         get => _marioMeshRenderer.Materials.Count > 1 ? _marioMeshRenderer.Materials[1] : null;
         set
         {
-            if (_isMat2Switching) return;
+            SyncAssetList<Material> mats = _marioMeshRenderer.Materials;
+            if (_isMat2Switching || mats.Count <= 1 || mats[1] == value) return;
             _isMat2Switching = true;
             _marioMeshRenderer.RunInUpdates(2, () =>
             {
-                if (_marioMeshRenderer.Materials.Count > 1 && _marioMeshRenderer.Materials[1] != value)
-                    _marioMeshRenderer.Materials[1] = value;
+                _marioMeshRenderer.Materials[1] = value;
                 _isMat2Switching = false;
             });
         }
     }
 
-#endregion
+    #endregion
 
-#region Input Properties & Streams
+    #region Input Properties & Streams
 
     // Input Properties
     private float2 Joystick
@@ -176,98 +178,90 @@ public sealed class SM64Mario : ISM64Object
     }
 
     // Input Streams
-    private ValueStream<float2> _joystickStream;
-    private ValueStream<bool> _jumpStream;
-    private ValueStream<bool> _punchStream;
-    private ValueStream<bool> _crouchStream;
 
     private ValueStream<float2> JoystickStream
     {
         get
         {
-            if (_joystickStream == null || _joystickStream.IsRemoved)
+            if (field == null || field.IsRemoved)
             {
-                _joystickStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickVarName} {Context.MyMarios.Count}", out bool created);
+                field = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<float2>>(MarioSlot.LocalUser, $"SM64 {JoystickVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
-                    _joystickStream.Group = "SM64";
-                    _joystickStream.Encoding = ValueEncoding.Full;
-                    _joystickStream.SetUpdatePeriod(2, 0);
-                    _joystickStream.SetInterpolation();
+                    field.Group = "SM64";
+                    field.Encoding = ValueEncoding.Full;
+                    field.SetUpdatePeriod(2, 0);
+                    field.SetInterpolation();
                 }
             }
 
-            return _joystickStream;
+            return field;
         }
-        set => _joystickStream = value;
     }
 
     private ValueStream<bool> JumpStream
     {
         get
         {
-            if (_jumpStream == null || _jumpStream.IsRemoved)
+            if (field == null || field.IsRemoved)
             {
-                _jumpStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpVarName} {Context.MyMarios.Count}", out bool created);
+                field = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {JumpVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
-                    _jumpStream.Group = "SM64";
-                    _jumpStream.Encoding = ValueEncoding.Full;
-                    _jumpStream.SetUpdatePeriod(2, 0);
-                    _jumpStream.SetInterpolation();
+                    field.Group = "SM64";
+                    field.Encoding = ValueEncoding.Full;
+                    field.SetUpdatePeriod(2, 0);
+                    field.SetInterpolation();
                 }
             }
 
-            return _jumpStream;
+            return field;
         }
-        set => _jumpStream = value;
     }
 
     private ValueStream<bool> PunchStream
     {
         get
         {
-            if (_punchStream == null || _punchStream.IsRemoved)
+            if (field == null || field.IsRemoved)
             {
-                _punchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchVarName} {Context.MyMarios.Count}", out bool created);
+                field = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {PunchVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
-                    _punchStream.Group = "SM64";
-                    _punchStream.Encoding = ValueEncoding.Full;
-                    _punchStream.SetUpdatePeriod(2, 0);
-                    _punchStream.SetInterpolation();
+                    field.Group = "SM64";
+                    field.Encoding = ValueEncoding.Full;
+                    field.SetUpdatePeriod(2, 0);
+                    field.SetInterpolation();
                 }
             }
 
-            return _punchStream;
+            return field;
         }
-        set => _punchStream = value;
     }
 
     private ValueStream<bool> CrouchStream
     {
         get
         {
-            if (_crouchStream == null || _crouchStream.IsRemoved)
+            if (field == null || field.IsRemoved)
             {
-                _crouchStream = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchVarName} {Context.MyMarios.Count}", out bool created);
+                field = CommonAvatarBuilder.GetStreamOrAdd<ValueStream<bool>>(MarioSlot.LocalUser, $"SM64 {CrouchVarName} {Context.MyMarios.Count}", out bool created);
                 if (created)
                 {
-                    _crouchStream.Group = "SM64";
-                    _crouchStream.Encoding = ValueEncoding.Full;
-                    _crouchStream.SetUpdatePeriod(2, 0);
-                    _crouchStream.SetInterpolation();
+                    field.Group = "SM64";
+                    field.Encoding = ValueEncoding.Full;
+                    field.SetUpdatePeriod(2, 0);
+                    field.SetInterpolation();
                 }
             }
 
-            return _crouchStream;
+            return field;
         }
-        set => _crouchStream = value;
     }
 
-#endregion
+    #endregion
 
-#region Synced Variables & State
+    #region Synced Variables & State
 
     public bool IsControlled => !Context.MyMarios.Any(x => x.SyncedControlled) || SyncedControlled;
 
@@ -284,29 +278,17 @@ public sealed class SM64Mario : ISM64Object
         get => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
         set => MarioSpace.TryWriteValue(HealthPointsVarName, value);
     }
-    
-    public int SyncedAnimID
+
+    public ActionFlag SyncedActionFlags
     {
-        get => MarioSpace.TryReadValue(AnimIDVarName, out int animId) ? animId : 0;
-        set => MarioSpace.TryWriteValue(AnimIDVarName, value);
-    }
-    
-    public short SyncedAnimFrame
-    {
-        get => MarioSpace.TryReadValue(AnimFrameVarName, out short animId) ? animId : (short)0;
-        set => MarioSpace.TryWriteValue(AnimFrameVarName, value);
+        get => MarioSpace.TryReadValue(ActionFlagsVarName, out uint actionFlags) ? (ActionFlag)actionFlags : 0;
+        set => MarioSpace.TryWriteValue(ActionFlagsVarName, (uint)value);
     }
 
-    public uint SyncedActionFlags
+    public StateFlag SyncedStateFlags
     {
-        get => MarioSpace.TryReadValue(ActionFlagsVarName, out uint actionFlags) ? actionFlags : 0;
-        set => MarioSpace.TryWriteValue(ActionFlagsVarName, value);
-    }
-
-    public uint SyncedStateFlags
-    {
-        get => MarioSpace.TryReadValue(StateFlagsVarName, out uint stateFlags) ? stateFlags : 0;
-        set => MarioSpace.TryWriteValue(StateFlagsVarName, value);
+        get => MarioSpace.TryReadValue(StateFlagsVarName, out uint stateFlags) ? (StateFlag)stateFlags : 0;
+        set => MarioSpace.TryWriteValue(StateFlagsVarName, (uint)value);
     }
 
     public int SyncedStarCounter
@@ -327,15 +309,70 @@ public sealed class SM64Mario : ISM64Object
         set => MarioSpace.TryWriteValue(RedCoinVarName, value);
     }
 
-    public uint CurrentActionFlags => CurrentState.ActionFlags;
-    public uint CurrentStateFlags => CurrentState.StateFlags;
+    public SM64MarioAnimationID SyncedAnimID
+    {
+        get => MarioSpace.TryReadValue(AnimIDVarName, out short animId) ? (SM64MarioAnimationID)animId : 0;
+        set => MarioSpace.TryWriteValue(AnimIDVarName, (short)value);
+    }
 
-    private uint _lastActionFlags;
-    // private uint _lastStateFlags;
+    public short SyncedAnimFrame
+    {
+        get => MarioSpace.TryReadValue(AnimFrameVarName, out short animFrame) ? animFrame : (short)0;
+        set => MarioSpace.TryWriteValue(AnimFrameVarName, value);
+    }
 
-#endregion
+    public SM64AnimationFlags SyncedAnimFlags
+    {
+        get => MarioSpace.TryReadValue(AnimFlagVarName, out short animFlag) ? (SM64AnimationFlags)animFlag : SM64AnimationFlags.NoLoop;
+        set => MarioSpace.TryWriteValue(AnimFlagVarName, (short)value);
+    }
 
-#endregion
+    public short SyncedStartFrame
+    {
+        get => MarioSpace.TryReadValue(StartFrameVarName, out short animId) ? animId : (short)0;
+        set => MarioSpace.TryWriteValue(StartFrameVarName, value);
+    }
+
+    public short SyncedLoopStart
+    {
+        get => MarioSpace.TryReadValue(LoopStartVarName, out short animId) ? animId : (short)0;
+        set => MarioSpace.TryWriteValue(LoopStartVarName, value);
+    }
+
+    public short SyncedLoopEnd
+    {
+        get => MarioSpace.TryReadValue(LoopEndVarName, out short animId) ? animId : (short)0;
+        set => MarioSpace.TryWriteValue(LoopEndVarName, value);
+    }
+
+    private readonly DynamicValueVariable<float> _marioAlphaVar;
+    public float SyncedMarioAlpha
+    {
+        get
+        {
+            if (_marioAlphaVar == null || _marioAlphaVar.IsRemoved)
+                return 1f;
+
+            return _marioAlphaVar.Value;
+        }
+        set
+        {
+            if (_marioAlphaVar == null || _marioAlphaVar.IsRemoved || Math.Abs(_marioAlphaVar.Value.Value - value) < 0.001)
+                return;
+
+            _marioAlphaVar.RunSynchronously(() => _marioAlphaVar.Value.Value = value, true);
+        }
+    }
+
+    public ActionFlag CurrentActionFlags => CurrentState.ActionFlags;
+    public StateFlag CurrentStateFlags => CurrentState.StateFlags;
+
+    private ActionFlag _lastActionFlags;
+    // private StateFlag _lastStateFlags;
+
+    #endregion
+
+    #endregion
 
     static SM64Mario()
     {
@@ -368,7 +405,12 @@ public sealed class SM64Mario : ISM64Object
         MarioSpace = MarioSlot.GetComponentOrAttach<DynamicVariableSpace>();
         MarioSpace.SpaceName.Value = MarioSpaceName;
 
-        _marioGrabbable = MarioSlot.GetComponentOrAttach<Grabbable>();
+        _marioGrabbable = MarioSlot.GetComponentOrAttach<Slider>();
+        if (IsLocal)
+        {
+            _marioGrabbable.DontDrive.Value = true;
+            _marioGrabbable.Rotatable.Value = true;
+        }
 
         _marioCollider = MarioSlot.GetComponentOrAttach<CapsuleCollider>();
         if (IsLocal)
@@ -384,7 +426,7 @@ public sealed class SM64Mario : ISM64Object
 
         MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
 
-        if (MarioId == int.MaxValue)
+        if (MarioId == int.MaxValue || MarioId == int.MinValue || MarioId == -1)
         {
             Logger.Error("Failed to create Mario, Interop returned int.MaxValue", caller);
             return;
@@ -436,12 +478,6 @@ public sealed class SM64Mario : ISM64Object
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
 
-            DynamicValueVariable<short> animFrame = varsSlot.AttachComponent<DynamicValueVariable<short>>();
-            animFrame.VariableName.Value = AnimFrameVarName;
-            
-            DynamicValueVariable<int> animId = varsSlot.AttachComponent<DynamicValueVariable<int>>();
-            animId.VariableName.Value = AnimIDVarName;
-
             DynamicValueVariable<uint> actionFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             actionFlags.VariableName.Value = ActionFlagsVarName;
 
@@ -456,6 +492,30 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             starCounter.VariableName.Value = StarVarName;
+
+            Slot animVarsSlot = varsSlot.AddSlot("Animation");
+
+            DynamicValueVariable<short> animFrame = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            animFrame.VariableName.Value = AnimFrameVarName;
+
+            DynamicValueVariable<short> animId = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            animId.VariableName.Value = AnimIDVarName;
+
+            DynamicValueVariable<short> animFlags = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            animFlags.VariableName.Value = AnimFlagVarName;
+
+            DynamicValueVariable<short> startFrame = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            startFrame.VariableName.Value = StartFrameVarName;
+
+            DynamicValueVariable<short> loopStart = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            loopStart.VariableName.Value = LoopStartVarName;
+
+            DynamicValueVariable<short> loopEnd = animVarsSlot.AttachComponent<DynamicValueVariable<short>>();
+            loopEnd.VariableName.Value = LoopEndVarName;
+
+            _marioAlphaVar = varsSlot.AttachComponent<DynamicValueVariable<float>>();
+            _marioAlphaVar.VariableName.Value = MarioAlphaVarName;
+            _marioAlphaVar.Value.Value = 1f;
 
             slot.RunInUpdates(2, () =>
             {
@@ -553,7 +613,8 @@ public sealed class SM64Mario : ISM64Object
         TriangleSubmesh marioTris = _marioMesh.AddSubmesh<TriangleSubmesh>();
         for (int i = 0; i < Interop.SM64GeoMaxTriangles; i++)
         {
-            marioTris.AddTriangle(i * 3, i * 3 + 1, i * 3 + 2);
+            int idx = i * 3;
+            marioTris.AddTriangle(idx, idx + 1, idx + 2);
         }
 
         _marioMeshProvider.Mesh = _marioMesh;
@@ -565,11 +626,7 @@ public sealed class SM64Mario : ISM64Object
 
     private void CreateNonModdedRenderer()
     {
-        Uri uri = Config.MarioUrl.Value;
-        if (uri == null)
-        {
-            uri = new Uri("resdb:///ac7d686dec35e073d39f9d33c40f7386f1e140bababe8c244fdc6efc2b26987d.brson");
-        }
+        Uri uri = Config.MarioUrl.Value ?? new Uri("resdb:///ac7d686dec35e073d39f9d33c40f7386f1e140bababe8c244fdc6efc2b26987d.brson");
 
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
         if (_marioNonModdedRendererSlot == null && IsLocal)
@@ -647,8 +704,14 @@ public sealed class SM64Mario : ISM64Object
         {
             SyncedStateFlags = CurrentStateFlags;
             SyncedActionFlags = CurrentActionFlags;
-            SyncedAnimID = CurrentState.AnimID;
-            SyncedAnimFrame = CurrentState.AnimFrame;
+            AnimInfo info = CurrentState.AnimInfo;
+            Animation anim = info.CurrentAnim;
+            SyncedAnimID = info.AnimID;
+            SyncedAnimFrame = info.AnimFrame;
+            SyncedAnimFlags = anim.Flags;
+            SyncedStartFrame = anim.StartFrame;
+            SyncedLoopStart = anim.LoopStart;
+            SyncedLoopEnd = anim.LoopEnd;
 
             foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
             {
@@ -664,7 +727,7 @@ public sealed class SM64Mario : ISM64Object
             float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
             bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
 
-            bool isQuickSandDeath = (SyncedActionFlags & (uint)ActionFlag.QuicksandDeath) == (uint)ActionFlag.QuicksandDeath;
+            bool isQuickSandDeath = (SyncedActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
             bool isDeathPlaneDeath = isDeathPlane && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 15;
             if (!_isDying && (isQuickSandDeath || isDeathPlaneDeath))
             {
@@ -676,7 +739,7 @@ public sealed class SM64Mario : ISM64Object
                 _isDying = true;
 
                 float laughDelay = isQuickSandDeath ? 0.8f : isDeathPlane ? 0.4f : 2.5f;
-                float nukeDelay = isQuickSandDeath ? 2.2f : isDeathPlane ? 1.8f : 12f;
+                float nukeDelay = isQuickSandDeath  ? 2.2f : isDeathPlane ? 1.8f : 12f;
 
                 MarioSlot.RunInSeconds(laughDelay, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(nukeDelay, () => SetMarioAsNuked(true));
@@ -687,7 +750,7 @@ public sealed class SM64Mario : ISM64Object
             // This seems to be kinda broken, maybe revisit syncing the WHOLE state instead
             UpdateFlagsIfChanged();
 
-            // Trigger the cap if the synced values have cap (if we already have the cap it will ignore)
+            // Trigger the cap if the synced values have cap (if we already have the cap, it will ignore)
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
             {
                 WearCap(MarioCapType.VanishCap);
@@ -708,7 +771,7 @@ public sealed class SM64Mario : ISM64Object
                 WearCap(MarioCapType.NormalCap);
             }
 
-            if (Utils.IsTeleporting(SyncedStateFlags)/* && !Utils.IsTeleporting(CurrentStateFlags)*/ && !IsTeleporting)
+            if (Utils.IsTeleporting(SyncedStateFlags) /* && !Utils.IsTeleporting(CurrentStateFlags)*/ && !IsTeleporting)
             {
                 TeleportTo(float3.Zero);
             }
@@ -788,6 +851,11 @@ public sealed class SM64Mario : ISM64Object
         }
         else if (!IsTeleporting)
         {
+            if (Math.Abs(_marioAlphaVar.Value.Value - 1f) > 0.001f)
+            {
+                _marioAlphaVar.Value.Value = 1f;
+            }
+
             if (_marioMaterialClipped.AlbedoColor.Value != colorX.White)
             {
                 _marioMaterialClipped.AlbedoColor.Value = colorX.White;
@@ -897,10 +965,10 @@ public sealed class SM64Mario : ISM64Object
         }
     }
 
-    public void UpdateFlagsIfChanged()
+    private void UpdateFlagsIfChanged()
     {
-        uint currentActionFlags = SyncedActionFlags;
-        // uint currentStateFlags = SyncedStateFlags;
+        ActionFlag currentActionFlags = SyncedActionFlags;
+        // StateFlag currentStateFlags = SyncedStateFlags;
 
         // if (currentStateFlags != _lastStateFlags)
         // {
@@ -977,12 +1045,9 @@ public sealed class SM64Mario : ISM64Object
 
     public void WearCap(MarioCapType capType, float duration = 15f, bool playMusic = true)
     {
-        if (playMusic)
-        {
-            playMusic = Config.PlayCapMusic.Value;
-        }
-        
         if (Utils.HasCapType(CurrentStateFlags, capType)) return;
+
+        playMusic &= Config.PlayCapMusic.Value;
 
         switch (capType)
         {
@@ -991,6 +1056,7 @@ public sealed class SM64Mario : ISM64Object
             case MarioCapType.WingCap:
             case MarioCapType.NormalCap:
                 // Prevent Vanish and Wing from being active at the same time - This prevents a crash
+                // TODO: Look into why this actually happens....
                 if (capType == MarioCapType.VanishCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap) || capType == MarioCapType.WingCap && Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
                 {
                     break;
@@ -1057,7 +1123,7 @@ public sealed class SM64Mario : ISM64Object
         if (CurrentState.IsDead) return;
         IsTeleporting = true;
         SetAction(ActionFlag.TeleportFadeOut);
-        
+
         if (_marioMaterialClipped.AlbedoColor.Value != Utils.VanishCapColor)
         {
             _marioMaterialClipped.AlbedoColor.Value = Utils.VanishCapColor;
@@ -1079,6 +1145,7 @@ public sealed class SM64Mario : ISM64Object
         }
 
         MarioSlot.RunInSeconds(1f, () => _marioMeshRenderer.Enabled = false);
+        _marioAlphaVar.Value.TweenTo(0f, 1f);
         _marioMaterialClipped.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
         _marioMaterialVanish.AlbedoColor.TweenTo(new colorX(1f, 1f, 1f, 0f), 1f);
     }
@@ -1089,6 +1156,7 @@ public sealed class SM64Mario : ISM64Object
         SetAction(ActionFlag.TeleportFadeIn);
 
         _marioMeshRenderer.Enabled = true;
+        _marioAlphaVar.Value.TweenTo(1f, 1f);
         _marioMaterialClipped.AlbedoColor.TweenTo(colorX.White, 1f);
         _marioMaterialVanish.AlbedoColor.TweenTo(colorX.White, 1f);
         MarioSlot.RunInSeconds(1f, () => IsTeleporting = false);
@@ -1115,7 +1183,6 @@ public sealed class SM64Mario : ISM64Object
             anyPointInside = true;
             break;
         }
-
         return anyPointInside;
     }
 

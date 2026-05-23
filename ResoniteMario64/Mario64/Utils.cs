@@ -302,21 +302,14 @@ public static class Utils
         return query.ToList();
     }
 
-    public static bool HasCapType(uint flags, MarioCapType capType)
+    public static bool HasCapType(StateFlag flags, MarioCapType capType)
     {
-        return capType switch
-        {
-            MarioCapType.VanishCap => (flags & (uint)StateFlag.VanishCap) != 0,
-            MarioCapType.MetalCap  => (flags & (uint)StateFlag.MetalCap) != 0,
-            MarioCapType.WingCap   => (flags & (uint)StateFlag.WingCap) != 0,
-            MarioCapType.NormalCap => (flags & (uint)StateFlag.NormalCap) != 0,
-            _                      => throw new ArgumentOutOfRangeException(nameof(capType), capType, null)
-        };
+        return flags.HasFlag((StateFlag)capType);
     }
 
-    public static bool IsTeleporting(uint flags)
+    public static bool IsTeleporting(StateFlag flags)
     {
-        return (flags & (uint)StateFlag.Teleporting) != 0;
+        return flags.HasFlag(StateFlag.Teleporting);
     }
 }
 
