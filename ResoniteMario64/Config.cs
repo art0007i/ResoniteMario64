@@ -35,6 +35,8 @@ public class Config
     public static ConfigEntry<bool> DebugEnabled;
     public static ConfigEntry<bool> RenderSlotPublic;
     public static ConfigEntry<bool> LogColliderChanges;
+    public static ConfigEntry<Key> LogColliderKey;
+    public static ConfigEntry<Key> RefreshCollidersKey;
 
     internal static bool ConfigInit(ConfigFile config)
     {
@@ -65,6 +67,8 @@ public class Config
             DebugEnabled = config.Bind("Debug", "Debug Enabled", false, "Whether to enable debug mode or not.");
             RenderSlotPublic = config.Bind("Debug", "Render Slot Public", false, "When true the renderer slot will not be a local slot.");
             LogColliderChanges = config.Bind("Debug", "Log Collider Changes", false, "Whether to Log Collider changes or not.");
+            LogColliderKey = config.Bind("Debug", "Log Collider Key", Key.Backslash, "The key to toggle logging collider changes.");
+            RefreshCollidersKey = config.Bind("Debug", "Refresh Colliders Key", Key.Semicolon, "The key to refresh the colliders.");
 
             return true;
         }

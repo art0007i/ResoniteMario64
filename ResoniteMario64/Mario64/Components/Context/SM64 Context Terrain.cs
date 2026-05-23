@@ -121,9 +121,15 @@ public sealed partial class SM64Context
     {
         QueueStaticCollidersUpdate();
 
-        if (StaticColliders.ContainsKey(collider))
+        if (StaticColliders.TryGetValue(collider, out SM64StaticCollider staticCollider))
         {
-            return new ColliderOp(ColliderCategory.Static, ColliderOpResult.AlreadyExists);
+            if (collider.Slot.Tag == staticCollider.OriginalTag)
+            {
+                return new ColliderOp(ColliderCategory.Static, ColliderOpResult.AlreadyExists);
+            }
+
+            staticCollider.Dispose();
+            DynamicColliders.Remove(collider);
         }
 
         SM64StaticCollider col = new SM64StaticCollider(collider, this);
@@ -143,7 +149,7 @@ public sealed partial class SM64Context
     {
         if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
         {
-            if (dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f))
+            if (dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f) || collider.Slot.Tag == dynamicCollider.OriginalTag)
             {
                 return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.AlreadyExists);
             }
@@ -166,9 +172,15 @@ public sealed partial class SM64Context
     // Interactables
     private ColliderOp RegisterInteractable(Collider collider)
     {
-        if (Interactables.ContainsKey(collider))
+        if (Interactables.TryGetValue(collider, out SM64Interactable interactable))
         {
-            return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.AlreadyExists);
+            if (collider.Slot.Tag == interactable.OriginalTag)
+            {
+                return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.AlreadyExists);
+            }
+
+            interactable.Dispose();
+            Interactables.Remove(collider);
         }
 
         SM64Interactable col = new SM64Interactable(collider, this);
@@ -202,9 +214,15 @@ public sealed partial class SM64Context
     // Teleporters
     private ColliderOp RegisterTeleporter(Collider collider)
     {
-        if (Teleporters.ContainsKey(collider))
+        if (Teleporters.TryGetValue(collider, out SM64Teleporter teleporter))
         {
-            return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.AlreadyExists);
+            if (collider.Slot.Tag == teleporter.OriginalTag)
+            {
+                return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.AlreadyExists);
+            }
+
+            teleporter.Dispose();
+            Teleporters.Remove(collider);
         }
 
         SM64Teleporter col = new SM64Teleporter(collider, this);
@@ -268,14 +286,7 @@ public sealed partial class SM64Context
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
 
-        Utils.TryParseTagParts(
-            tagParts,
-            out SM64Constants.SM64SurfaceType surfaceType,
-            out SM64Constants.SM64TerrainType terrainType,
-            out SM64Constants.SM64InteractableType interactableType,
-            out int interactableId,
-            out int group
-        );
+        Utils.TryParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out int interactableId, out int group);
 
         string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
 
@@ -311,9 +322,7 @@ public sealed partial class SM64Context
         {
             foreach (ISM64Object obj in entry.Source)
             {
-                ColliderOpResult result = obj.Collider.IsDestroyed
-                    ? ColliderOpResult.Removed
-                    : ColliderOpResult.AlreadyExists;
+                ColliderOpResult result = obj.Collider.IsDestroyed ? ColliderOpResult.Removed : ColliderOpResult.AlreadyExists;
 
                 LogCollider(obj.Collider, new ColliderOp(entry.Category, result));
             }

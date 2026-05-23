@@ -15,6 +15,7 @@ public sealed class SM64Teleporter : ISM64Object
     public World World { get; private set; }
     public SM64Context Context { get; private set; }
     public Collider Collider { get; private set; }
+    public string OriginalTag { get; }
 
     public bool IsDisposed { get; private set; }
 
@@ -25,6 +26,7 @@ public sealed class SM64Teleporter : ISM64Object
         World = col.World;
         Context = instance;
         Collider = col;
+        OriginalTag = col.Slot.Tag;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
         Utils.TryParseTagParts(tagParts, out _, out _, out _, out ID, out Group);

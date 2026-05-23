@@ -112,11 +112,11 @@ public sealed partial class SM64Context
                     }
                 });
 
-                DynamicReferenceVariable<IField<float>> floatField = globalSlot?.GetComponentOrAttach<DynamicReferenceVariable<IField<float>>>();
+                DynamicField<float> floatField = globalSlot?.GetComponentOrAttach<DynamicField<float>>();
                 if (floatField != null)
                 {
                     floatField.VariableName.Value = "VolumeLevel";
-                    floatField.Reference.Target = globalAudio?.Volume;
+                    floatField.TargetField.Target = globalAudio?.Volume;
                 }
 
                 ValueEqualityDriver<float> valEqual = globalSlot?.GetComponentOrAttach<ValueEqualityDriver<float>>();

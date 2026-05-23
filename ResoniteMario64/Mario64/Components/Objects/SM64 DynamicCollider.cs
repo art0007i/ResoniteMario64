@@ -12,7 +12,8 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
     public SM64SurfaceType SurfaceType { get; }
     public SM64TerrainType TerrainType { get; }
     public int Force { get; }
-
+    public string OriginalTag { get; }
+    
     public readonly uint ObjectId;
 
     public World World { get; private set; }
@@ -30,6 +31,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
         World = col.World;
         Context = instance;
         Collider = col;
+        OriginalTag = col.Slot.Tag;
 
         Position = col.Slot.GlobalPosition;
         Rotation = col.Slot.GlobalRotation;

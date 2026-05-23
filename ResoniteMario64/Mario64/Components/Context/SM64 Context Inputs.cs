@@ -132,7 +132,7 @@ public sealed partial class SM64Context
     {
         public static void Prefix(ref bool value)
         {
-            if (ShouldBlockInputs()) value = false;
+            if (ShouldBlockInputs() && !(Config.UseGamepad.Value && Engine.Current.InputInterface.GetDevices<StandardGamepad>().Count != 0)) value = false;
         }
     }
 
@@ -189,40 +189,37 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
     public class MarioInputBlocker
     {
-        private static bool _reset;
+        private static bool? _lastBlocked;
+        private static Slot _cachedLocomotionModules;
+
         public static void Postfix(InteractionHandler __instance)
         {
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
 
             bool isIndex = __instance.Controller is IndexController;
-            Slot locomotionModules = isIndex ? __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule?.Slot.Parent : null;
-            if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
+            if (isIndex && _cachedLocomotionModules == null)
             {
-                if (isIndex && locomotionModules?.ActiveSelf != false)
+                LocomotionController locomotionController = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>();
+                _cachedLocomotionModules = locomotionController?.ActiveModule?.Slot?.Parent;
+            }
+
+            bool blocked = ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther());
+
+            if (_lastBlocked.HasValue && blocked == _lastBlocked) return;
+
+            _lastBlocked = blocked;
+
+            if (isIndex)
+            {
+                if (_cachedLocomotionModules != null)
                 {
-                    locomotionModules?.ActiveSelf = false;
-                    _reset = false;
-                }
-                else
-                {
-                    __instance.Inputs.Axis.RegisterBlocks = true;
+                    _cachedLocomotionModules.ActiveSelf = !blocked;
                 }
             }
             else
             {
-                if (isIndex && locomotionModules?.ActiveSelf != true)
-                {
-                    if (_reset) return;
-                    locomotionModules?.ActiveSelf = true;
-                    _reset = true;
-                }
+                __instance.Inputs.Axis.RegisterBlocks = blocked;
             }
-            /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
-            {
-                __instance.Inputs.UserspaceToggle.RegisterBlocks = true;
-                __instance.Inputs.Interact.RegisterBlocks = true;
-                __instance.Inputs.Grab.RegisterBlocks = true;
-            }*/
         }
     }
 

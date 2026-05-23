@@ -271,12 +271,12 @@ public sealed partial class SM64Context : IDisposable
     {
         if (_disposed) return;
 
-        if (World.InputInterface.GetKeyDown(Key.Semicolon))
+        if (World.InputInterface.GetKeyDown(Config.RefreshCollidersKey.Value) && Config.DebugEnabled.Value)
         {
             ReloadAllColliders();
         }
 
-        if (World.InputInterface.GetKeyDown(Key.Backslash))
+        if (World.InputInterface.GetKeyDown(Config.LogColliderKey.Value) && Config.DebugEnabled.Value)
         {
             GetAllColliders(true, out _);
         }
