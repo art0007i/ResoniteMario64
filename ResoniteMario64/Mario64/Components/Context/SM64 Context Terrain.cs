@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Reflection;
+using System.Runtime.CompilerServices;
+using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -149,7 +151,20 @@ public sealed partial class SM64Context
     {
         if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
         {
-            if (dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f) || collider.Slot.Tag == dynamicCollider.OriginalTag)
+            bool scaleChanged = !dynamicCollider.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f);
+            bool tagChanged = collider.Slot.Tag != dynamicCollider.OriginalTag;
+            bool shapeChanged = collider.ShapeChanged;
+
+            bool changed = scaleChanged || tagChanged || shapeChanged;
+
+            if (changed && dynamicCollider.IsPlayer)
+            {
+                double timeSinceChange = (collider.World.Time.AbsoluteWorldTime - dynamicCollider.LastChangedTime).TotalMilliseconds;
+
+                changed = timeSinceChange >= 100.0;
+            }
+
+            if (!changed)
             {
                 return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.AlreadyExists);
             }
@@ -157,7 +172,7 @@ public sealed partial class SM64Context
             dynamicCollider.Dispose();
             DynamicColliders.Remove(collider);
         }
-
+        
         SM64DynamicCollider col = new SM64DynamicCollider(collider, this);
         DynamicColliders.Add(collider, col);
 
@@ -286,7 +301,7 @@ public sealed partial class SM64Context
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
 
-        Utils.TryParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out int interactableId, out int group);
+        Utils.ParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out int interactableId, out int group);
 
         string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
 

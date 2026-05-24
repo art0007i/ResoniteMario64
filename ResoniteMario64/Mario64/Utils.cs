@@ -31,13 +31,13 @@ public static class Utils
 
     public static readonly colorX VanishCapColor = new colorX(1, 1, 1, 0.5f);
 
-    public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force, Func<float3, float3> transformFunc)
+    public static void TransformAndGetSurfaces(List<SM64Surface> outSurfaces, MeshX mesh, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force, Func<float3, float3> transformFunc)
     {
         for (int subMeshIndex = 0; subMeshIndex < mesh.SubmeshCount; subMeshIndex++)
         {
             Submesh submesh = mesh.GetSubmesh(subMeshIndex);
             float3[] vertices = mesh.Vertices.Select(v => transformFunc(v.Position)).ToArray();
-            Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType, force);
+            Interop.CreateAndAppendSurfaces(outSurfaces, submesh.RawIndicies, vertices, surfaceType, terrainType, flags, force);
         }
     }
 
@@ -45,17 +45,19 @@ public static class Utils
     {
         string tag = col.Slot.Tag ?? string.Empty;
 
-        bool isStatic = tag.Contains("SM64 StaticCollider") || tag.Contains("SM64 Collider");
-        bool isDynamic = tag.Contains("SM64 DynamicCollider");
-        bool isInteractable = tag.Contains("SM64 Interactable");
-        bool isWaterBox = tag.Contains("SM64 WaterBox");
-        bool isTeleporter = tag.Contains("SM64 Teleporter");
+        const StringComparison comp = StringComparison.OrdinalIgnoreCase;
+        bool isStatic = tag.Contains("SM64 StaticCollider", comp) || tag.Contains("SM64 Collider", comp);
+        bool isDynamic = tag.Contains("SM64 DynamicCollider", comp);
+        bool isInteractable = tag.Contains("SM64 Interactable", comp);
+        bool isWaterBox = tag.Contains("SM64 WaterBox", comp);
+        bool isTeleporter = tag.Contains("SM64 Teleporter", comp);
+        bool isCharacterController = col.Type.Value == ColliderType.CharacterController && col.Slot.GetComponent<UserRoot>() != null;
         bool isValid = col.Enabled && col.Slot.IsActive;
 
         if ((isStatic || ((ICollider)col).CollidesWithCharacters) && !isDynamic && isValid)
             return ColliderCategory.Static;
 
-        if (isDynamic && isValid && col.Type.Value != ColliderType.Trigger)
+        if (isDynamic || isCharacterController && isValid && !Collider.IsTrigger(col.Type.Value))
             return ColliderCategory.Dynamic;
 
         if (isInteractable && col.Enabled)
@@ -82,7 +84,7 @@ public static class Utils
             if (GetColliderCategory(col) != ColliderCategory.Static) continue;
 
             string[] tagParts = col.Slot.Tag?.Split(',');
-            Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
+            Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
 
             if (col is MeshCollider meshCollider)
             {
@@ -90,7 +92,7 @@ public static class Utils
             }
             else
             {
-                GetTransformedSurfaces(col, surfaces, surfaceType, terrainType, force);
+                GetTransformedSurfaces(surfaces, col, surfaceType, terrainType, SM64SurfaceFlag.None, force);
             }
 
             StaticSurfaces.Add(col);
@@ -125,7 +127,7 @@ public static class Utils
                 continue;
             }
 
-            GetTransformedSurfaces(meshCollider, surfaces, surfaceType, terrainType, force);
+            GetTransformedSurfaces(surfaces, meshCollider, surfaceType, terrainType, SM64SurfaceFlag.None, force);
             totalMeshColliderTris = newTotalMeshColliderTris;
         }
 
@@ -145,18 +147,18 @@ public static class Utils
     }
 
     // Function used for static colliders. Returns correct global positions, rotations and scales.
-    public static void GetTransformedSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static void GetTransformedSurfaces(List<SM64Surface> surfaces, Collider collider, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force)
     {
-        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
+        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, flags, force, x => collider.Slot.LocalPointToGlobal(x + collider.Offset));
     }
 
     // Function used for dynamic colliders. Returns correct scales. (rotation and position are set dynamically)
-    public static void GetScaledSurfaces(Collider collider, List<SM64Surface> surfaces, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static void GetScaledSurfaces(List<SM64Surface> surfaces, Collider collider, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force)
     {
-        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
+        TransformAndGetSurfaces(surfaces, collider.GetColliderMesh(), surfaceType, terrainType, flags, force, x => collider.Slot.GlobalScale * (x + collider.Offset));
     }
 
-    public static void TryParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx, out int ext)
+    public static void ParseTagParts(string[] tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out SM64InteractableType interactableType, out int idx, out int ext)
     {
         surfaceType = SM64SurfaceType.Default;
         terrainType = SM64TerrainType.Grass;

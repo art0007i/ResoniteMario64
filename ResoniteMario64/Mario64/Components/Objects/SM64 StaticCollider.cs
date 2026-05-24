@@ -20,14 +20,21 @@ public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
 
     public SM64StaticCollider(Collider col, SM64Context instance)
     {
+        if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
+        {
+            if (Config.DebugEnabled.Value) Logger.Warn($"[StaticCollider{mc.GetType()}] {mc.Slot.Name} ({mc.ReferenceID}) Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}");
+            Dispose();
+            return;
+        }
+
         World = col.World;
         Context = instance;
         Collider = col;
         OriginalTag = col.Slot.Tag;
-        
+
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force, out _);
-        
+        Utils.ParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force, out _);
+
         SurfaceType = surfaceType;
         TerrainType = terrainType;
         Force = force;

@@ -13,21 +13,31 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
     public SM64TerrainType TerrainType { get; }
     public int Force { get; }
     public string OriginalTag { get; }
-    
+
     public readonly uint ObjectId;
 
     public World World { get; private set; }
     public SM64Context Context { get; private set; }
     public Collider Collider { get; private set; }
+    public bool IsPlayer { get; internal set; }
 
     public float3 Position { get; private set; }
     public floatQ Rotation { get; private set; }
     public float3 InitScale { get; }
 
+    public DateTime LastChangedTime { get; private set; }
+
     public bool IsDisposed { get; private set; }
 
     public SM64DynamicCollider(Collider col, SM64Context instance)
     {
+        if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
+        {
+            if (Config.DebugEnabled.Value) Logger.Warn($"{mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
+            Dispose();
+            return;
+        }
+
         World = col.World;
         Context = instance;
         Collider = col;
@@ -38,22 +48,19 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
         InitScale = col.Slot.GlobalScale;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
-        
+        Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
+
         SurfaceType = surfaceType;
         TerrainType = terrainType;
         Force = force;
 
-        if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
-        {
-            if (Config.DebugEnabled.Value) Logger.Warn($"{mc.Slot.Name} Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}, so we won't be able to use this as a collider for Mario :(");
-            Dispose();
-            return;
-        }
+        IsPlayer = col.Type.Value == ColliderType.CharacterController && col.Slot.GetComponent<UserRoot>() != null;
 
         List<SM64Surface> surfaces = new List<SM64Surface>();
-        Utils.GetScaledSurfaces(col, surfaces, SurfaceType, TerrainType, Force);
+        Utils.GetScaledSurfaces(surfaces, col, SurfaceType, TerrainType, SM64SurfaceFlag.Dynamic, Force);
         ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
+
+        LastChangedTime = col.World.Time.AbsoluteWorldTime;
     }
 
     private bool UpdateCurrentPositionData()

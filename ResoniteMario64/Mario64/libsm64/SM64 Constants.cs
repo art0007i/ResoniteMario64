@@ -72,6 +72,14 @@ public static class SM64Constants
         Trapdoor = 0x00FF                // Bowser Left trapdoor, has no action defined
     }
 
+    public enum SM64SurfaceFlag : sbyte
+    {
+        None = 0,
+        Dynamic = (1 << 0),
+        NoCollision = (1 << 1),
+        XProjection = (1 << 3)
+    }
+
     public enum SM64InteractableType
     {
         None = -1,
@@ -1227,6 +1235,8 @@ public static class SM64Constants
 
     #endregion
 
+    #region  Animations
+
     // mario_animation_ids.h
     /// <summary>
     /// Represents all of Mario's animation IDs.
@@ -1457,6 +1467,8 @@ public static class SM64Constants
         _6 = (1 << 6),        // 0x40
         _7 = (1 << 7),        // 0x80
     }
+    
+    #endregion
 
     // sm64.h
     /// <summary>

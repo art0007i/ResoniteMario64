@@ -28,6 +28,8 @@
     <ItemGroup>
         <PackageReference Include="BepInEx.ResonitePluginInfoProps" Version="3.*"/>
         <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.9.*"/>
+
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all"/>
     </ItemGroup>
 
     <!-- NuGet fallback stripped game references -->
@@ -37,7 +39,7 @@
 
     <!-- Local game references -->
     <ItemGroup Condition="Exists('$(GamePath)')">
-        <Reference Include="FrooxEngine">
+        <Reference Include="FrooxEngine" Publicize="True">
             <HintPath>$(GamePath)FrooxEngine.dll</HintPath>
             <Private>False</Private>
         </Reference>

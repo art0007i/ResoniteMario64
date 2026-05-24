@@ -23,13 +23,20 @@ public sealed class SM64Teleporter : ISM64Object
 
     public SM64Teleporter(Collider col, SM64Context instance)
     {
+        if (col is MeshCollider mc && (mc.Mesh.Target == null || !mc.Mesh.IsAssetAvailable))
+        {
+            if (Config.DebugEnabled.Value) Logger.Warn($"[Teleporter{mc.GetType()}] {mc.Slot.Name} ({mc.ReferenceID}) Mesh is {(mc.Mesh.Target == null ? "null" : "non-readable")}");
+            Dispose();
+            return;
+        }
+
         World = col.World;
         Context = instance;
         Collider = col;
         OriginalTag = col.Slot.Tag;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.TryParseTagParts(tagParts, out _, out _, out _, out ID, out Group);
+        Utils.ParseTagParts(tagParts, out _, out _, out _, out ID, out Group);
     }
 
     public void Handle(SM64Mario mario)

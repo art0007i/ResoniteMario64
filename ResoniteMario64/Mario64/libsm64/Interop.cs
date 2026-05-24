@@ -436,13 +436,13 @@ public static class Interop
         sm64_set_mario_forward_velocity(marioId, frooxVelocity * ScaleFactor);
     }
 
-    public static void CreateAndAppendSurfaces(List<SM64Surface> outSurfaces, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static void CreateAndAppendSurfaces(List<SM64Surface> outSurfaces, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force)
     {
         for (int i = 0; i < triangles.Length; i += 3)
         {
             SM64Surface? surface = Config.ClampedSurfaces.Value
-                    ? ClampedSurface(i, triangles, vertices, surfaceType, terrainType, force)
-                    : NonClampedSurface(i, triangles, vertices, surfaceType, terrainType, force);
+                    ? ClampedSurface(i, triangles, vertices, surfaceType, terrainType, flags, force)
+                    : NonClampedSurface(i, triangles, vertices, surfaceType, terrainType, flags, force);
 
             if (!surface.HasValue) continue;
 
@@ -450,20 +450,20 @@ public static class Interop
         }
     }
 
-    public static SM64Surface? ClampedSurface(int triangleIndex, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static SM64Surface? ClampedSurface(int triangleIndex, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force)
     {
-        float3 v0 = vertices[triangles[triangleIndex]];
-        float3 v1 = vertices[triangles[triangleIndex + 1]];
-        float3 v2 = vertices[triangles[triangleIndex + 2]];
+        float3 v1 = vertices[triangles[triangleIndex]];
+        float3 v2 = vertices[triangles[triangleIndex + 1]];
+        float3 v3 = vertices[triangles[triangleIndex + 2]];
 
-        float3 p0 = new float3(-v0.x, v0.y, v0.z);
         float3 p1 = new float3(-v1.x, v1.y, v1.z);
         float3 p2 = new float3(-v2.x, v2.y, v2.z);
+        float3 p3 = new float3(-v3.x, v3.y, v3.z);
 
-        (p1, p2) = (p2, p1);
+        (p2, p3) = (p3, p2);
 
-        float3 e1 = p1 - p0;
-        float3 e2 = p2 - p0;
+        float3 e1 = p2 - p1;
+        float3 e2 = p3 - p1;
         float3 normal = new float3(
             e1.y * e2.z - e1.z * e2.y,
             e1.z * e2.x - e1.x * e2.z,
@@ -479,18 +479,19 @@ public static class Interop
             Force = (short)(force == -1 ? 0 : force),
             Type = surfaceType,
             Terrain = terrainType,
+            Flags = flags,
 
-            v0x = ClampToSm64(p0.x),
-            v0y = ClampToSm64(p0.y),
-            v0z = ClampToSm64(p0.z),
+            v0x = ClampToSm64(p1.x),
+            v0y = ClampToSm64(p1.y),
+            v0z = ClampToSm64(p1.z),
 
-            v1x = ClampToSm64(p1.x),
-            v1y = ClampToSm64(p1.y),
-            v1z = ClampToSm64(p1.z),
+            v1x = ClampToSm64(p2.x),
+            v1y = ClampToSm64(p2.y),
+            v1z = ClampToSm64(p2.z),
 
-            v2x = ClampToSm64(p2.x),
-            v2y = ClampToSm64(p2.y),
-            v2z = ClampToSm64(p2.z)
+            v2x = ClampToSm64(p3.x),
+            v2y = ClampToSm64(p3.y),
+            v2z = ClampToSm64(p3.z)
         };
     }
 
@@ -500,13 +501,14 @@ public static class Interop
         return Math.Clamp(scaled, -SM64MaxVertexDistance, SM64MaxVertexDistance);
     }
 
-    public static SM64Surface NonClampedSurface(int i, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, int force)
+    public static SM64Surface NonClampedSurface(int i, int[] triangles, float3[] vertices, SM64SurfaceType surfaceType, SM64TerrainType terrainType, SM64SurfaceFlag flags, int force)
     {
         return new SM64Surface
         {
             Force = (short)(force == -1 ? 0 : force),
             Type = surfaceType,
             Terrain = terrainType,
+            Flags = flags,
 
             v0x = ScaleFactor * -vertices[triangles[i]].x,
             v0y = ScaleFactor * vertices[triangles[i]].y,
@@ -709,6 +711,7 @@ public struct SM64Surface
     public SM64SurfaceType Type;
     public short Force;
     public SM64TerrainType Terrain;
+    public SM64SurfaceFlag Flags;
     public float v0x, v0y, v0z;
     public float v1x, v1y, v1z;
     public float v2x, v2y, v2z;
@@ -847,10 +850,10 @@ public struct SM64SurfaceObject
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct SM64SurfaceCollisionData
 {
-    public short type;
+    public SM64SurfaceType type;
     public short force;
-    public byte flags;
-    public byte room;
+    public SM64SurfaceFlag flags;
+    public sbyte room;
     public float lowerY;
     public float upperY;
 
@@ -862,7 +865,7 @@ public unsafe struct SM64SurfaceCollisionData
     public float originOffset;
     public byte isValid;
     public IntPtr transform;
-    public ushort terrain;
+    public SM64TerrainType terrain;
 }
 
 [StructLayout(LayoutKind.Sequential)]

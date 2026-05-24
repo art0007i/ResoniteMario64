@@ -724,11 +724,18 @@ public sealed class SM64Mario : ISM64Object
             }
 
             // Check for deaths, so we delete mario
-            float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData data);
-            bool isDeathPlane = data.type == (short)SM64SurfaceType.DeathPlane;
-
             bool isQuickSandDeath = (SyncedActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
-            bool isDeathPlaneDeath = isDeathPlane && MathX.Distance(floorHeight, MarioSlot.GlobalPosition.Y) < 15;
+            bool isDeathPlaneDeath = false;
+
+            if (!isQuickSandDeath)
+            {
+                float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData floorData);
+                if (floorData.type == SM64SurfaceType.DeathPlane || floorData.type == SM64SurfaceType.VerticalWind)
+                {
+                    isDeathPlaneDeath = MarioSlot.GlobalPosition.Y < floorHeight + 2048f.FromMarioFloat();
+                }
+            }
+
             if (!_isDying && (isQuickSandDeath || isDeathPlaneDeath))
             {
                 SetHealthPoints(0);
@@ -738,8 +745,8 @@ public sealed class SM64Mario : ISM64Object
             {
                 _isDying = true;
 
-                float laughDelay = isQuickSandDeath ? 0.8f : isDeathPlane ? 0.4f : 2.5f;
-                float nukeDelay = isQuickSandDeath  ? 2.2f : isDeathPlane ? 1.8f : 12f;
+                float laughDelay = isQuickSandDeath ? 0.8f : isDeathPlaneDeath ? 0.2f : 2.5f;
+                float nukeDelay = isQuickSandDeath  ? 2.2f : isDeathPlaneDeath ? 1.2f : 12f;
 
                 MarioSlot.RunInSeconds(laughDelay, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
                 MarioSlot.RunInSeconds(nukeDelay, () => SetMarioAsNuked(true));
