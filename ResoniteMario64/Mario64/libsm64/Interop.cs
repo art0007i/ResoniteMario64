@@ -63,11 +63,18 @@ public static class Interop
     public static bool IsGlobalInit;
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void SM64RumbleCallbackFunctionPtr(int marioId, short level, short time);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void SM64DebugPrintFunctionPtr(string message);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void SM64PlaySoundFunctionPtr(uint soundBits, float[] pos);
 
     // Initialization & Setup
+    [DllImport("sm64")]
+    private static extern void sm64_register_rumble_callback_function(IntPtr rumbleCallbackFunctionPtr);
+    
     [DllImport("sm64")]
     private static extern void sm64_register_debug_print_function(IntPtr debugPrintFunctionPtr);
 
@@ -223,6 +230,9 @@ public static class Interop
     [DllImport("sm64")]
     private static extern float sm64_surface_find_poison_gas_level(float x, float z);
 
+    private static readonly SM64RumbleCallbackFunctionPtr RumbleCallback = SM64Context.VibrateCallback;
+    private static readonly SM64DebugPrintFunctionPtr DebugPrintCallback = c => UniLog.Log($"[libsm64] {c}");
+
     public static void GlobalInit(byte[] rom)
     {
         GCHandle romHandle = GCHandle.Alloc(rom, GCHandleType.Pinned);
@@ -234,12 +244,13 @@ public static class Interop
             // This is laggy as all balls with audio.
             // if (Utils.CheckDebug())
             // {
-            //     var callbackDelegate = new SM64DebugPrintFunctionPtr(c => UniLog.Log($"[libsm64] {c}"));
-            //     sm64_register_debug_print_function(Marshal.GetFunctionPointerForDelegate(callbackDelegate));
+            //     sm64_register_debug_print_function(Marshal.GetFunctionPointerForDelegate(DebugPrintCallback));
             // }
 
             sm64_global_init(romHandle.AddrOfPinnedObject(), textureDataHandle.AddrOfPinnedObject());
             sm64_audio_init(romHandle.AddrOfPinnedObject());
+
+            sm64_register_rumble_callback_function(Marshal.GetFunctionPointerForDelegate(RumbleCallback));
 
             // MarioTexture = new Bitmap2D(SM64TextureWidth, SM64TextureHeight, TextureFormat.RGBA32, false, ColorProfile.sRGB, false, null, Engine.Current.AssetManager.TextureAllocator);
             // for (int ix = 0; ix < SM64TextureWidth; ix++)

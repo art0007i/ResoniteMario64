@@ -101,6 +101,7 @@ public sealed partial class SM64Context : IDisposable
         Config.MaxMariosPerPerson.SettingChanged += HandleMaxMariosPerPersonChanged;
 
         Config.UseGamepad.SettingChanged += HandleKeyUseGamepadChanged;
+        if (Config.UseGamepad.Value) World?.Input.InvalidateBindings();
 
         world.RunInUpdates(3, () => { World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c)); });
     }

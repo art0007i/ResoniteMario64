@@ -149,6 +149,9 @@ enum
     SM64_TEXTURE_WIDTH = 64 * 11, SM64_TEXTURE_HEIGHT = 64, SM64_GEO_MAX_TRIANGLES = 1024,
 };
 
+typedef void (*SM64RumbleCallbackFunctionPtr)(int32_t marioId, int16_t level, int16_t time);
+
+extern SM64_LIB_FN void sm64_register_rumble_callback_function(SM64RumbleCallbackFunctionPtr rumbleCallbackFunction);
 
 typedef void (*SM64DebugPrintFunctionPtr)(const char *);
 

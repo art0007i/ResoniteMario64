@@ -72,6 +72,7 @@ public static class SM64Constants
         Trapdoor = 0x00FF                // Bowser Left trapdoor, has no action defined
     }
 
+    [Flags]
     public enum SM64SurfaceFlag : sbyte
     {
         None = 0,

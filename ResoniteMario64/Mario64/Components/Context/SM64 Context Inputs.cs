@@ -1,4 +1,5 @@
-﻿using Elements.Core;
+﻿using System.Diagnostics.CodeAnalysis;
+using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using Renderite.Shared;
@@ -29,7 +30,7 @@ public sealed partial class SM64Context
             _movementBlocked = !_movementBlocked;
         }
 
-        bool shouldRun = !World.LocalUser.HasActiveFocus() && _movementBlocked;
+        bool shouldRun = !World.LocalUser.HasActiveFocus() && _movementBlocked || inp.VR_Active;
         bool shouldGamepad = Config.UseGamepad.Value && inp.GetDevices<StandardGamepad>().Count != 0;
         if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
@@ -118,9 +119,7 @@ public sealed partial class SM64Context
         if (right) input += new float2(-1);
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
-        return length > 1.0f
-            ? new float2(input.x / length, input.y / length)
-            : input;
+        return length > 1.0f ? new float2(input.x / length, input.y / length) : input;
     }
 
     private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => ShouldBlockInit() && c.Side.Value == hand;
@@ -197,13 +196,13 @@ public sealed partial class SM64Context
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
 
             bool isIndex = __instance.Controller is IndexController;
-            if (isIndex && _cachedLocomotionModules == null)
+            if (isIndex && _cachedLocomotionModules?.FilterWorldElement() == null)
             {
                 LocomotionController locomotionController = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>();
                 _cachedLocomotionModules = locomotionController?.ActiveModule?.Slot?.Parent;
             }
 
-            bool blocked = ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther());
+            bool blocked = ShouldBlockInputs();
 
             if (_lastBlocked.HasValue && blocked == _lastBlocked) return;
 
@@ -211,14 +210,16 @@ public sealed partial class SM64Context
 
             if (isIndex)
             {
-                if (_cachedLocomotionModules != null)
-                {
-                    _cachedLocomotionModules.ActiveSelf = !blocked;
-                }
+                __instance.RunSynchronously(() => _cachedLocomotionModules?.ActiveSelf = !blocked, true);
             }
             else
             {
                 __instance.Inputs.Axis.RegisterBlocks = blocked;
+            }
+
+            if (!blocked && !__instance.InputInterface.VR_Active && !(_cachedLocomotionModules?.ActiveSelf ?? false))
+            {
+                __instance.RunSynchronously(() => _cachedLocomotionModules?.ActiveSelf = true, true);
             }
         }
     }
@@ -234,5 +235,61 @@ public sealed partial class SM64Context
             return false;
 
         }
+    }
+
+    [HarmonyPatch(typeof(VR_Manager), "UpdateHaptics")]
+    public static class UpdateHapticsPatch
+    {
+        internal volatile static bool PendingHaptics;
+
+        internal static int MarioId = -1;
+        internal static short Level;
+        internal static double Time;
+
+        [SuppressMessage("ReSharper", "CompareOfFloatsByEqualityOperator")]
+        public static void Postfix(Chirality side, ref VR_ControllerOutputState state)
+        {
+            if (!PendingHaptics) return;
+
+            bool shouldRunMario = PendingHaptics && state.hapticState is { force: 0, pain: 0, temperature: 0, vibration: 0 } || state.hapticState.force == Level && state.hapticState.pain == Level && state.hapticState.temperature == Level && state.hapticState.vibration == Level;
+            if (shouldRunMario)
+            {
+                state.vibrateTime = Time;
+
+                state.hapticState.force = Level;
+                state.hapticState.temperature = Level;
+                state.hapticState.pain = Level;
+                state.hapticState.vibration = Level;
+
+                if (side == Chirality.Right)
+                {
+                    PendingHaptics = false;
+                    MarioId = -1;
+                    Level = 0;
+                    Time = 0;
+                }
+            }
+        }
+    }
+    
+    public static void VibrateCallback(int marioId, short level, short time)
+    {
+        if (marioId == -1 || level <= 0 || time <= 0) return;
+
+        SM64Context instance = Instance;
+        if (instance == null) return;
+
+        if (!instance.World.InputInterface.ControllerVibrationEnabled) return;
+        if (instance.MyMarios.All(x => x.MarioId != marioId)) return;
+
+        float durationSeconds = time * 2 / 1000f;
+        if (durationSeconds <= 0) return;
+
+        UpdateHapticsPatch.PendingHaptics = true;
+        UpdateHapticsPatch.MarioId = marioId;
+        UpdateHapticsPatch.Level = level;
+        UpdateHapticsPatch.Time = durationSeconds;
+        
+        if (Config.DebugEnabled.Value) Plugin.Log.LogDebug($"Got Vibrate Callback: marioId: {marioId}, level: {level}, time: {UpdateHapticsPatch.Time}");
     }
 }

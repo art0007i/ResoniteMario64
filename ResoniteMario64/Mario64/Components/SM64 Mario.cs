@@ -1264,12 +1264,12 @@ public sealed class SM64Mario : ISM64Object
 
             if (_marioRendererSlot is { IsDestroyed: false })
             {
-                _marioRendererSlot.Destroy();
+                World.RunSynchronously(() => _marioRendererSlot.Destroy(), true);
             }
 
             if (IsLocal && _marioNonModdedRendererSlot is { IsDestroyed: false })
             {
-                _marioNonModdedRendererSlot.Destroy();
+                World.RunSynchronously(() => _marioNonModdedRendererSlot.Destroy(), true);
             }
 
             if (IsLocal && MarioSlot is { IsDestroyed: false })
