@@ -60,7 +60,7 @@ public class Config
             PlayCapMusic = config.Bind("Audio", "Play Cap Music", true, "Whether to play the Cap music when a mario picks one up or not.");
             LocalAudio = config.Bind("Audio", "Local Audio", true, "Whether to play the Audio Locally or not.");
 
-            DeleteAfterDeath = config.Bind("Performance", "Delete Mario After Death", true, "Whether to automatically delete our marios after 12 seconds of being dead or not.");
+            DeleteAfterDeath = config.Bind("Performance", "Delete Mario After Death", false, "Whether to automatically delete our marios after 5 seconds of being dead or not.");
             MarioCullDistance = config.Bind("Performance", "Mario Cull Distance", 15f, new ConfigDescription("The distance where it should stop using the Super Mario 64 Engine to handle other players Marios.", new AcceptableValueRange<float>(0f, 50f))); // slider 0f, 50f, 2 // The max distance that we're going to calculate the mario animations for other people.
             MaxMariosPerPerson = config.Bind("Performance", "Max Marios Per Person", 5, new ConfigDescription("Max number of Marios per player that will be animated using the Super Mario 64 Engine.", new AcceptableValueRange<int>(0, 20)));         // slider 0, 20, 0 // The max number of marios per person that we're going to calculate the mario animations for.
             MaxMeshColliderTris = config.Bind("Performance", "Max Mesh Collider Tris", 50000, new ConfigDescription("Maximum total number of triangles of automatically generated from mesh colliders allowed.", new AcceptableValueRange<int>(0, 250000)));        // slider 0 250000 0 // The max total number of collision tris loaded from automatically generated static mesh colliders.

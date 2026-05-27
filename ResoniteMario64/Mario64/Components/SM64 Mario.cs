@@ -65,6 +65,8 @@ public sealed class SM64Mario : ISM64Object
 
     internal SM64Teleporter LastTeleportDestination;
 
+    public float3 MarioSpawn { get; private set; }
+
     #endregion
 
     #region Environment Interaction
@@ -423,8 +425,9 @@ public sealed class SM64Mario : ISM64Object
         MarioSlot.OnPrepareDestroy += HandleSlotDestroyed;
 
         float3 initPos = MarioSlot.GlobalPosition;
+        MarioSpawn = new float3(-initPos.x, initPos.y, initPos.z);
 
-        MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
+        MarioId = Interop.MarioCreate(MarioSpawn * Interop.ScaleFactor);
 
         if (MarioId == int.MaxValue || MarioId == int.MinValue || MarioId == -1)
         {
@@ -729,10 +732,13 @@ public sealed class SM64Mario : ISM64Object
 
             if (!isQuickSandDeath)
             {
-                float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData floorData);
-                if (floorData.type == SM64SurfaceType.DeathPlane || floorData.type == SM64SurfaceType.VerticalWind)
+                float floorHeight = Interop.FindFloor(MarioSlot.GlobalPosition, out SM64SurfaceCollisionData? floorData);
+                if (floorData is { } floor)
                 {
-                    isDeathPlaneDeath = MarioSlot.GlobalPosition.Y < floorHeight + 2048f.FromMarioFloat();
+                    if (floor.type == SM64SurfaceType.DeathPlane || floor.type == SM64SurfaceType.VerticalWind)
+                    {
+                        isDeathPlaneDeath = MarioSlot.GlobalPosition.Y < floorHeight + 3072f.FromMarioFloat();
+                    }
                 }
             }
 
@@ -744,12 +750,22 @@ public sealed class SM64Mario : ISM64Object
             if (!_isDying && CurrentState.IsDead)
             {
                 _isDying = true;
+                MarioSlot.RunSynchronously(() => _marioGrabbable.Enabled = false, true);
 
                 float laughDelay = isQuickSandDeath ? 0.8f : isDeathPlaneDeath ? 0.2f : 2.5f;
-                float nukeDelay = isQuickSandDeath  ? 2.2f : isDeathPlaneDeath ? 1.2f : 12f;
-
                 MarioSlot.RunInSeconds(laughDelay, () => Interop.PlaySoundGlobal(Sounds.Menu_BowserLaugh));
-                MarioSlot.RunInSeconds(nukeDelay, () => SetMarioAsNuked(true));
+
+                if (isDeathPlaneDeath || isQuickSandDeath)
+                {
+                    float posDelay = isDeathPlaneDeath ? 1f : 2.2f;
+                    MarioSlot.RunInSeconds(posDelay, () =>
+                    {
+                        float3 pos = MarioSlot.GlobalPosition;
+                        SetPosition(new float3(pos.X - 10000, pos.Y - 10000, pos.Z - 10000));
+                    });
+                }
+
+                MarioSlot.RunInSeconds(6.5f, () => SetMarioAsNuked());
             }
         }
         else
@@ -1024,6 +1040,10 @@ public sealed class SM64Mario : ISM64Object
 
     public void SetHealthPoints(float healthPoints) => Interop.MarioSetHealthPoints(MarioId, healthPoints);
 
+    public void SetFullHealth() => Interop.MarioSetFullHealth(MarioId);
+
+    public void SetInvicibleTimer(float timeMs) => Interop.MarioSetInvincibility(MarioId, timeMs);
+
     public void SetAction(ActionFlag actionFlag) => Interop.MarioSetAction(MarioId, actionFlag);
 
     public void SetAction(uint actionFlags) => Interop.MarioSetAction(MarioId, actionFlags);
@@ -1193,14 +1213,42 @@ public sealed class SM64Mario : ISM64Object
         return anyPointInside;
     }
 
-    public void SetMarioAsNuked(bool delete = false)
+    public void SetMarioAsNuked(bool forceDelete = false)
     {
         _isNuked = true;
-        bool deleteMario = Config.DeleteAfterDeath.Value || delete;
 
-        Logger.Debug($"One of our Marios died, so {(deleteMario ? "delete the mario" : "stop its engine updates")}.");
+        bool shouldDelete = Config.DeleteAfterDeath.Value || forceDelete;
+        if (!shouldDelete)
+        {
+            if (Revive())
+            {
+                Logger.Debug("One of our Marios died, so revive the mario.");
+                return;
+            }
+        }
 
-        if (deleteMario) Dispose();
+        Logger.Debug("One of our Marios died, so delete the mario.");
+        Dispose();
+    }
+
+    public bool Revive()
+    {
+        Interop.FindFloor(MarioSpawn, out SM64SurfaceCollisionData? data);
+        if (data == null) return false;
+
+        SetInvicibleTimer(30);
+        SetFullHealth();
+
+        SetPosition(MarioSpawn);
+        SetVelocity(float3.Zero);
+        SetForwardVelocity(0f);
+
+        _isNuked = false;
+        _isDying = false;
+
+        SetAction(ActionFlag.SpawnSpinAirborne);
+        MarioSlot.RunSynchronously(() => _marioGrabbable.Enabled = true, true);
+        return true;
     }
 
     public void SetIsOverMaxCount(bool isOverTheMaxCount)

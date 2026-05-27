@@ -271,7 +271,7 @@ public sealed partial class SM64Context
             }
         }
     }
-    
+
     public static void VibrateCallback(int marioId, short level, short time)
     {
         if (marioId == -1 || level <= 0 || time <= 0) return;
@@ -279,7 +279,8 @@ public sealed partial class SM64Context
         SM64Context instance = Instance;
         if (instance == null) return;
 
-        if (!instance.World.InputInterface.ControllerVibrationEnabled) return;
+        if (instance.World.InputInterface is { } inputInterface && (!inputInterface.VR_Active || !inputInterface.ControllerVibrationEnabled)) return;
+
         if (instance.MyMarios.All(x => x.MarioId != marioId)) return;
 
         float durationSeconds = time * 2 / 1000f;

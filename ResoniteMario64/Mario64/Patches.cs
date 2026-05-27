@@ -197,8 +197,12 @@ public class Patches
         public static void Postfix(Slot __instance, UIBuilder ui)
         {
             SceneInspector inspector = ui.Root.GetComponentInParents<SceneInspector>();
+
             Slot compView = inspector?.ComponentView?.Target;
-            if (compView?.Tag == ContextTag || compView?.FindParent(x => x.Tag == ContextTag) == null) return;
+            if (compView == null) return;
+
+            bool isUnderContext = compView.Tag == ContextTag || compView.FindParent(x => x.Tag == ContextTag) != null;
+            if (!isUnderContext) return;
 
             // ui.Button("Button Label").LocalPressed += (b, _) => { b.RunSynchronously(() => { /* Do things here */ }); };
 
