@@ -1,4 +1,5 @@
-﻿using Elements.Core;
+﻿using System.Runtime.CompilerServices;
+using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
 using HarmonyLib;
@@ -190,6 +191,199 @@ public class Patches
         }
     }
 
+    [HarmonyPatch(typeof(WorkerInspector), nameof(WorkerInspector.BuildInspectorUI))]
+    private class SlotUIEnumAddon
+    {
+        private static ConditionalWeakTable<Worker, Dictionary<string, Text>> _conditionalWeakTable = new ConditionalWeakTable<Worker, Dictionary<string, Text>>();
+
+        public static void Postfix(Worker worker, UIBuilder ui)
+        {
+            if (worker is Slot slot && slot.GetComponent<Collider>() is { } col)
+            {
+                if (!_conditionalWeakTable.TryGetValue(worker, out Dictionary<string, Text> texts) || texts == null)
+                {
+                    texts = new Dictionary<string, Text>(3);
+                    _conditionalWeakTable.Add(worker, texts);
+                }
+
+                string[] tagParts = slot.Tag?.Split(',');
+                Utils.ParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out _, out _);
+                ColliderCategory category = Utils.GetColliderCategory(col);
+
+                BuildEnumEditor(ui, slot, "ColliderCategory", category, texts);
+                BuildEnumEditor(ui, slot, "SurfaceType", surfaceType, texts);
+                BuildEnumEditor(ui, slot, "TerrainType", terrainType, texts);
+                BuildEnumEditor(ui, slot, "InteractableType", interactableType, texts);
+            }
+        }
+
+        private static void BuildEnumEditor<T>(UIBuilder ui, Slot slot, string name, T enumValue, Dictionary<string, Text> texts) where T : Enum
+        {
+            ui.HorizontalLayout(4f);
+            ui.Style.FlexibleWidth = -1f;
+            ui.Style.MinWidth = 24f;
+            ui.Button((LocaleString)"<<").LocalPressed += (_, _) =>
+            {
+                if (texts.TryGetValue(name, out var text))
+                {
+                    DecrementEnum(ref enumValue);
+                    text.Content.Value = enumValue.ToString();
+                    if (typeof(T) == typeof(ColliderCategory))
+                    {
+                        SetColliderCategory((ColliderCategory)(object)enumValue, slot);
+                        return;
+                    }
+                    SetSlotTag(enumValue, slot);
+                }
+            };
+            ui.Style.FlexibleWidth = 100f;
+            ui.Style.MinWidth = -1f;
+            Button button = ui.Button();
+            var content = button.Slot.GetComponentInChildren<Text>();
+            content.Content.Value = enumValue.ToString();
+            texts.Add(name, content);
+            ui.Style.FlexibleWidth = -1f;
+            ui.Style.MinWidth = 24f;
+            ui.Button((LocaleString)">>").LocalPressed += (_, _) =>
+            {
+                if (texts.TryGetValue(name, out var text))
+                {
+                    IncrementEnum(ref enumValue);
+                    text.Content.Value = enumValue.ToString();
+                    if (typeof(T) == typeof(ColliderCategory))
+                    {
+                        SetColliderCategory((ColliderCategory)(object)enumValue, slot);
+                        return;
+                    }
+                    SetSlotTag(enumValue, slot);
+                }
+            };
+            ui.Style.FlexibleWidth = -1f;
+            ui.Style.MinWidth = 24f;
+            ui.Button("∅").LocalPressed += (_, _) =>
+            {
+                if (typeof(T) == typeof(ColliderCategory))
+                {
+                    RemoveAllColliderCategories(slot);
+                    return;
+                }
+                RemoveSlotTagType<T>(slot);
+            };
+            ui.NestOut();
+        }
+
+        private static void SetSlotTag<T>(T enumValue, Slot slot) where T : Enum
+        {
+            RemoveSlotTagType<T>(slot);
+            AddSlotTag(enumValue, slot);
+        }
+
+        private static void AddSlotTag<T>(T enumValue, Slot slot) where T : Enum
+        {
+            string newTag = $"{typeof(T).Name.Replace("SM64", "")}_{enumValue}";
+
+            List<string> tags = GetSlotTags(slot);
+
+            if (!tags.Contains(newTag, StringComparer.Ordinal))
+            {
+                tags.Add(newTag);
+            }
+
+            slot.Tag = string.Join(",", tags);
+        }
+
+        private static void RemoveSlotTagType<T>(Slot slot) where T : Enum
+        {
+            string prefix = $"{typeof(T).Name.Replace("SM64", "")}_";
+
+            List<string> tags = GetSlotTags(slot);
+
+            tags.RemoveAll(x => x.StartsWith(prefix, StringComparison.Ordinal));
+
+            slot.Tag = string.Join(",", tags);
+        }
+
+        private static readonly string[] AllColliderTags =
+        {
+            "SM64 StaticCollider",
+            "SM64 Collider",
+            "SM64 DynamicCollider",
+            "SM64 Interactable",
+            "SM64 WaterBox",
+            "SM64 Teleporter"
+        };
+
+        private static void SetColliderCategory(ColliderCategory enumValue, Slot slot)
+        {
+            RemoveAllColliderCategories(slot);
+            AddColliderCategory(enumValue, slot);
+        }
+
+        private static void AddColliderCategory(ColliderCategory category, Slot slot)
+        {
+            if (category == ColliderCategory.None)
+            {
+                return;
+            }
+
+            List<string> tags = GetSlotTags(slot);
+
+            string colliderTag = GetColliderTag(category);
+
+            if (!tags.Contains(colliderTag, StringComparer.OrdinalIgnoreCase))
+            {
+                tags.Add(colliderTag);
+            }
+
+            slot.Tag = string.Join(",", tags);
+        }
+
+        private static void RemoveAllColliderCategories(Slot slot)
+        {
+            List<string> tags = GetSlotTags(slot);
+
+            foreach (string colliderTag in AllColliderTags)
+            {
+                tags.RemoveAll(x => string.Equals(x, colliderTag, StringComparison.OrdinalIgnoreCase));
+            }
+
+            slot.Tag = string.Join(",", tags);
+        }
+
+        private static string GetColliderTag(ColliderCategory category)
+        {
+            return category switch
+            {
+                ColliderCategory.Static       => "SM64 StaticCollider",
+                ColliderCategory.Dynamic      => "SM64 DynamicCollider",
+                ColliderCategory.Interactable => "SM64 Interactable",
+                ColliderCategory.WaterBox     => "SM64 WaterBox",
+                ColliderCategory.Teleporter   => "SM64 Teleporter",
+                _                             => string.Empty
+            };
+        }
+
+        private static List<string> GetSlotTags(Slot slot)
+        {
+            return string.IsNullOrWhiteSpace(slot.Tag) ? new List<string>() : slot.Tag.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(static x => x.Trim()).ToList();
+        }
+
+        private static void DecrementEnum<T>(ref T value) where T : Enum
+        {
+            value = ShiftEnum(value, -1);
+        }
+
+        private static void IncrementEnum<T>(ref T value) where T : Enum
+        {
+            value = ShiftEnum(value, 1);
+        }
+
+        private static T ShiftEnum<T>(T value, int delta) where T : Enum
+        {
+            return value.ShiftEnum(delta);
+        }
+    }
+
     // TODO: Either add a config to make these debug only, or remove them entirely for physical buttons
     [HarmonyPatch(typeof(Slot), nameof(Slot.BuildInspectorUI))]
     private class SlotUiAddon
@@ -236,14 +430,8 @@ public class Patches
                 if (mario != null && mario.IsLocal)
                 {
                     ui.Spacer(8);
-                    
-                    ui.Button("Goto Mario").LocalPressed += (b, _) =>
-                    {
-                        b.RunSynchronously(() =>
-                        {
-                            __instance.LocalUser.Root.Slot.GlobalPosition = mario.MarioSlot.GlobalPosition;
-                        });
-                    };
+
+                    ui.Button("Goto Mario").LocalPressed += (b, _) => { b.RunSynchronously(() => { __instance.LocalUser.Root.Slot.GlobalPosition = mario.MarioSlot.GlobalPosition; }); };
 
                     ui.Button("Bring Mario").LocalPressed += (b, _) =>
                     {
@@ -264,6 +452,13 @@ public class Patches
                     ui.Spacer(8);
 
                     ui.Button("Heal Mario").LocalPressed += (_, _) => mario.Heal(1);
+                    ui.Button("Add Life").LocalPressed += (_, _) => mario.SyncedLives++;
+                    ui.Button("Remove Life").LocalPressed += (_, _) => mario.SyncedLives--;
+
+                    ui.Spacer(8);
+
+                    ui.Button("999 Lives").LocalPressed += (_, _) => mario.SyncedLives = 999;
+                    ui.Button("0 Lives").LocalPressed += (_, _) => mario.SyncedLives = 0;
 
                     ui.Spacer(8);
 

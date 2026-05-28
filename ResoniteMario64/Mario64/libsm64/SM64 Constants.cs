@@ -84,15 +84,16 @@ public static class SM64Constants
     public enum SM64InteractableType
     {
         None = -1,
-        GoldCoin = 0,
-        RedCoin = 1,
-        BlueCoin = 2,
-        Star = 3,
-        NormalCap = 4,
-        VanishCap = 5,
-        MetalCap = 6,
-        WingCap = 7,
-        Damage = 8
+        GoldCoin,
+        RedCoin,
+        BlueCoin,
+        Star,
+        OneUp,
+        NormalCap,
+        VanishCap,
+        MetalCap,
+        WingCap,
+        Damage
     }
 
     #region Music

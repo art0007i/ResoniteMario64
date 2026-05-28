@@ -1,4 +1,5 @@
 ﻿using FrooxEngine;
+using ProtoFlux.Runtimes.Execution.Nodes.Actions;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;
 using ResoniteMario64.Mario64.libsm64;
@@ -93,11 +94,15 @@ public sealed class SM64Interactable : ISM64Object
                 mario.SetForwardVelocity(0f);
                 mario.SetAction(ActionFlag.Freefall);
                 break;
+            case SM64InteractableType.OneUp:
+                Interop.PlaySoundGlobal(Sounds.General_Collect1Up);
+                mario.SyncedLives++;
+                break;
             case SM64InteractableType.Damage:
                 bool isLocalMarioCollider = Collider.Slot.IsChildOf(mario.MarioSlot);
                 if (!isLocalMarioCollider)
                 {
-                    uint damage = TypeId == -1 || TypeId >= 10 ? 1 : (uint)TypeId;
+                    uint damage = TypeId == -1 || TypeId >= 8 ? 7 : (uint)TypeId;
 
                     mario.TakeDamage(Collider.Slot.GlobalPosition, damage);
                 }
@@ -114,6 +119,8 @@ public sealed class SM64Interactable : ISM64Object
         Collider.Slot.RunSynchronously(() =>
         {
             _runningSync = true;
+
+            DynamicImpulseHelper.Singleton.TriggerDynamicImpulseWithArgument(this.Collider.Slot.GetObjectRoot(), "MarioCollided", true, mario.MarioSlot);
 
             if (Delete) Collider.Slot.Destroy();
 

@@ -40,6 +40,8 @@ public static class Interop
 
     public const float SM64HealthPerHealthPoint = 256;
     private const byte HealPointMultiplier = 4;
+    public const float SM64MaxHealth = 8.5f;
+    public const ushort SM64MaxHealthRaw = 0x880;
 
     private const byte SecondsMultiplier = 40;
 
@@ -105,6 +107,18 @@ public static class Interop
 
     [DllImport("sm64")]
     private static extern void sm64_fadeout_background_music(ushort arg0, ushort fadeOut);
+    
+    [DllImport("sm64")]
+    private static extern void sm64_play_cap_music(ushort playMusic);
+    
+    [DllImport("sm64")]
+    private static extern void sm64_stop_cap_music();
+    
+    [DllImport("sm64")]
+    private static extern void sm64_play_shell_music();
+    
+    [DllImport("sm64")]
+    private static extern void sm64_stop_shell_music();
 
     [DllImport("sm64")]
     private static extern ushort sm64_get_current_background_music();
@@ -323,6 +337,26 @@ public static class Interop
         {
             sm64_stop_background_music(currentMusic);
         }
+    }
+
+    public static void PlayCapMusic(ushort seq)
+    {
+        sm64_play_cap_music(seq);
+    }
+
+    public static void StopCapMusic()
+    {
+        sm64_stop_cap_music();
+    }
+
+    public static void PlayShellMusic()
+    {
+        sm64_play_shell_music();
+    }
+    
+    public static void StopShellMusic()
+    {
+        sm64_stop_shell_music();
     }
 
     public static void FadeoutBackgroundMusic(ushort fadeOut)
@@ -650,6 +684,11 @@ public static class Interop
         sm64_set_mario_angle(marioId, marioRotation.x, marioRotation.y, marioRotation.z);
     }
 
+    public static void MarioSetHealthPointsRaw(int marioId, ushort healthPoints)
+    {
+        sm64_set_mario_health(marioId, healthPoints);
+    }
+
     public static void MarioSetHealthPoints(int marioId, float healthPoints)
     {
         sm64_set_mario_health(marioId, (ushort)(healthPoints * SM64HealthPerHealthPoint));
@@ -657,7 +696,7 @@ public static class Interop
 
     public static void MarioSetFullHealth(int marioId)
     {
-        sm64_set_mario_health(marioId, SM64MarioState.MaxHealthUshort);
+        sm64_set_mario_health(marioId, SM64MaxHealthRaw);
     }
 
     public static void MarioSetInvincibility(int marioId, float timeMs)
@@ -767,9 +806,6 @@ public struct AnimInfo
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct SM64MarioState
 {
-    public const float MaxHealth = 8.5f;
-    public const ushort MaxHealthUshort = 0x880;
-
     public fixed float Position[3];
     public fixed float Velocity[3];
     public float FacingAngle;
@@ -787,7 +823,7 @@ public unsafe struct SM64MarioState
 
     public float HealthPoints => Health / Interop.SM64HealthPerHealthPoint;
 
-    public bool IsDead => Health <= 0 || (ActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
+    public bool IsDead => Health <= 0xFF;
     public bool IsAttacking => (ActionFlags & ActionFlag.Attacking) != 0;
     public bool IsFirstPerson => IsFlyingOrSwimming;
     public bool IsFlyingOrSwimming => (ActionFlags & ActionFlag.SwimmingOrFlying) != 0;

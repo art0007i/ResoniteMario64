@@ -245,6 +245,14 @@ extern SM64_LIB_FN void sm64_play_music(uint8_t player, uint16_t seqArgs, uint16
 
 extern SM64_LIB_FN void sm64_stop_background_music(uint16_t seqId);
 
+extern SM64_LIB_FN void sm64_play_cap_music(uint16_t playMusic);
+
+extern SM64_LIB_FN void sm64_stop_cap_music();
+
+extern SM64_LIB_FN void sm64_play_shell_music();
+
+extern SM64_LIB_FN void sm64_stop_shell_music();
+
 extern SM64_LIB_FN void sm64_fadeout_background_music(uint16_t arg0, uint16_t fadeOut);
 
 extern SM64_LIB_FN uint16_t sm64_get_current_background_music();

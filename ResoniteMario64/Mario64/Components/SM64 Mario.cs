@@ -277,8 +277,14 @@ public sealed class SM64Mario : ISM64Object
 
     public float SyncedHealthPoints
     {
-        get => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 255;
-        set => MarioSpace.TryWriteValue(HealthPointsVarName, value);
+        get => MarioSpace.TryReadValue(HealthPointsVarName, out float healthPoints) ? healthPoints : 0;
+        set => MarioSpace.TryWriteValue(HealthPointsVarName, MathX.Clamp(value, 0, 8.5f));
+    }
+
+    public short SyncedHealthPointsRaw
+    {
+        get => MarioSpace.TryReadValue(HealthPointsVarName, out short healthPoints) ? healthPoints : (short)0;
+        set => MarioSpace.TryWriteValue(HealthPointsVarName, MathX.Clamp(value, 0, 0x880));
     }
 
     public ActionFlag SyncedActionFlags
@@ -296,19 +302,25 @@ public sealed class SM64Mario : ISM64Object
     public int SyncedStarCounter
     {
         get => MarioSpace.TryReadValue(StarVarName, out int starCounter) ? starCounter : 0;
-        set => MarioSpace.TryWriteValue(StarVarName, value);
+        set => MarioSpace.TryWriteValue(StarVarName, MathX.Clamp(value, 0, 1000));
+    }
+
+    public int SyncedLives
+    {
+        get => MarioSpace.TryReadValue(LiveVarName, out int liveCounter) ? liveCounter : 0;
+        set => MarioSpace.TryWriteValue(LiveVarName, MathX.Clamp(value, 0, 1000));
     }
 
     public int SyncedCoinCounter
     {
         get => MarioSpace.TryReadValue(CoinsVarName, out int coinCounter) ? coinCounter : 0;
-        set => MarioSpace.TryWriteValue(CoinsVarName, value);
+        set => MarioSpace.TryWriteValue(CoinsVarName, MathX.Clamp(value, 0, 1000));
     }
 
     public int SyncedRedCoinCounter
     {
         get => MarioSpace.TryReadValue(RedCoinVarName, out int redCoinCounter) ? redCoinCounter : 0;
-        set => MarioSpace.TryWriteValue(RedCoinVarName, value);
+        set => MarioSpace.TryWriteValue(RedCoinVarName, MathX.Clamp(value, 0, 1000));
     }
 
     public SM64MarioAnimationID SyncedAnimID
@@ -345,6 +357,12 @@ public sealed class SM64Mario : ISM64Object
     {
         get => MarioSpace.TryReadValue(LoopEndVarName, out short animId) ? animId : (short)0;
         set => MarioSpace.TryWriteValue(LoopEndVarName, value);
+    }
+
+    public bool SyncedIsGrabbed
+    {
+        get => MarioSpace.TryReadValue(IsGrabbedVarName, out bool isGrabbed) && isGrabbed;
+        set => MarioSpace.TryWriteValue(IsGrabbedVarName, value);
     }
 
     private readonly DynamicValueVariable<float> _marioAlphaVar;
@@ -425,9 +443,8 @@ public sealed class SM64Mario : ISM64Object
         MarioSlot.OnPrepareDestroy += HandleSlotDestroyed;
 
         float3 initPos = MarioSlot.GlobalPosition;
-        MarioSpawn = new float3(-initPos.x, initPos.y, initPos.z);
-
-        MarioId = Interop.MarioCreate(MarioSpawn * Interop.ScaleFactor);
+        MarioSpawn = initPos;
+        MarioId = Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * Interop.ScaleFactor);
 
         if (MarioId == int.MaxValue || MarioId == int.MinValue || MarioId == -1)
         {
@@ -481,6 +498,9 @@ public sealed class SM64Mario : ISM64Object
             DynamicValueVariable<float> healthPoints = varsSlot.AttachComponent<DynamicValueVariable<float>>();
             healthPoints.VariableName.Value = HealthPointsVarName;
 
+            DynamicValueVariable<short> healthPointsRaw = varsSlot.AttachComponent<DynamicValueVariable<short>>();
+            healthPointsRaw.VariableName.Value = HealthPointsVarName;
+
             DynamicValueVariable<uint> actionFlags = varsSlot.AttachComponent<DynamicValueVariable<uint>>();
             actionFlags.VariableName.Value = ActionFlagsVarName;
 
@@ -495,6 +515,13 @@ public sealed class SM64Mario : ISM64Object
 
             DynamicValueVariable<int> starCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
             starCounter.VariableName.Value = StarVarName;
+
+            DynamicValueVariable<int> liveCounter = varsSlot.AttachComponent<DynamicValueVariable<int>>();
+            liveCounter.VariableName.Value = LiveVarName;
+            liveCounter.Value.Value = 4;
+
+            DynamicValueVariable<bool> isGrabbed = varsSlot.AttachComponent<DynamicValueVariable<bool>>();
+            isGrabbed.VariableName.Value = IsGrabbedVarName;
 
             Slot animVarsSlot = varsSlot.AddSlot("Animation");
 
@@ -629,7 +656,7 @@ public sealed class SM64Mario : ISM64Object
 
     private void CreateNonModdedRenderer()
     {
-        Uri uri = Config.MarioUrl.Value ?? new Uri("resdb:///ac7d686dec35e073d39f9d33c40f7386f1e140bababe8c244fdc6efc2b26987d.brson");
+        Uri uri = Config.MarioUrl.Value ?? new Uri("resdb:///3ac6f2e37deb52573a3dbd4630f6e20eff9e8eb6db5d1f0c9dd4dfd84e99c107.brson");
 
         _marioNonModdedRendererSlot = MarioSlot.Children.FirstOrDefault(x => x.Tag == MarioNonMRendererTag);
         if (_marioNonModdedRendererSlot == null && IsLocal)
@@ -715,6 +742,10 @@ public sealed class SM64Mario : ISM64Object
             SyncedStartFrame = anim.StartFrame;
             SyncedLoopStart = anim.LoopStart;
             SyncedLoopEnd = anim.LoopEnd;
+            if (_marioGrabbable is { IsRemoved: false })
+            {
+                SyncedIsGrabbed = _marioGrabbable.IsGrabbed;
+            }
 
             foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
             {
@@ -776,22 +807,22 @@ public sealed class SM64Mario : ISM64Object
             // Trigger the cap if the synced values have cap (if we already have the cap, it will ignore)
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.VanishCap))
             {
-                WearCap(MarioCapType.VanishCap);
+                WearCap(MarioCapType.VanishCap, 15f, false);
             }
 
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.MetalCap))
             {
-                WearCap(MarioCapType.MetalCap);
+                WearCap(MarioCapType.MetalCap, 15f, false);
             }
 
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.WingCap))
             {
-                WearCap(MarioCapType.WingCap, 40f);
+                WearCap(MarioCapType.WingCap, 40f, false);
             }
 
             if (Utils.HasCapType(SyncedStateFlags, MarioCapType.NormalCap))
             {
-                WearCap(MarioCapType.NormalCap);
+                WearCap(MarioCapType.NormalCap, 15f, false);
             }
 
             if (Utils.IsTeleporting(SyncedStateFlags) /* && !Utils.IsTeleporting(CurrentStateFlags)*/ && !IsTeleporting)
@@ -969,6 +1000,7 @@ public sealed class SM64Mario : ISM64Object
         if (IsLocal)
         {
             SyncedHealthPoints = CurrentState.HealthPoints;
+            SyncedHealthPointsRaw = CurrentState.Health;
         }
         else
         {
@@ -1231,8 +1263,10 @@ public sealed class SM64Mario : ISM64Object
         Dispose();
     }
 
-    public bool Revive()
+    public bool Revive(bool force = false)
     {
+        if (--SyncedLives < 0 && !force) return false;
+
         Interop.FindFloor(MarioSpawn, out SM64SurfaceCollisionData? data);
         if (data == null) return false;
 
@@ -1246,7 +1280,10 @@ public sealed class SM64Mario : ISM64Object
         _isNuked = false;
         _isDying = false;
 
+        Interop.StopCapMusic();
+
         SetAction(ActionFlag.SpawnSpinAirborne);
+        SetState(StateFlag.CapOnHead | StateFlag.NormalCap);
         MarioSlot.RunSynchronously(() => _marioGrabbable.Enabled = true, true);
         return true;
     }
@@ -1322,7 +1359,7 @@ public sealed class SM64Mario : ISM64Object
 
             if (IsLocal && MarioSlot is { IsDestroyed: false })
             {
-                MarioSlot.Destroy();
+                World.RunSynchronously(() => MarioSlot.Destroy(), true);
             }
 
             World = null;

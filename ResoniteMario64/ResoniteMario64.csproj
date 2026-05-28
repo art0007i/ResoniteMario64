@@ -71,6 +71,10 @@
             <HintPath>$(GamePath)Renderite.Shared.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="ProtoFlux.Nodes.FrooxEngine">
+            <HintPath>$(GamePath)ProtoFlux.Nodes.FrooxEngine.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
     </ItemGroup>
 
     <ItemGroup>

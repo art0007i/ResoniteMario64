@@ -50,7 +50,7 @@ public sealed class SM64Teleporter : ISM64Object
         {
             if (mario.LastTeleportDestination == this)
             {
-                Logger.Warn("Resetting teleport destination");
+                if (Config.DebugEnabled.Value) Logger.Warn("Resetting teleport destination");
                 mario.LastTeleportDestination = null;
             }
 

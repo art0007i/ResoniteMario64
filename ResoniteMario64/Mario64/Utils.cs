@@ -10,6 +10,7 @@ namespace ResoniteMario64.Mario64;
 
 public enum ColliderCategory
 {
+    None,
     Static,
     Dynamic,
     Interactable,
@@ -41,7 +42,7 @@ public static class Utils
         }
     }
 
-    public static ColliderCategory? GetColliderCategory(Collider col)
+    public static ColliderCategory GetColliderCategory(Collider col)
     {
         string tag = col.Slot.Tag ?? string.Empty;
 
@@ -69,7 +70,7 @@ public static class Utils
         if (isTeleporter && isValid)
             return ColliderCategory.Teleporter;
 
-        return null;
+        return ColliderCategory.None;
     }
 
     internal static SM64Surface[] GetAllStaticSurfaces(World wld)
