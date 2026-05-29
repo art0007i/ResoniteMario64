@@ -1,6 +1,4 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
-using Elements.Core;
+﻿using System.Runtime.CompilerServices;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -301,7 +299,7 @@ public sealed partial class SM64Context
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
 
-        Utils.ParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out int interactableId, out int group);
+        Utils.ParseTagParts(tagParts, out SM64Constants.SurfaceType surfaceType, out SM64Constants.TerrainType terrainType, out SM64Constants.InteractableType interactableType, out int interactableId, out int group);
 
         string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
 
@@ -313,33 +311,34 @@ public sealed partial class SM64Context
             Logger.Warn(message, caller, line);
     }
 
-    public void GetAllColliders(bool log, out Dictionary<string, List<ISM64Object>> colliders)
+    public Dictionary<ColliderCategory, List<ISM64Object>> GetAllColliders(bool log)
     {
-        List<(string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source)> entries = new List<(string, ColliderCategory, IEnumerable<ISM64Object>)>
+        Dictionary<ColliderCategory, List<ISM64Object>> colliders = new Dictionary<ColliderCategory, List<ISM64Object>>();
+
+        Add(ColliderCategory.Static, StaticColliders.Values);
+        Add(ColliderCategory.Dynamic, DynamicColliders.Values);
+        Add(ColliderCategory.Interactable, Interactables.Values);
+        Add(ColliderCategory.WaterBox, WaterBoxes.Values);
+        Add(ColliderCategory.Teleporter, Teleporters.Values);
+
+        return colliders;
+
+        void Add(ColliderCategory category, IEnumerable<ISM64Object> source)
         {
-            ("Static Collider", ColliderCategory.Static, StaticColliders.Values),
-            ("Dynamic Collider", ColliderCategory.Dynamic, DynamicColliders.Values),
-            ("Interactable", ColliderCategory.Interactable, Interactables.Values),
-            ("Waterbox", ColliderCategory.WaterBox, WaterBoxes.Values),
-            ("Teleporter", ColliderCategory.Teleporter, Teleporters.Values)
-        };
+            List<ISM64Object> objects = source.GetTempList();
+            colliders[category] = objects;
 
-        colliders = new Dictionary<string, List<ISM64Object>>(entries.Count);
+            if (!log) return;
 
-        foreach ((string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source) entry in entries)
-        {
-            colliders.Add(entry.Name, entry.Source.GetTempList());
-        }
-
-        if (!log) return;
-
-        foreach ((string Name, ColliderCategory Category, IEnumerable<ISM64Object> Source) entry in entries)
-        {
-            foreach (ISM64Object obj in entry.Source)
+            for (int i = 0; i < objects.Count; i++)
             {
-                ColliderOpResult result = obj.Collider.IsDestroyed ? ColliderOpResult.Removed : ColliderOpResult.AlreadyExists;
+                ISM64Object obj = objects[i];
 
-                LogCollider(obj.Collider, new ColliderOp(entry.Category, result));
+                ColliderOpResult result = obj.Collider.IsDestroyed
+                    ? ColliderOpResult.Removed
+                    : ColliderOpResult.AlreadyExists;
+
+                LogCollider(obj.Collider, new ColliderOp(category, result));
             }
         }
     }

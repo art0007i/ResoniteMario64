@@ -7,8 +7,8 @@ namespace ResoniteMario64.Mario64.Components.Objects;
 
 public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
 {
-    public SM64SurfaceType SurfaceType { get; }
-    public SM64TerrainType TerrainType { get; }
+    public SurfaceType SurfaceType { get; }
+    public TerrainType TerrainType { get; }
     public int Force { get; }
     public string OriginalTag { get; }
 

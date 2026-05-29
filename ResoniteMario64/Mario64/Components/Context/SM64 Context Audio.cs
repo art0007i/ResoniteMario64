@@ -24,6 +24,8 @@ public sealed partial class SM64Context
     private AudioOutput _marioAudioOutput;
     private Slot _audioSlot;
     private OpusStream<StereoSample> _marioAudioStream;
+    private Thread _audioThread;
+    private volatile bool _audioThreadRunning;
 
     private CircularBufferWriteState<StereoSample> _writeState;
 
@@ -33,10 +35,7 @@ public sealed partial class SM64Context
         {
             World.RunSynchronously(() =>
             {
-                _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(
-                    World.LocalUser,
-                    $"{AudioTag} - {World.LocalUser.UserID}",
-                    out bool created);
+                _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(World.LocalUser, $"{AudioTag} - {World.LocalUser.UserID}", out bool created);
 
                 if (created)
                 {
@@ -156,9 +155,67 @@ public sealed partial class SM64Context
         }
     }
 
+    private void StartAudioThread()
+    {
+        if (_audioThread != null)
+        {
+            return;
+        }
+
+        _audioThreadRunning = true;
+        _audioThread = new Thread(AudioThreadLoop)
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.Highest,
+            Name = "SM64 Audio"
+        };
+        _audioThread.Start();
+    }
+
+    private void StopAudioThread()
+    {
+        _audioThreadRunning = false;
+
+        Thread audioThread = _audioThread;
+        if (audioThread != null && audioThread.IsAlive && audioThread != Thread.CurrentThread)
+        {
+            audioThread.Join();
+        }
+
+        _audioThread = null;
+    }
+
+    private void AudioThreadLoop()
+    {
+        while (_audioThreadRunning)
+        {
+            Stopwatch tickStopwatch = Stopwatch.StartNew();
+            ProcessAudio();
+
+            long targetTicks = (long)(Config.GameTickMs.Value * Stopwatch.Frequency / 1000.0);
+            if (targetTicks < 1)
+            {
+                targetTicks = 1;
+            }
+
+            while (_audioThreadRunning && tickStopwatch.ElapsedTicks < targetTicks)
+            {
+                long remainingTicks = targetTicks - tickStopwatch.ElapsedTicks;
+                if (remainingTicks > Stopwatch.Frequency / 1000)
+                {
+                    Thread.Sleep(1);
+                }
+                else
+                {
+                    Thread.SpinWait(64);
+                }
+            }
+        }
+    }
+
     private void HandleAudioDestroy(Slot slot)
     {
-        if (Interop.IsGlobalInit)
+        if (SM64Interop.IsGlobalInit)
         {
             if (Config.LocalAudio.Value)
             {
@@ -187,7 +244,7 @@ public sealed partial class SM64Context
         }
 
         float volume = Config.AudioVolume.Value;
-        
+
         _audioSlot.RunSynchronously(() =>
         {
             if (_audioSlot.IsLocalElement)
@@ -210,7 +267,7 @@ public sealed partial class SM64Context
 
         if (_audioSlot.GetAllocatingUser() == World.LocalUser)
         {
-            _audioSlot.Destroy();
+            _audioSlot.SafeDestroy();
         }
     }
 
@@ -223,7 +280,7 @@ public sealed partial class SM64Context
 
         if (_audioSlot.IsLocalElement)
         {
-            _audioSlot.Destroy();
+            _audioSlot.SafeDestroy();
         }
 
         SetAudioSource();
@@ -254,15 +311,10 @@ public sealed partial class SM64Context
         if (_audioAccumulator < AudioTickInterval) return;
         _audioAccumulator -= AudioTickInterval;
 
-        Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.CurrentBufferSize, (uint)_marioAudioStream.UnreadSamples);
+        var numSamples = SM64Interop.AudioTick(_audioBuffer, (uint)_marioAudioStream.CurrentBufferSize, (uint)_marioAudioStream.UnreadSamples);
+        if (numSamples <= 0) return;
 
-        int written = DownmixAndResampleStereo(
-            _audioBuffer,
-            NativeSampleRate,
-            TargetSampleRate,
-            _convertedBuffer
-        );
-
+        int written = DownmixAndResampleStereo(_audioBuffer, NativeSampleRate, TargetSampleRate, _convertedBuffer);
         if (written <= 0) return;
         if (written > _marioAudioStream.CurrentBufferSize - _marioAudioStream.UnreadSamples) return;
 

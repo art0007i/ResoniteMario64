@@ -207,7 +207,7 @@ public class Patches
                 }
 
                 string[] tagParts = slot.Tag?.Split(',');
-                Utils.ParseTagParts(tagParts, out SM64Constants.SM64SurfaceType surfaceType, out SM64Constants.SM64TerrainType terrainType, out SM64Constants.SM64InteractableType interactableType, out _, out _);
+                Utils.ParseTagParts(tagParts, out SM64Constants.SurfaceType surfaceType, out SM64Constants.TerrainType terrainType, out SM64Constants.InteractableType interactableType, out _, out _);
                 ColliderCategory category = Utils.GetColliderCategory(col);
 
                 BuildEnumEditor(ui, slot, "ColliderCategory", category, texts);
@@ -414,10 +414,10 @@ public class Patches
                     b.RunInSeconds(5, () => b.LabelText = "Spawn Mario");
                 });
             };
-            if (Interop.IsGlobalInit) ui.Button("Reload All Colliders").LocalPressed += (b, _) => b.RunSynchronously(() => SM64Context.Instance?.ReloadAllColliders());
+            if (SM64Interop.IsGlobalInit) ui.Button("Reload All Colliders").LocalPressed += (b, _) => b.RunSynchronously(() => SM64Context.Instance?.ReloadAllColliders());
             ui.Button("Destroy Mario64 Context").LocalPressed += (b, _) => b.RunSynchronously(() => SM64Context.Instance?.Dispose());
 
-            if (SM64Context.Instance == null || !Interop.IsGlobalInit) return;
+            if (SM64Context.Instance == null || !SM64Interop.IsGlobalInit) return;
 
             try
             {
@@ -472,8 +472,8 @@ public class Patches
                 {
                     ui.Spacer(8);
 
-                    ui.Button("Play Random Music").LocalPressed += (_, _) => Interop.PlayRandomMusic();
-                    ui.Button("Stop Music").LocalPressed += (_, _) => Interop.StopMusic();
+                    ui.Button("Play Random Music").LocalPressed += (_, _) => SM64Interop.PlayRandomMusic();
+                    ui.Button("Stop Music").LocalPressed += (_, _) => SM64Interop.StopMusic();
 
                     ui.Spacer(8);
                 }

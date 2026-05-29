@@ -1,5 +1,4 @@
 using FrooxEngine;
-using Renderite.Shared;
 using ResoniteMario64.Mario64.Components.Objects;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
@@ -85,16 +84,17 @@ public sealed partial class SM64Context : IDisposable
 
         InitContextWorld(world);
 
-        if (!Interop.IsGlobalInit)
+        if (!SM64Interop.IsGlobalInit)
         {
             Logger.Debug("Init SM64", caller);
-            Interop.GlobalInit(Mario64Manager.RomBytes);
+            SM64Interop.GlobalInit(Mario64Manager.RomBytes);
         }
 
         SetAudioSource();
+        StartAudioThread();
 
         // Update context's colliders
-        Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
+        SM64Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
         Config.MaxMeshColliderTris.SettingChanged += HandleMaxMeshColliderTrisChanged;
 
         _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
@@ -185,7 +185,7 @@ public sealed partial class SM64Context : IDisposable
             {
                 foreach (SM64Mario mario in AllMarios.Values.GetTempList())
                 {
-                    Interop.SetWaterLevel(mario.MarioId, val.Value);
+                    SM64Interop.SetWaterLevel(mario.MarioId, val.Value);
                 }
             };
 
@@ -201,7 +201,7 @@ public sealed partial class SM64Context : IDisposable
             {
                 foreach (SM64Mario mario in AllMarios.Values.GetTempList())
                 {
-                    Interop.SetGasLevel(mario.MarioId, val.Value);
+                    SM64Interop.SetGasLevel(mario.MarioId, val.Value);
                 }
             };
 
@@ -279,13 +279,13 @@ public sealed partial class SM64Context : IDisposable
 
         if (World.InputInterface.GetKeyDown(Config.LogColliderKey.Value) && Config.DebugEnabled.Value)
         {
-            GetAllColliders(true, out _);
+            GetAllColliders(true);
         }
 
         if (_staticColliderUpdate)
         {
             _staticColliderUpdate = false;
-            Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
+            SM64Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
         }
 
         HandleInputs();
@@ -295,8 +295,6 @@ public sealed partial class SM64Context : IDisposable
             SM64GameTick();
             LastTick = World.Time.WorldTime;
         }
-
-        ProcessAudio();
 
         foreach (SM64Mario mario in AllMarios.Values.GetTempList())
         {
@@ -430,6 +428,8 @@ public sealed partial class SM64Context : IDisposable
             _staticUpdateTimer?.Dispose();
             _staticUpdateTimer = null;
 
+            StopAudioThread();
+
             World.RunSynchronously(() =>
             {
                 // Release the locomotion input block
@@ -445,7 +445,7 @@ public sealed partial class SM64Context : IDisposable
                     _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
                     if (_audioSlot.IsLocalElement && !_audioSlot.IsDestroyed)
                     {
-                        _audioSlot.Destroy();
+                        _audioSlot.SafeDestroy();
                     }
                 }
             }, true, null, true);
@@ -461,7 +461,7 @@ public sealed partial class SM64Context : IDisposable
         }
 
         // Free unmanaged resources (from the C++ library)
-        Interop.GlobalTerminate();
+        SM64Interop.GlobalTerminate();
 
         // Finally, nullify the static instance
         if (Instance == this)

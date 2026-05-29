@@ -9,8 +9,8 @@ namespace ResoniteMario64.Mario64.Components.Objects;
 
 public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
 {
-    public SM64SurfaceType SurfaceType { get; }
-    public SM64TerrainType TerrainType { get; }
+    public SurfaceType SurfaceType { get; }
+    public TerrainType TerrainType { get; }
     public int Force { get; }
     public string OriginalTag { get; }
 
@@ -48,7 +48,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
         InitScale = col.Slot.GlobalScale;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.ParseTagParts(tagParts, out SM64SurfaceType surfaceType, out SM64TerrainType terrainType, out _, out int force, out _);
+        Utils.ParseTagParts(tagParts, out SurfaceType surfaceType, out TerrainType terrainType, out _, out int force, out _);
 
         SurfaceType = surfaceType;
         TerrainType = terrainType;
@@ -57,8 +57,8 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
         IsPlayer = col.Type.Value == ColliderType.CharacterController && col.Slot.GetComponent<UserRoot>() != null;
 
         List<SM64Surface> surfaces = new List<SM64Surface>();
-        Utils.GetScaledSurfaces(surfaces, col, SurfaceType, TerrainType, SM64SurfaceFlag.Dynamic, Force);
-        ObjectId = Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
+        Utils.GetScaledSurfaces(surfaces, col, SurfaceType, TerrainType, SurfaceFlag.Dynamic, Force);
+        ObjectId = SM64Interop.SurfaceObjectCreate(col.Slot.GlobalPosition, col.Slot.GlobalRotation, surfaces.ToArray());
 
         LastChangedTime = col.World.Time.AbsoluteWorldTime;
     }
@@ -82,7 +82,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
     {
         if (UpdateCurrentPositionData())
         {
-            Interop.SurfaceObjectMove(ObjectId, Position, Rotation);
+            SM64Interop.SurfaceObjectMove(ObjectId, Position, Rotation);
         }
     }
 
@@ -110,9 +110,9 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
             World = null;
         }
 
-        if (Interop.IsGlobalInit)
+        if (SM64Interop.IsGlobalInit)
         {
-            Interop.SurfaceObjectDelete(ObjectId);
+            SM64Interop.SurfaceObjectDelete(ObjectId);
         }
 
         IsDisposed = true;

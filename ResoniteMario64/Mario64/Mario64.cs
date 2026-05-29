@@ -8,6 +8,9 @@ public static class Mario64Manager
     private const string RomExpectedHash = "20b854b239203baf6c961b850a4a51a2"; // MD5 hash
     private const string RomFileName = "baserom.us.z64";
     internal static byte[] RomBytes;
+    
+    public static readonly string LibName = "sm64" + (OperatingSystem.IsWindows() ? ".dll" : ".so");
+    public static readonly string LibPath = Path.Combine(Plugin.DllDirectory, LibName);
 
     internal static bool Init()
     {
@@ -28,18 +31,15 @@ public static class Mario64Manager
     {
         try
         {
-            string libName = "sm64" + (OperatingSystem.IsWindows() ? ".dll" : ".so");
-            string libPath = Path.Combine(Plugin.DllDirectory, libName);
+            Logger.Info($"Copying {LibName} to {LibPath} from embedded resources.");
 
-            Logger.Info($"Copying {libName} to {libPath} from embedded resources.");
-
-            using Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(libName);
+            using Stream resourceStream = typeof(Mario64Manager).Assembly.GetManifestResourceStream(LibName);
             if (resourceStream == null)
             {
-                throw new FileLoadException($"Embedded resource {libName} not found in assembly.");
+                throw new FileLoadException($"Embedded resource {LibName} not found in assembly.");
             }
 
-            using FileStream fileStream = File.Open(libPath, FileMode.Create, FileAccess.Write);
+            using FileStream fileStream = File.Open(LibPath, FileMode.Create, FileAccess.Write);
             resourceStream.CopyTo(fileStream);
 
             return true;

@@ -1,5 +1,4 @@
 ﻿using BepInEx.Configuration;
-using FrooxEngine;
 using Renderite.Shared;
 
 namespace ResoniteMario64;
@@ -36,6 +35,7 @@ public class Config
     public static ConfigEntry<bool> DebugEnabled;
     public static ConfigEntry<bool> RenderSlotPublic;
     public static ConfigEntry<bool> LogColliderChanges;
+    public static ConfigEntry<bool> LibSM64DebugEnabled;
     public static ConfigEntry<Key> LogColliderKey;
     public static ConfigEntry<Key> RefreshCollidersKey;
 
@@ -69,6 +69,7 @@ public class Config
             RenderSlotPublic = config.Bind("Debug", "Render Slot Public", false, "When true the renderer slot will not be a local slot.");
             LogColliderChanges = config.Bind("Debug", "Log Collider Changes", false, "Whether to Log Collider changes or not.");
             LogColliderKey = config.Bind("Debug", "Log Collider Key", Key.Backslash, "The key to toggle logging collider changes.");
+            LibSM64DebugEnabled = config.Bind("Debug", "LibSM64 DebugLog Enabled", false, "Whether to enable LibSM64's DebugLog or not.");
             RefreshCollidersKey = config.Bind("Debug", "Refresh Colliders Key", Key.Semicolon, "The key to refresh the colliders.");
 
             return true;

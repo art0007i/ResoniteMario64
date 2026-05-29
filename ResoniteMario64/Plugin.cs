@@ -4,6 +4,7 @@ using BepInEx.Logging;
 using BepInEx.NET.Common;
 using BepInExResoniteShim;
 using ResoniteMario64.Mario64;
+using ResoniteMario64.Mario64.Components.Context;
 
 namespace ResoniteMario64;
 
@@ -40,5 +41,12 @@ public class Plugin : BasePlugin
             Logger.Fatal("Failed to load ResoniteMario64.");
             Logger.Fatal(ex);
         }
+    }
+
+    public override bool Unload()
+    {
+        SM64Context.Instance?.Dispose();
+        HarmonyInstance.UnpatchSelf();
+        return true;
     }
 }

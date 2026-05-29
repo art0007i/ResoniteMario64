@@ -84,7 +84,7 @@ public sealed partial class SM64Context
             if (context.MyMarios.Count >= maxMarios)
             {
                 Logger.Msg("Tried to create mario, but we are at the configured limit!");
-                slot.RunSynchronously(slot.Destroy);
+                slot.SafeDestroy();
                 return null;
             }
         }
@@ -94,39 +94,36 @@ public sealed partial class SM64Context
         {
             mario = new SM64Mario(slot, context);
             context.AllMarios.Add(slot, mario);
-            if (Config.PlayRandomMusic.Value)
+            if (mario.IsLocal && Config.PlayRandomMusic.Value)
             {
-                Interop.PlayRandomMusic();
+                SM64Interop.PlayRandomMusic();
             }
-            
-            if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music) && !Interop.IsMusicPlaying(music))
+
+            if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music) && !SM64Interop.IsMusicPlaying(music))
             {
-                Interop.PlayMusic(music);
+                SM64Interop.PlayMusic(music);
             }
         }
 
         if (!manual) return mario;
 
         Slot containerSlot = context.MarioContainersSlot;
-        if (containerSlot != null)
+        containerSlot?.RunInUpdates(3, () =>
         {
-            containerSlot.RunInUpdates(3, () =>
+            foreach (Slot child1 in containerSlot.Children.GetTempList())
             {
-                foreach (Slot child1 in containerSlot.Children.GetTempList())
+                foreach (Slot child2 in child1.Children.GetTempList())
                 {
-                    foreach (Slot child2 in child1.Children.GetTempList())
-                    {
-                        if (child2.Tag != MarioTag) continue;
-                        if (context.AllMarios.ContainsKey(child2)) continue;
+                    if (child2.Tag != MarioTag) continue;
+                    if (context.AllMarios.ContainsKey(child2)) continue;
 
-                        SM64Mario mario2 = new SM64Mario(child2, context);
-                        context.AllMarios.Add(child2, mario2);
-                    }
+                    SM64Mario mario2 = new SM64Mario(child2, context);
+                    context.AllMarios.Add(child2, mario2);
                 }
+            }
 
-                context.ReloadAllColliders(false);
-            });
-        }
+            context.ReloadAllColliders(false);
+        });
 
         return mario;
     }
@@ -138,7 +135,7 @@ public sealed partial class SM64Context
 
         if (mario.Context.AllMarios.Count == 0)
         {
-            Interop.StopMusic();
+            SM64Interop.StopMusic();
         }
     }
     

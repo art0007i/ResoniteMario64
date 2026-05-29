@@ -4,7 +4,7 @@ namespace ResoniteMario64.Mario64.libsm64;
 
 public static class SM64Constants
 {
-    public enum SM64TerrainType : ushort
+    public enum TerrainType : ushort
     {
         Grass = 0x0000,
         Stone = 0x0001,
@@ -15,7 +15,7 @@ public static class SM64Constants
         Slide = 0x0006
     }
 
-    public enum SM64SurfaceType : short
+    public enum SurfaceType : short
     {
         Default = 0x0000,                // Environment default
         Burning = 0x0001,                // Lava / Frostbite (in SL), but is used mostly for Lava
@@ -73,15 +73,15 @@ public static class SM64Constants
     }
 
     [Flags]
-    public enum SM64SurfaceFlag : sbyte
+    public enum SurfaceFlag : sbyte
     {
         None = 0,
-        Dynamic = (1 << 0),
-        NoCollision = (1 << 1),
-        XProjection = (1 << 3)
+        Dynamic = 1 << 0,
+        NoCollision = 1 << 1,
+        XProjection = 1 << 3
     }
 
-    public enum SM64InteractableType
+    public enum InteractableType
     {
         None = -1,
         GoldCoin,
@@ -1237,13 +1237,13 @@ public static class SM64Constants
 
     #endregion
 
-    #region  Animations
+    #region Animations
 
     // mario_animation_ids.h
     /// <summary>
     /// Represents all of Mario's animation IDs.
     /// </summary>
-    public enum SM64MarioAnimationID : short
+    public enum MarioAnimationID : short
     {
         SlowLedgeGrab,                  // 0x00 
         FallOverBackwards,              // 0x01 
@@ -1457,20 +1457,45 @@ public static class SM64Constants
     }
 
     [Flags]
-    public enum SM64AnimationFlags : short
+    public enum AnimationFlags : short
     {
-        Loop = 0,             // 0x00
-        NoLoop = (1 << 0),    // 0x01
-        Forward = (1 << 1),   // 0x02
-        _2 = (1 << 2),        // 0x04
-        HorTrans = (1 << 3),  // 0x08
-        VertTrans = (1 << 4), // 0x10
-        _5 = (1 << 5),        // 0x20
-        _6 = (1 << 6),        // 0x40
-        _7 = (1 << 7),        // 0x80
+        Loop = 0,           // 0x00
+        NoLoop = 1 << 0,    // 0x01
+        Forward = 1 << 1,   // 0x02
+        _2 = 1 << 2,        // 0x04
+        HorTrans = 1 << 3,  // 0x08
+        VertTrans = 1 << 4, // 0x10
+        _5 = 1 << 5,        // 0x20
+        _6 = 1 << 6,        // 0x40
+        _7 = 1 << 7,        // 0x80
     }
-    
+
     #endregion
+
+    [Flags]
+    public enum ParticleFlags : uint
+    {
+        Dust = 1 << 0,                // 0x00000001
+        VerticalStar = 1 << 1,        // 0x00000002
+        _2 = 1 << 2,                  // 0x00000004
+        Sparkles = 1 << 3,            // 0x00000008
+        HorizontalStar = 1 << 4,      // 0x00000010
+        Bubble = 1 << 5,              // 0x00000020
+        WaterSplash = 1 << 6,         // 0x00000040
+        IdleWaterWave = 1 << 7,       // 0x00000080
+        ShallowWaterWave = 1 << 8,    // 0x00000100
+        PlungeBubble = 1 << 9,        // 0x00000200
+        WaveTrail = 1 << 10,          // 0x00000400
+        Fire = 1 << 11,               // 0x00000800
+        ShallowWaterSplash = 1 << 12, // 0x00001000
+        Leaf = 1 << 13,               // 0x00002000
+        Snow = 1 << 14,               // 0x00004000
+        Dirt = 1 << 15,               // 0x00008000
+        MistCircle = 1 << 16,         // 0x00010000
+        Breath = 1 << 17,             // 0x00020000
+        Triangle = 1 << 18,           // 0x00040000
+        _19 = 1 << 19                 // 0x00080000
+    }
 
     // sm64.h
     /// <summary>

@@ -9,7 +9,7 @@ namespace ResoniteMario64.Mario64.Components.Objects;
 
 public sealed class SM64Interactable : ISM64Object
 {
-    public readonly SM64InteractableType Type;
+    public readonly InteractableType Type;
 
     public readonly int TypeId;
 
@@ -54,51 +54,51 @@ public sealed class SM64Interactable : ISM64Object
         bool disable = true;
         switch (Type)
         {
-            case SM64InteractableType.GoldCoin:
-                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+            case InteractableType.GoldCoin:
+                SM64Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
                 mario.SyncedCoinCounter++;
                 mario.Heal(1);
                 break;
-            case SM64InteractableType.BlueCoin:
-                Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
+            case InteractableType.BlueCoin:
+                SM64Interop.PlaySoundGlobal(Sounds.SOUND_GENERAL_COIN);
                 mario.SyncedCoinCounter += 5;
                 mario.Heal(5);
                 break;
-            case SM64InteractableType.RedCoin:
+            case InteractableType.RedCoin:
                 int currentRedIndex = mario.SyncedRedCoinCounter;
 
                 Sounds redSound = Utils.GetRedCoinSound(TypeId == -1 ? currentRedIndex : TypeId);
 
-                Interop.PlaySoundGlobal(redSound);
+                SM64Interop.PlaySoundGlobal(redSound);
 
                 mario.SyncedRedCoinCounter = currentRedIndex == 7 ? 0 : currentRedIndex + 1;
                 mario.SyncedCoinCounter += 2;
                 mario.Heal(2);
                 break;
-            case SM64InteractableType.VanishCap:
+            case InteractableType.VanishCap:
                 mario.WearCap(MarioCapType.VanishCap);
                 break;
-            case SM64InteractableType.MetalCap:
+            case InteractableType.MetalCap:
                 mario.WearCap(MarioCapType.MetalCap);
                 break;
-            case SM64InteractableType.WingCap:
+            case InteractableType.WingCap:
                 mario.WearCap(MarioCapType.WingCap, 40f);
                 break;
-            case SM64InteractableType.NormalCap:
+            case InteractableType.NormalCap:
                 mario.WearCap(MarioCapType.NormalCap);
                 break;
-            case SM64InteractableType.Star:
-                Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
+            case InteractableType.Star:
+                SM64Interop.PlaySoundGlobal(Sounds.Menu_StarSound);
                 mario.SyncedStarCounter++;
                 mario.Heal(8);
                 mario.SetForwardVelocity(0f);
                 mario.SetAction(ActionFlag.Freefall);
                 break;
-            case SM64InteractableType.OneUp:
-                Interop.PlaySoundGlobal(Sounds.General_Collect1Up);
+            case InteractableType.OneUp:
+                SM64Interop.PlaySoundGlobal(Sounds.General_Collect1Up);
                 mario.SyncedLives++;
                 break;
-            case SM64InteractableType.Damage:
+            case InteractableType.Damage:
                 bool isLocalMarioCollider = Collider.Slot.IsChildOf(mario.MarioSlot);
                 if (!isLocalMarioCollider)
                 {
@@ -109,7 +109,7 @@ public sealed class SM64Interactable : ISM64Object
 
                 disable = false;
                 break;
-            case SM64InteractableType.None:
+            case InteractableType.None:
                 disable = false;
                 break;
             default:
