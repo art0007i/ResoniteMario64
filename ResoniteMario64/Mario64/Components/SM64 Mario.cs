@@ -7,7 +7,6 @@ using ResoniteMario64.Mario64.Components.Interfaces;
 using ResoniteMario64.Mario64.Components.Objects;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
-using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.Mario64.Components;
 
@@ -757,6 +756,11 @@ public sealed class SM64Mario : ISM64Object
                 teleporter.Handle(this);
             }
 
+            foreach (var thing in Context.FakeObjects.Values.GetTempList())
+            {
+                thing.ContextFixedUpdate();
+            }
+            
             // Check for deaths, so we delete mario
             bool isQuickSandDeath = (SyncedActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
             bool isDeathPlaneDeath = false;
@@ -1099,7 +1103,7 @@ public sealed class SM64Mario : ISM64Object
     {
         if (CurrentState.IsDead || !IsLocal) return;
 
-        SM64Interop.MarioTakeDamage(MarioId, worldPosition, damage);
+        SM64Interop.MarioTakeDamage(MarioId, worldPosition, damage, (uint)0);
     }
 
     public void WearCap(MarioCapType capType, float duration = 15f, bool playMusic = true)

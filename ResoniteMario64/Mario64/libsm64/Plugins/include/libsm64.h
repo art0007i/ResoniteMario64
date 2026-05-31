@@ -1,9 +1,12 @@
 #ifndef LIB_SM64_H
 #define LIB_SM64_H
 
-#include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
+#include <math.h>
 
 #if defined(_WIN32)
 #ifdef SM64_LIB_EXPORT
@@ -146,7 +149,9 @@ struct SM64SurfaceCollisionData
 
 enum
 {
-    SM64_TEXTURE_WIDTH = 64 * 11, SM64_TEXTURE_HEIGHT = 64, SM64_GEO_MAX_TRIANGLES = 1024,
+    SM64_TEXTURE_WIDTH = 64 * 11,
+    SM64_TEXTURE_HEIGHT = 64,
+    SM64_GEO_MAX_TRIANGLES = 1024,
 };
 
 typedef void (*SM64RumbleCallbackFunctionPtr)(int32_t marioId, int16_t level, int16_t time);
@@ -258,6 +263,16 @@ extern SM64_LIB_FN void sm64_fadeout_background_music(uint16_t arg0, uint16_t fa
 extern SM64_LIB_FN uint16_t sm64_get_current_background_music();
 
 extern SM64_LIB_FN void sm64_play_sound(int32_t soundBits, float *pos);
+
+extern SM64_LIB_FN int32_t sm64_fake_object_create(float x, float y, float z, int32_t preset);
+
+extern SM64_LIB_FN void sm64_fake_object_delete(int32_t objectId);
+
+extern SM64_LIB_FN void sm64_fake_object_set_position(int32_t objectId, float x, float y, float z);
+
+extern SM64_LIB_FN void sm64_fake_object_set_hitbox(int32_t objectId, float radius, float height, float downOffset);
+
+extern SM64_LIB_FN void sm64_fake_object_tick(int32_t objectId);
 
 extern SM64_LIB_FN void sm64_play_sound_global(int32_t soundBits);
 

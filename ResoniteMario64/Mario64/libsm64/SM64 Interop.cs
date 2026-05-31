@@ -251,6 +251,11 @@ public unsafe static class SM64Interop
         SM64Native.sm64_mario_take_damage(marioId, damage, subtype, marioPos.x, marioPos.y, marioPos.z);
     }
 
+    public static void MarioTakeDamage(int marioId, float3 frooxPosition, uint damage, InteractionSubtype subtype = 0)
+    {
+        MarioTakeDamage(marioId, frooxPosition, damage, (uint)subtype);
+    }
+
     public static void MarioSetVelocity(int marioId, SM64MarioState previousState, SM64MarioState currentState)
     {
         SM64Native.sm64_set_mario_velocity(marioId, currentState.Position[0] - previousState.Position[0], currentState.Position[1] - previousState.Position[1], currentState.Position[2] - previousState.Position[2]);
@@ -536,6 +541,33 @@ public unsafe static class SM64Interop
     public static void MarioSetAnimFrame(int marioId, short frame)
     {
         SM64Native.sm64_set_mario_anim_frame(marioId, frame);
+    }
+    
+    public static int CreateFakeObject(float3 pos, int preset)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        return SM64Native.sm64_fake_object_create(marioPos.x, marioPos.y, marioPos.z, preset);
+    }
+
+    public static void DeleteFakeObject(int objectId)
+    {
+        SM64Native.sm64_fake_object_delete(objectId);
+    }
+
+    public static void SetFakeObjectPosition(int objectId, float3 pos)
+    {
+        float3 marioPos = pos.ToMarioPosition();
+        SM64Native.sm64_fake_object_set_position(objectId, marioPos.x, marioPos.y, marioPos.z);
+    }
+
+    public static void SetFakeObjectHitbox(int objectId, float radius, float height, float downOffset)
+    {
+        SM64Native.sm64_fake_object_set_hitbox(objectId, radius, height, downOffset);
+    }
+
+    public static void TickFakeObject(int objectId)
+    {
+        SM64Native.sm64_fake_object_tick(objectId);
     }
 }
 

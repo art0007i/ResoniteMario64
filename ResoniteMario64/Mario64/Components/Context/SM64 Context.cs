@@ -311,6 +311,11 @@ public sealed partial class SM64Context : IDisposable
             dynamicCol?.ContextFixedUpdateSynced();
         }
 
+        foreach (SM64FakeObject obj in FakeObjects.Values.GetTempList())
+        {
+            obj.ContextFixedUpdateSynced();
+        }
+
         foreach (SM64Mario mario in AllMarios.Values.GetTempList())
         {
             mario?.ContextFixedUpdateSynced();

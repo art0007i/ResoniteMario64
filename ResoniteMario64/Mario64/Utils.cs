@@ -4,7 +4,6 @@ using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.libsm64;
-using static ResoniteMario64.Mario64.libsm64.SM64Constants;
 
 namespace ResoniteMario64.Mario64;
 
@@ -15,7 +14,8 @@ public enum ColliderCategory
     Dynamic,
     Interactable,
     WaterBox,
-    Teleporter
+    Teleporter,
+    FakeObject
 }
 
 internal enum ColliderOpResult
@@ -52,6 +52,7 @@ public static class Utils
         bool isInteractable = tag.Contains("SM64 Interactable", comp);
         bool isWaterBox = tag.Contains("SM64 WaterBox", comp);
         bool isTeleporter = tag.Contains("SM64 Teleporter", comp);
+        bool isPole = tag.Contains("SM64 FakeObject", comp) || tag.Contains("SM64 Pole", comp);
         bool isCharacterController = col.Type.Value == ColliderType.CharacterController && col.Slot.GetComponent<UserRoot>() != null;
         bool isValid = col.Enabled && col.Slot.IsActive;
 
@@ -69,6 +70,9 @@ public static class Utils
 
         if (isTeleporter && isValid)
             return ColliderCategory.Teleporter;
+
+        if (isPole && isValid)
+            return ColliderCategory.FakeObject;
 
         return ColliderCategory.None;
     }

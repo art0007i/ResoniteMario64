@@ -1,7 +1,8 @@
-﻿using FrooxEngine;
+﻿using Elements.Core;
+using FrooxEngine;
 using ResoniteMario64.Mario64.Components.Context;
 using ResoniteMario64.Mario64.Components.Interfaces;
-using static ResoniteMario64.Mario64.libsm64.SM64Constants;
+using ResoniteMario64.Mario64.libsm64;
 
 namespace ResoniteMario64.Mario64.Components.Objects;
 
@@ -17,6 +18,7 @@ public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
     public Collider Collider { get; private set; }
 
     public bool IsDisposed { get; private set; }
+    public int PoleId = -1;
 
     public SM64StaticCollider(Collider col, SM64Context instance)
     {
@@ -33,11 +35,24 @@ public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
         OriginalTag = col.Slot.Tag;
 
         string[] tagParts = col.Slot.Tag?.Split(',');
-        Utils.ParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force, out _);
+        Utils.ParseTagParts(tagParts, out var surfaceType, out var terrainType, out _, out int force, out int ext);
 
         SurfaceType = surfaceType;
         TerrainType = terrainType;
         Force = force;
+
+        if (ext == -1) return;
+
+        float radiusFloat = MathF.Max(Collider.LocalBoundingBox.Size.x, Collider.LocalBoundingBox.Size.z) * 0.5f;
+
+        PoleId = SM64Interop.CreateFakeObject(new float3(Collider.Slot.GlobalPosition.x, Collider.Slot.GlobalPosition.y, Collider.Slot.GlobalPosition.z), 1);
+        SM64Interop.SetFakeObjectHitbox(PoleId, radiusFloat, Collider.LocalBoundingBox.Size.y.ToMarioFloat(), 0);
+    }
+
+    public void UpdateFakeObject()
+    {
+        if (PoleId == -1) return;
+        SM64Interop.TickFakeObject(PoleId);
     }
 
     ~SM64StaticCollider()

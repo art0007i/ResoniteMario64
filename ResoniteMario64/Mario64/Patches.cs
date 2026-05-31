@@ -207,7 +207,7 @@ public class Patches
                 }
 
                 string[] tagParts = slot.Tag?.Split(',');
-                Utils.ParseTagParts(tagParts, out SM64Constants.SurfaceType surfaceType, out SM64Constants.TerrainType terrainType, out SM64Constants.InteractableType interactableType, out _, out _);
+                Utils.ParseTagParts(tagParts, out SurfaceType surfaceType, out TerrainType terrainType, out InteractableType interactableType, out _, out _);
                 ColliderCategory category = Utils.GetColliderCategory(col);
 
                 BuildEnumEditor(ui, slot, "ColliderCategory", category, texts);
@@ -444,9 +444,9 @@ public class Patches
 
                     ui.Spacer(8);
 
-                    foreach (SM64Constants.MarioCapType capType in Enum.GetValues(typeof(SM64Constants.MarioCapType)))
+                    foreach (MarioCapType capType in Enum.GetValues(typeof(MarioCapType)))
                     {
-                        ui.Button($"Wear {capType.ToString()}").LocalPressed += (_, _) => mario.WearCap(capType, capType == SM64Constants.MarioCapType.WingCap ? 40f : 15f, !Config.DisableAudio.Value);
+                        ui.Button($"Wear {capType.ToString()}").LocalPressed += (_, _) => mario.WearCap(capType, capType == MarioCapType.WingCap ? 40f : 15f, !Config.DisableAudio.Value);
                     }
 
                     ui.Spacer(8);

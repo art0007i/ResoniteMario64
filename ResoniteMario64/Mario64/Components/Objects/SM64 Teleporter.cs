@@ -58,7 +58,7 @@ public sealed class SM64Teleporter : ISM64Object
             return;
         }
 
-        if (mario.LastTeleportDestination == this || !mario.CurrentActionFlags.HasFlag(SM64Constants.ActionFlag.Stationary))
+        if (mario.LastTeleportDestination == this || !mario.CurrentActionFlags.HasFlag(ActionFlag.Stationary))
         {
             teleporterWatch.Reset();
             return;

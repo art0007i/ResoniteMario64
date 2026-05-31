@@ -14,6 +14,7 @@ public sealed partial class SM64Context
     internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
     internal readonly Dictionary<Collider, SM64Teleporter> Teleporters = new Dictionary<Collider, SM64Teleporter>();
     internal readonly Dictionary<Collider, SM64WaterBox> WaterBoxes = new Dictionary<Collider, SM64WaterBox>();
+    internal readonly Dictionary<Collider, SM64FakeObject> FakeObjects = new Dictionary<Collider, SM64FakeObject>();
 
     public void HandleCollider(Collider collider, bool log = true)
     {
@@ -58,6 +59,7 @@ public sealed partial class SM64Context
             ColliderCategory.Interactable => RegisterInteractable(collider),
             ColliderCategory.WaterBox => RegisterWaterBox(collider),
             ColliderCategory.Teleporter => RegisterTeleporter(collider),
+            ColliderCategory.FakeObject => RegisterFakeObject(collider),
             _ => null
         };
     }
@@ -92,6 +94,12 @@ public sealed partial class SM64Context
         {
             teleporter.Dispose();
             return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.Removed);
+        }
+
+        if (FakeObjects.Remove(collider, out SM64FakeObject fakeObject))
+        {
+            fakeObject.Dispose();
+            return new ColliderOp(ColliderCategory.FakeObject, ColliderOpResult.Removed);
         }
 
         return null;
@@ -247,6 +255,35 @@ public sealed partial class SM64Context
     {
         Teleporters.Remove(collider);
     }
+    
+    // Teleporters
+    private ColliderOp RegisterFakeObject(Collider collider)
+    {
+        if (FakeObjects.TryGetValue(collider, out SM64FakeObject fakeObject))
+        {
+            bool scaleChanged = !fakeObject.InitScale.Approximately(collider.Slot.GlobalScale, 0.001f);
+            bool tagChanged = collider.Slot.Tag != fakeObject.OriginalTag;
+            bool shapeChanged = collider.ShapeChanged;
+
+            bool changed = scaleChanged || tagChanged || shapeChanged;
+            if (!changed)
+            {
+                return new ColliderOp(ColliderCategory.FakeObject, ColliderOpResult.AlreadyExists);
+            }
+
+            fakeObject.Dispose();
+            FakeObjects.Remove(collider);
+        }
+
+        SM64FakeObject col = new SM64FakeObject(collider, this);
+        FakeObjects.Add(collider, col);
+        return new ColliderOp(ColliderCategory.FakeObject, ColliderOpResult.Added);
+    }
+
+    internal void UnregisterFakeObject(Collider collider)
+    {
+        FakeObjects.Remove(collider);
+    }
 
     // Patches
     [HarmonyPatch(typeof(Collider))]
@@ -269,43 +306,28 @@ public sealed partial class SM64Context
         }
     }
 
-    private static void LogCollider(object obj, ColliderOp added, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
+    private static void LogCollider(object obj, ColliderOp op, [CallerMemberName] string caller = "", [CallerLineNumber] int line = 0)
     {
-        if (added == null) return;
+        if (op == null) return;
         if (obj is not Collider collider) return;
+        if ((collider.Slot.Tag?.Contains("NOLOG") ?? false) || collider.Slot.GetComponent<UserRoot>() != null) return;
         if (!Config.LogColliderChanges.Value) return;
 
-        string name = added.Category switch
-        {
-            ColliderCategory.Static => "Static Collider",
-            ColliderCategory.Dynamic => "Dynamic Collider",
-            ColliderCategory.Interactable => "Interactable",
-            ColliderCategory.WaterBox => "WaterBox",
-            ColliderCategory.Teleporter => "Teleporter",
-            _ => "Collider"
-        };
-
-        string state = added.Result switch
-        {
-            ColliderOpResult.Added => "Added",
-            ColliderOpResult.AlreadyExists => "Already Added",
-            ColliderOpResult.Removed => "Destroyed",
-            ColliderOpResult.Updated => "Updated",
-            _ => "Unknown"
-        };
+        string name = op.Category.ToString();
+        string state = op.Result.ToString();
 
         if (collider.IsRemoved) state = "Destroyed";
 
         string tag = collider.Slot?.Tag;
         string[] tagParts = tag?.Split(',');
 
-        Utils.ParseTagParts(tagParts, out SM64Constants.SurfaceType surfaceType, out SM64Constants.TerrainType terrainType, out SM64Constants.InteractableType interactableType, out int interactableId, out int group);
+        Utils.ParseTagParts(tagParts, out SurfaceType surfaceType, out TerrainType terrainType, out InteractableType interactableType, out int idx, out int ext);
 
-        string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {interactableId}, Group: {group}";
+        string message = $"{name} {state}: Name: {collider.Slot?.Name}, ID: {collider.ReferenceID}, Surface: {surfaceType}, Terrain: {terrainType}, Interactable: {interactableType}, ID/Force: {idx}, Ext: {ext}";
 
-        if (added.Result == ColliderOpResult.Removed || collider.IsRemoved)
+        if (op.Result == ColliderOpResult.Removed || collider.IsRemoved)
             Logger.Error(message, caller, line);
-        else if (added.Result == ColliderOpResult.Added)
+        else if (op.Result == ColliderOpResult.Added)
             Logger.Msg(message, caller, line);
         else
             Logger.Warn(message, caller, line);
@@ -320,6 +342,7 @@ public sealed partial class SM64Context
         Add(ColliderCategory.Interactable, Interactables.Values);
         Add(ColliderCategory.WaterBox, WaterBoxes.Values);
         Add(ColliderCategory.Teleporter, Teleporters.Values);
+        Add(ColliderCategory.FakeObject, FakeObjects.Values);
 
         return colliders;
 

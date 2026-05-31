@@ -99,7 +99,7 @@ public sealed partial class SM64Context
                 SM64Interop.PlayRandomMusic();
             }
 
-            if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out SM64Constants.MusicSequence music) && !SM64Interop.IsMusicPlaying(music))
+            if (context.WorldVariableSpace.TryReadValue("SM64Music", out string value) && Enum.TryParse(value, out MusicSequence music) && !SM64Interop.IsMusicPlaying(music))
             {
                 SM64Interop.PlayMusic(music);
             }

@@ -185,4 +185,19 @@ internal unsafe static partial class SM64Native
 
     [LibraryImport(LibName)]
     public static partial float sm64_surface_find_poison_gas_level(float x, float z);
+    
+    [LibraryImport(LibName)]    
+    public static partial int sm64_fake_object_create(float x, float y, float z, int preset);
+    
+    [LibraryImport(LibName)]
+    public static partial void sm64_fake_object_delete(int objectId);
+    
+    [LibraryImport(LibName)]
+    public static partial void sm64_fake_object_set_position(int objectId, float x, float y, float z);
+    
+    [LibraryImport(LibName)]
+    public static partial void sm64_fake_object_set_hitbox(int objectId, float radius, float height, float downOffset);
+    
+    [LibraryImport(LibName)]
+    public static partial void sm64_fake_object_tick(int objectId);
 }
