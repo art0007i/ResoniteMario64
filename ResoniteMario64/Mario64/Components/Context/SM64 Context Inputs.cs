@@ -290,7 +290,7 @@ public sealed partial class SM64Context
         UpdateHapticsPatch.MarioId = marioId;
         UpdateHapticsPatch.Level = level;
         UpdateHapticsPatch.Time = durationSeconds;
-        
+
         if (Config.DebugEnabled.Value) Plugin.Log.LogDebug($"Got Vibrate Callback: marioId: {marioId}, level: {level}, time: {UpdateHapticsPatch.Time}");
     }
 }

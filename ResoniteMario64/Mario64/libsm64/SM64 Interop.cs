@@ -57,13 +57,15 @@ public unsafe static class SM64Interop
     private static readonly SM64Native.SM64RumbleCallbackFunctionPtr RumbleCallback = SM64Context.VibrateCallback;
     private static readonly SM64Native.SM64DebugPrintFunctionPtr DebugPrintCallback = DebugPrint;
 
-    private static void DebugPrint(string str)
+    private static void DebugPrint(nint strPtr)
     {
         if (!Config.DebugEnabled.Value || !Config.LibSM64DebugEnabled.Value) return;
+
+        string str = Marshal.PtrToStringAnsi(strPtr);
         Logger.Debug($"[libsm64] {str}");
     }
 
-    public static void GlobalInit(byte[] rom)
+    public static bool GlobalInit(byte[] rom)
     {
         byte[] textureData = new byte[4 * SM64TextureWidth * SM64TextureHeight];
 
@@ -106,6 +108,7 @@ public unsafe static class SM64Interop
         }
 
         IsGlobalInit = true;
+        return true;
     }
 
     public static void GlobalTerminate()
@@ -183,7 +186,7 @@ public unsafe static class SM64Interop
         }
     }
 
-    public static int MarioCreate(float3 marioPos) => SM64Native.sm64_mario_create(marioPos.x, marioPos.y, marioPos.z);
+    public static int MarioCreate(float3 marioPos, bool isLocal) => SM64Native.sm64_mario_create(marioPos.x, marioPos.y, marioPos.z, (byte)(isLocal ? 1 : 0));
 
     public static SM64MarioState MarioTick(int marioId, SM64MarioInputs inputs, float3[] positionBuffer, float3[] normalBuffer, float3[] colorBuffer, float2[] uvBuffer, out ushort numTrianglesUsed)
     {

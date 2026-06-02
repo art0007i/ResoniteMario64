@@ -206,6 +206,8 @@ public class Patches
                     _conditionalWeakTable.Add(worker, texts);
                 }
 
+                texts.Clear();
+
                 string[] tagParts = slot.Tag?.Split(',');
                 Utils.ParseTagParts(tagParts, out SurfaceType surfaceType, out TerrainType terrainType, out InteractableType interactableType, out _, out _);
                 ColliderCategory category = Utils.GetColliderCategory(col);

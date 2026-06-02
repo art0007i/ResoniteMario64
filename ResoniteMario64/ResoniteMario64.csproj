@@ -28,6 +28,7 @@
     <ItemGroup>
         <PackageReference Include="BepInEx.ResonitePluginInfoProps" Version="3.*"/>
         <PackageReference Include="ResoniteModding.BepInExResoniteShim" Version="0.9.*"/>
+        <PackageReference Include="ResoniteModding.BepisResoniteWrapper" Version="1.*"/>
 
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all"/>
     </ItemGroup>

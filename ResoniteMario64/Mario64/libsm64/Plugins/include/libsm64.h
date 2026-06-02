@@ -8,6 +8,9 @@
 #include <string.h>
 #include <math.h>
 
+#include "obj_pool.h"
+#include "decomp/include/types.h"
+
 #if defined(_WIN32)
 #ifdef SM64_LIB_EXPORT
 #define SM64_LIB_FN __declspec(dllexport)
@@ -154,6 +157,10 @@ enum
     SM64_GEO_MAX_TRIANGLES = 1024,
 };
 
+extern f32 dist_between_objects(struct Object *obj1, struct Object *obj2);
+
+extern struct Object *get_closest_pole_object();
+
 typedef void (*SM64RumbleCallbackFunctionPtr)(int32_t marioId, int16_t level, int16_t time);
 
 extern SM64_LIB_FN void sm64_register_rumble_callback_function(SM64RumbleCallbackFunctionPtr rumbleCallbackFunction);
@@ -176,7 +183,7 @@ extern SM64_LIB_FN uint32_t sm64_audio_tick(uint32_t numQueuedSamples, uint32_t 
 
 extern SM64_LIB_FN void sm64_static_surfaces_load(const struct SM64Surface *surfaceArray, uint32_t numSurfaces);
 
-extern SM64_LIB_FN int32_t sm64_mario_create(float x, float y, float z);
+extern SM64_LIB_FN int32_t sm64_mario_create(float x, float y, float z, uint8_t isLocal);
 
 extern SM64_LIB_FN void sm64_mario_tick(int32_t marioId, const struct SM64MarioInputs *inputs, struct SM64MarioState *outState, struct SM64MarioGeometryBuffers *outBuffers);
 

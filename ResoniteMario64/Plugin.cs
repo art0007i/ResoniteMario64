@@ -3,6 +3,9 @@ using BepInEx;
 using BepInEx.Logging;
 using BepInEx.NET.Common;
 using BepInExResoniteShim;
+using Elements.Core;
+using FrooxEngine;
+using FrooxEngine.UIX;
 using ResoniteMario64.Mario64;
 using ResoniteMario64.Mario64.Components.Context;
 
@@ -40,13 +43,32 @@ public class Plugin : BasePlugin
         {
             Logger.Fatal("Failed to load ResoniteMario64.");
             Logger.Fatal(ex);
-        }
-    }
+            BepisResoniteWrapper.ResoniteHooks.OnEngineReady += () =>
+            {
+                Task.Run(async () =>
+                {
+                    while (Userspace.UserspaceWorld == null) await Task.Delay(100);
 
-    public override bool Unload()
-    {
-        SM64Context.Instance?.Dispose();
-        HarmonyInstance.UnpatchSelf();
-        return true;
+                    World w = Userspace.UserspaceWorld;
+                    w.RunSynchronously(() =>
+                    {
+                        Slot slot = w.RootSlot.LocalUserSpace.AddSlot("ResoniteMario64 Fatal", false);
+                        UIBuilder uIBuilder = RadiantUI_Panel.SetupPanel(slot, "ResoniteMario64 - <color=Hero.Red>Fatal</color>", new float2(700f, 350f), pinButton: false);
+                        slot.LocalScale *= 0.0008f;
+                        RadiantUI_Constants.SetupEditorStyle(uIBuilder);
+                        uIBuilder.VerticalLayout(4f);
+                        uIBuilder.Style.MinHeight = 48f;
+
+                        uIBuilder.Text($"ResoniteMario64 has encountered a\n<color=Hero.Red>Fatal Error</color> when loading!\nReason:\n<color=Hero.Red>{ex.GetType().GetNiceName()}</color>\n{ex.Message}", 32f);
+
+                        Hyperlink hl = uIBuilder.Button("Go to Github", RadiantUI_Constants.Sub.GREEN).Slot.AttachComponent<Hyperlink>();
+                        hl.URL.Value = new Uri("https://github.com/art0007i/ResoniteMario64");
+                        hl.Reason.Value = "Opening ResoniteMario64 Github";
+
+                        slot.PositionInFrontOfUser(float3.Backward, null, 3f);
+                    });
+                });
+            };
+        }
     }
 }

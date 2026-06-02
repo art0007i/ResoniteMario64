@@ -442,7 +442,7 @@ public sealed class SM64Mario : ISM64Object
 
         float3 initPos = MarioSlot.GlobalPosition;
         MarioSpawn = initPos;
-        MarioId = SM64Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * SM64Interop.ScaleFactor);
+        MarioId = SM64Interop.MarioCreate(new float3(-initPos.x, initPos.y, initPos.z) * SM64Interop.ScaleFactor, IsLocal);
 
         if (MarioId == int.MaxValue || MarioId == int.MinValue || MarioId == -1)
         {
@@ -748,19 +748,19 @@ public sealed class SM64Mario : ISM64Object
 
             foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
             {
-                interactable.Handle(this);
+                interactable?.Handle(this);
             }
 
             foreach (SM64Teleporter teleporter in Context.Teleporters.Values.GetTempList())
             {
-                teleporter.Handle(this);
+                teleporter?.Handle(this);
             }
 
-            foreach (var thing in Context.FakeObjects.Values.GetTempList())
+            foreach (var fakeObject in Context.FakeObjects.Values.GetTempList())
             {
-                thing.ContextFixedUpdate();
+                fakeObject?.ContextFixedUpdate();
             }
-            
+
             // Check for deaths, so we delete mario
             bool isQuickSandDeath = (SyncedActionFlags & ActionFlag.QuicksandDeath) == ActionFlag.QuicksandDeath;
             bool isDeathPlaneDeath = false;
@@ -779,7 +779,7 @@ public sealed class SM64Mario : ISM64Object
 
             if (!_isDying && (isQuickSandDeath || isDeathPlaneDeath))
             {
-                SetHealthPoints(0);
+                SetHealthPointsRaw(0xFF);
             }
 
             if (!_isDying && CurrentState.IsDead)
@@ -795,8 +795,7 @@ public sealed class SM64Mario : ISM64Object
                     float posDelay = isDeathPlaneDeath ? 1f : 2.2f;
                     MarioSlot.RunInSeconds(posDelay, () =>
                     {
-                        float3 pos = MarioSlot.GlobalPosition;
-                        SetPosition(new float3(pos.X - 10000, pos.Y - 10000, pos.Z - 10000));
+                        SetPosition(MarioSlot.GlobalPosition - 10000);
                     });
                 }
 
@@ -909,9 +908,12 @@ public sealed class SM64Mario : ISM64Object
         }
         else if (!IsTeleporting)
         {
-            if (Math.Abs(_marioAlphaVar.Value.Value - 1f) > 0.001f)
+            if (IsLocal)
             {
-                _marioAlphaVar.Value.Value = 1f;
+                if (Math.Abs(_marioAlphaVar.Value.Value - 1f) > 0.001f)
+                {
+                    _marioAlphaVar.Value.Value = 1f;
+                }
             }
 
             if (_marioMaterialClipped.AlbedoColor.Value != colorX.White)
@@ -1075,6 +1077,7 @@ public sealed class SM64Mario : ISM64Object
     public void SetFaceAngle(floatQ rot) => SM64Interop.MarioSetFaceAngle(MarioId, rot);
 
     public void SetHealthPoints(float healthPoints) => SM64Interop.MarioSetHealthPoints(MarioId, healthPoints);
+    public void SetHealthPointsRaw(ushort healthPoints) => SM64Interop.MarioSetHealthPointsRaw(MarioId, healthPoints);
 
     public void SetFullHealth() => SM64Interop.MarioSetFullHealth(MarioId);
 

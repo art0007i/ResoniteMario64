@@ -10,10 +10,10 @@ internal unsafe static partial class SM64Native
     public delegate void SM64RumbleCallbackFunctionPtr(int marioId, short level, short time);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void SM64DebugPrintFunctionPtr(string message);
+    public delegate void SM64DebugPrintFunctionPtr(nint message);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void SM64PlaySoundFunctionPtr(uint soundBits, float[] pos);
+    public delegate void SM64PlaySoundFunctionPtr(uint soundBits, float* pos);
 
     // Initialization & Setup
     [LibraryImport(LibName)]
@@ -76,7 +76,7 @@ internal unsafe static partial class SM64Native
 
     // Mario Lifecycle
     [LibraryImport(LibName)]
-    public static partial int sm64_mario_create(float x, float y, float z);
+    public static partial int sm64_mario_create(float x, float y, float z, byte isLocal);
 
     [LibraryImport(LibName)]
     public static partial void sm64_mario_tick(int marioId, SM64MarioInputs* inputs, SM64MarioState* outState, SM64MarioGeometryBuffers* outBuffers);

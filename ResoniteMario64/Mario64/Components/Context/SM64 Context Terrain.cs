@@ -256,7 +256,7 @@ public sealed partial class SM64Context
         Teleporters.Remove(collider);
     }
     
-    // Teleporters
+    // FakeObjects
     private ColliderOp RegisterFakeObject(Collider collider)
     {
         if (FakeObjects.TryGetValue(collider, out SM64FakeObject fakeObject))

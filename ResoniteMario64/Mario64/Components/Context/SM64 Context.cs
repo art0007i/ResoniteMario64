@@ -87,7 +87,10 @@ public sealed partial class SM64Context : IDisposable
         if (!SM64Interop.IsGlobalInit)
         {
             Logger.Debug("Init SM64", caller);
-            SM64Interop.GlobalInit(Mario64Manager.RomBytes);
+            if (!SM64Interop.GlobalInit(Mario64Manager.RomBytes))
+            {
+                throw new Exception("Mario64 Global Init Failed...");
+            }
         }
 
         SetAudioSource();
@@ -382,7 +385,6 @@ public sealed partial class SM64Context : IDisposable
     public void Dispose()
     {
         Dispose(true);
-        // GC.SuppressFinalize(this);
     }
 
     private void Dispose(bool disposing)
@@ -392,7 +394,7 @@ public sealed partial class SM64Context : IDisposable
         if (disposing)
         {
             // Unsubscribe from all events to prevent memory leaks
-            World.WorldDestroyed -= HandleRemoved;
+            if (World != null) World.WorldDestroyed -= HandleRemoved;
             Config.UseGamepad.SettingChanged -= HandleKeyUseGamepadChanged;
             Config.MaxMeshColliderTris.SettingChanged -= HandleMaxMeshColliderTrisChanged;
             Config.MaxMariosPerPerson.SettingChanged -= HandleMaxMariosPerPersonChanged;
@@ -411,6 +413,11 @@ public sealed partial class SM64Context : IDisposable
                 mario?.Dispose();
             }
 
+            foreach (var staticCol in StaticColliders.Values.GetTempList())
+            {
+                staticCol?.Dispose();
+            }
+
             foreach (var col in DynamicColliders.Values.GetTempList())
             {
                 col?.Dispose();
@@ -421,12 +428,29 @@ public sealed partial class SM64Context : IDisposable
                 interactable?.Dispose();
             }
 
+            foreach (var waterBox in WaterBoxes.Values.GetTempList())
+            {
+                waterBox?.Dispose();
+            }
+
+            foreach (var teleporter in Teleporters.Values.GetTempList())
+            {
+                teleporter?.Dispose();
+            }
+
+            foreach (var fakeObject in FakeObjects.Values.GetTempList())
+            {
+                fakeObject?.Dispose();
+            }
+
             // Clear lists
             AllMarios.Clear();
+            StaticColliders.Clear();
             DynamicColliders.Clear();
             Interactables.Clear();
-            StaticColliders.Clear();
             WaterBoxes.Clear();
+            Teleporters.Clear();
+            FakeObjects.Clear();
 
             // Stop and dispose the timer for static collider updates
             _staticUpdateTimer?.Stop();
@@ -435,7 +459,7 @@ public sealed partial class SM64Context : IDisposable
 
             StopAudioThread();
 
-            World.RunSynchronously(() =>
+            World?.RunSynchronously(() =>
             {
                 // Release the locomotion input block
                 LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();

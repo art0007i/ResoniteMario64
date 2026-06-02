@@ -189,26 +189,33 @@ public sealed partial class SM64Context
     {
         while (_audioThreadRunning)
         {
-            Stopwatch tickStopwatch = Stopwatch.StartNew();
-            ProcessAudio();
-
-            long targetTicks = (long)(Config.GameTickMs.Value * Stopwatch.Frequency / 1000.0);
-            if (targetTicks < 1)
+            try
             {
-                targetTicks = 1;
+                Stopwatch tickStopwatch = Stopwatch.StartNew();
+                ProcessAudio();
+
+                long targetTicks = (long)(Config.GameTickMs.Value * Stopwatch.Frequency / 1000.0);
+                if (targetTicks < 1)
+                {
+                    targetTicks = 1;
+                }
+
+                while (_audioThreadRunning && tickStopwatch.ElapsedTicks < targetTicks)
+                {
+                    long remainingTicks = targetTicks - tickStopwatch.ElapsedTicks;
+                    if (remainingTicks > Stopwatch.Frequency / 1000)
+                    {
+                        Thread.Sleep(1);
+                    }
+                    else
+                    {
+                        Thread.SpinWait(64);
+                    }
+                }
             }
-
-            while (_audioThreadRunning && tickStopwatch.ElapsedTicks < targetTicks)
+            catch (Exception e)
             {
-                long remainingTicks = targetTicks - tickStopwatch.ElapsedTicks;
-                if (remainingTicks > Stopwatch.Frequency / 1000)
-                {
-                    Thread.Sleep(1);
-                }
-                else
-                {
-                    Thread.SpinWait(64);
-                }
+                Logger.Error(e);
             }
         }
     }
