@@ -1,4 +1,5 @@
 using FrooxEngine;
+using ResoniteMario64.Mario64.Components.Interfaces;
 using ResoniteMario64.Mario64.Components.Objects;
 using ResoniteMario64.Mario64.libsm64;
 using static ResoniteMario64.Constants;
@@ -12,8 +13,7 @@ public sealed partial class SM64Context : IDisposable
     public DynamicVariableSpace ContextVariableSpace { get; private set; }
 
     private Slot _contextSlot;
-
-    private Slot ContextSlot
+    internal Slot ContextSlot
     {
         get
         {
@@ -59,18 +59,21 @@ public sealed partial class SM64Context : IDisposable
     public Slot MarioContainersSlot { get; private set; }
     public Slot MyMariosSlot { get; private set; }
 
+    public SM64ContextInputs Inputs { get; private set; }
+    public SM64ContextTerrain Terrain { get; private set; }
+    public SM64ContextAudio Audio { get; private set; }
+
     public readonly Dictionary<Slot, SM64Mario> AllMarios = new Dictionary<Slot, SM64Mario>();
 
     public List<SM64Mario> MyMarios => AllMarios.Values.Where(x => x.IsLocal).GetTempList();
 
-    private bool AnyControlledMarios => AllMarios.Values.Any(x => x.IsLocal);
+    public bool AnyControlledMarios => AllMarios.Values.Any(x => x.IsLocal);
 
     public World World { get; }
     public DynamicVariableSpace WorldVariableSpace { get; private set; }
 
     internal double LastTick;
-
-    private bool _staticColliderUpdate;
+    public bool IsDisposed => _disposed;
 
     private bool _disposed;
     private int _maxMariosAnimatedPerPerson;
@@ -93,20 +96,17 @@ public sealed partial class SM64Context : IDisposable
             }
         }
 
-        SetAudioSource();
-        StartAudioThread();
+        Inputs = new SM64ContextInputs(this);
+        Terrain = new SM64ContextTerrain(this);
+        Audio = new SM64ContextAudio(this);
 
         // Update context's colliders
         SM64Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(world));
-        Config.MaxMeshColliderTris.SettingChanged += HandleMaxMeshColliderTrisChanged;
 
         _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
         Config.MaxMariosPerPerson.SettingChanged += HandleMaxMariosPerPersonChanged;
 
-        Config.UseGamepad.SettingChanged += HandleKeyUseGamepadChanged;
-        if (Config.UseGamepad.Value) World?.Input.InvalidateBindings();
-
-        world.RunInUpdates(3, () => { World.RootSlot.ForeachComponentInChildren<Collider>(c => HandleCollider(c)); });
+        world.RunInUpdates(3, () => { World.RootSlot.ForeachComponentInChildren<Collider>(c => Terrain.HandleCollider(c)); });
     }
 
     private void InitContextWorld(World world)
@@ -285,13 +285,8 @@ public sealed partial class SM64Context : IDisposable
             GetAllColliders(true);
         }
 
-        if (_staticColliderUpdate)
-        {
-            _staticColliderUpdate = false;
-            SM64Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(World));
-        }
-
-        HandleInputs();
+        Terrain.OnCommonUpdate();
+        Inputs.OnCommonUpdate();
 
         if (World.Time.WorldTime - LastTick >= Config.GameTickMs.Value / 1000f)
         {
@@ -309,12 +304,12 @@ public sealed partial class SM64Context : IDisposable
     {
         if (_disposed) return;
 
-        foreach (SM64DynamicCollider dynamicCol in DynamicColliders.Values.GetTempList())
+        foreach (SM64DynamicCollider dynamicCol in Terrain.DynamicColliders.Values.GetTempList())
         {
             dynamicCol?.ContextFixedUpdateSynced();
         }
 
-        foreach (SM64FakeObject obj in FakeObjects.Values.GetTempList())
+        foreach (SM64FakeObject obj in Terrain.FakeObjects.Values.GetTempList())
         {
             obj.ContextFixedUpdateSynced();
         }
@@ -346,20 +341,6 @@ public sealed partial class SM64Context : IDisposable
         Dispose();
     }
 
-    private void HandleKeyUseGamepadChanged(object sender, EventArgs args)
-    {
-        if (_disposed) return;
-
-        World?.Input.InvalidateBindings();
-    }
-
-    private void HandleMaxMeshColliderTrisChanged(object sender, EventArgs args)
-    {
-        if (_disposed) return;
-
-        ReloadAllColliders();
-    }
-
     private void HandleMaxMariosPerPersonChanged(object sender, EventArgs args)
     {
         _maxMariosAnimatedPerPerson = Config.MaxMariosPerPerson.Value;
@@ -370,7 +351,7 @@ public sealed partial class SM64Context : IDisposable
     {
         int maxPerPerson = _maxMariosAnimatedPerPerson;
 
-        foreach (User user in Instance.World.AllUsers.Where(x => !x.IsLocalUser))
+        foreach (User user in World.AllUsers.Where(x => !x.IsLocalUser))
         {
             List<SM64Mario> userMarios = AllMarios.GetFilteredSortedList(m => m.MarioUser == user && !m.IsLocal, m2 => m2.MarioId, false);
             for (int i = 0; i < userMarios.Count; i++)
@@ -382,6 +363,14 @@ public sealed partial class SM64Context : IDisposable
         }
     }
 
+    public void ReloadAllColliders(bool log = true) => Terrain.ReloadAllColliders(log);
+
+    public Dictionary<ColliderCategory, List<ISM64Object>> GetAllColliders(bool log) => Terrain.GetAllColliders(log);
+
+    public void HandleCollider(Collider collider, bool log = true) => Terrain.HandleCollider(collider, log);
+
+    public static void VibrateCallback(int marioId, short level, short time) => SM64ContextInputs.VibrateCallback(marioId, level, time);
+
     public void Dispose()
     {
         Dispose(true);
@@ -390,22 +379,22 @@ public sealed partial class SM64Context : IDisposable
     private void Dispose(bool disposing)
     {
         if (_disposed) return;
+        _disposed = true;
 
         if (disposing)
         {
             // Unsubscribe from all events to prevent memory leaks
             if (World != null) World.WorldDestroyed -= HandleRemoved;
-            Config.UseGamepad.SettingChanged -= HandleKeyUseGamepadChanged;
-            Config.MaxMeshColliderTris.SettingChanged -= HandleMaxMeshColliderTrisChanged;
             Config.MaxMariosPerPerson.SettingChanged -= HandleMaxMariosPerPersonChanged;
-            Config.LocalAudio.SettingChanged -= HandleLocalAudioChange;
-            Config.DisableAudio.SettingChanged -= HandleDisableChange;
-            Config.AudioVolume.SettingChanged -= HandleVolumeChange;
 
             if (_contextSlot != null)
             {
                 _contextSlot.OnPrepareDestroy -= HandleRemoved;
             }
+
+            Terrain?.Dispose();
+            Inputs?.Dispose();
+            Audio?.Dispose();
 
             // Dispose of all Lists
             foreach (var mario in AllMarios.Values.GetTempList())
@@ -413,80 +402,17 @@ public sealed partial class SM64Context : IDisposable
                 mario?.Dispose();
             }
 
-            foreach (var staticCol in StaticColliders.Values.GetTempList())
-            {
-                staticCol?.Dispose();
-            }
-
-            foreach (var col in DynamicColliders.Values.GetTempList())
-            {
-                col?.Dispose();
-            }
-
-            foreach (var interactable in Interactables.Values.GetTempList())
-            {
-                interactable?.Dispose();
-            }
-
-            foreach (var waterBox in WaterBoxes.Values.GetTempList())
-            {
-                waterBox?.Dispose();
-            }
-
-            foreach (var teleporter in Teleporters.Values.GetTempList())
-            {
-                teleporter?.Dispose();
-            }
-
-            foreach (var fakeObject in FakeObjects.Values.GetTempList())
-            {
-                fakeObject?.Dispose();
-            }
-
-            // Clear lists
             AllMarios.Clear();
-            StaticColliders.Clear();
-            DynamicColliders.Clear();
-            Interactables.Clear();
-            WaterBoxes.Clear();
-            Teleporters.Clear();
-            FakeObjects.Clear();
-
-            // Stop and dispose the timer for static collider updates
-            _staticUpdateTimer?.Stop();
-            _staticUpdateTimer?.Dispose();
-            _staticUpdateTimer = null;
-
-            StopAudioThread();
-
-            World?.RunSynchronously(() =>
-            {
-                // Release the locomotion input block
-                LocomotionController loco = World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
-                if (loco != null && _inputBlock != null)
-                {
-                    loco.SupressSources?.Remove(_inputBlock);
-                }
-
-                // Clean up audio resources
-                if (_audioSlot != null)
-                {
-                    _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
-                    if (_audioSlot.IsLocalElement && !_audioSlot.IsDestroyed)
-                    {
-                        _audioSlot.SafeDestroy();
-                    }
-                }
-            }, true, null, true);
 
             // Nullify references to Resonite objects
             _contextSlot = null;
             MyMariosSlot = null;
             MarioContainersSlot = null;
-            _marioAudioStream = null;
-            _marioAudioOutput = null;
-            _audioSlot = null;
-            _inputBlock = null;
+            ContextVariableSpace = null;
+            WorldVariableSpace = null;
+            Inputs = null;
+            Terrain = null;
+            Audio = null;
         }
 
         // Free unmanaged resources (from the C++ library)
@@ -497,7 +423,5 @@ public sealed partial class SM64Context : IDisposable
         {
             Instance = null;
         }
-
-        _disposed = true;
     }
 }

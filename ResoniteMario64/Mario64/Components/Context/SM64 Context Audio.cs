@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Elements.Assets;
 using FrooxEngine;
 using FrooxEngine.CommonAvatar;
@@ -7,7 +7,7 @@ using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Mario64.Components.Context;
 
-public sealed partial class SM64Context
+public sealed class SM64ContextAudio : IDisposable
 {
     private const int NativeSampleRate = 32000;
     private const int TargetSampleRate = 48000;
@@ -15,6 +15,8 @@ public sealed partial class SM64Context
     private const int NativeBufferCount = 544 * 2;              // Random ahh numbers
     private const int NativeBufferSize = NativeBufferCount * 2; // Pt.2
     private const double AudioTickInterval = 1000.0 / 30.0;
+
+    public SM64Context Context { get; }
 
     private readonly short[] _audioBuffer = new short[NativeBufferSize];
 
@@ -28,30 +30,38 @@ public sealed partial class SM64Context
     private volatile bool _audioThreadRunning;
 
     private CircularBufferWriteState<StereoSample> _writeState;
+    private bool _disposing;
+
+    public SM64ContextAudio(SM64Context context)
+    {
+        Context = context;
+        SetAudioSource();
+        StartAudioThread();
+    }
 
     private void SetAudioSource()
     {
         try
         {
-            World.RunSynchronously(() =>
+            if (Context.IsDisposed) return;
+
+            Context.World.RunSynchronously(() =>
             {
-                _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(World.LocalUser, $"{AudioTag} - {World.LocalUser.UserID}", out bool created);
+                _marioAudioStream = CommonAvatarBuilder.GetStreamOrAdd<OpusStream<StereoSample>>(Context.World.LocalUser, $"{AudioTag} - {Context.World.LocalUser.UserID}", out bool created);
 
                 if (created)
                 {
                     _marioAudioStream.Group = "SM64";
                 }
 
-
                 bool useLocalAudio = Config.LocalAudio.Value;
                 float defaultVolume = (float)Config.AudioVolume.DefaultValue;
-
 
                 Slot localSlot = null;
                 AudioOutput localAudio = null;
                 if (useLocalAudio)
                 {
-                    localSlot = World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
+                    localSlot = Context.World.LocalUser.Root.Slot.FindLocalChildOrAdd(AudioSlotName);
                     localSlot.Tag = AudioTag;
 
                     localAudio = localSlot.GetComponentOrAttach<AudioOutput>(out bool localAttached);
@@ -70,7 +80,7 @@ public sealed partial class SM64Context
                     _marioAudioOutput = localAudio;
                 }
 
-                Slot globalSlot = ContextSlot?.FindChildOrAdd(AudioSlotName, false);
+                Slot globalSlot = Context.ContextSlot?.FindChildOrAdd(AudioSlotName, false);
                 AudioOutput globalAudio = null;
 
                 if (globalSlot != null)
@@ -99,11 +109,11 @@ public sealed partial class SM64Context
                     _marioAudioOutput = globalAudio;
                 }
 
-                World.RunInUpdates(World.LocalUser.AllocationID + 1, () =>
+                Context.World.RunInUpdates(Context.World.LocalUser.AllocationID + 1, () =>
                 {
                     float volume = useLocalAudio ? 0f : Config.AudioVolume.Value;
 
-                    ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(World.LocalUser, volume);
+                    ValueUserOverride<float> overrideForUser = globalAudio?.Volume.OverrideForUser(Context.World.LocalUser, volume);
                     if (overrideForUser != null)
                     {
                         overrideForUser.Default.Value = defaultVolume;
@@ -222,24 +232,26 @@ public sealed partial class SM64Context
 
     private void HandleAudioDestroy(Slot slot)
     {
-        if (SM64Interop.IsGlobalInit)
+        if (_disposing || Context.IsDisposed || !SM64Interop.IsGlobalInit)
         {
-            if (Config.LocalAudio.Value)
-            {
-                slot.StartTask(async () =>
-                {
-                    while (World?.LocalUser?.Root?.GetRegisteredComponent<AvatarManager>() == null)
-                    {
-                        await Task.Delay(10);
-                    }
+            return;
+        }
 
-                    SetAudioSource();
-                });
-            }
-            else
+        if (Config.LocalAudio.Value)
+        {
+            slot.StartTask(async () =>
             {
-                slot.RunInUpdates(slot.LocalUser.AllocationID + 3, SetAudioSource);
-            }
+                while (Context?.World?.LocalUser?.Root?.GetRegisteredComponent<AvatarManager>() == null)
+                {
+                    await Task.Delay(10);
+                }
+
+                SetAudioSource();
+            });
+        }
+        else
+        {
+            slot.RunInUpdates(slot.LocalUser.AllocationID + 3, SetAudioSource);
         }
     }
 
@@ -260,7 +272,7 @@ public sealed partial class SM64Context
             }
             else
             {
-                _marioAudioOutput.Volume.OverrideForUser(World.LocalUser, volume);
+                _marioAudioOutput.Volume.OverrideForUser(Context.World.LocalUser, volume);
             }
         }, true);
     }
@@ -272,7 +284,7 @@ public sealed partial class SM64Context
             return;
         }
 
-        if (_audioSlot.GetAllocatingUser() == World.LocalUser)
+        if (_audioSlot.GetAllocatingUser() == Context.World.LocalUser)
         {
             _audioSlot.SafeDestroy();
         }
@@ -362,5 +374,35 @@ public sealed partial class SM64Context
         }
 
         return outIndex;
+    }
+
+    public void Dispose()
+    {
+        _disposing = true;
+        Config.LocalAudio.SettingChanged -= HandleLocalAudioChange;
+        Config.DisableAudio.SettingChanged -= HandleDisableChange;
+        Config.AudioVolume.SettingChanged -= HandleVolumeChange;
+
+        StopAudioThread();
+
+        if (_audioSlot != null)
+        {
+            _audioSlot.OnPrepareDestroy -= HandleAudioDestroy;
+        }
+
+        Context?.World?.RunSynchronously(() =>
+        {
+            if (_audioSlot != null)
+            {
+                if (_audioSlot.IsLocalElement && !_audioSlot.IsDestroyed)
+                {
+                    _audioSlot.SafeDestroy();
+                }
+            }
+        }, true, null, true);
+
+        _marioAudioStream = null;
+        _marioAudioOutput = null;
+        _audioSlot = null;
     }
 }

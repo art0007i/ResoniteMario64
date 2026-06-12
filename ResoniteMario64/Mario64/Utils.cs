@@ -104,7 +104,6 @@ public static class Utils
         }
 
         // Print all MeshColliders that are Null or Non-Readable
-        
         meshColliders.Where(InvalidCollider).Do(invalid =>
         {
             if (Config.DebugEnabled.Value) Logger.Warn($"- [{invalid.collider.GetType()}] {invalid.collider.Slot.Name} ({invalid.collider.ReferenceID}) Mesh is {(invalid.collider.Mesh.Target == null ? "null" : "non-readable")}");
@@ -137,12 +136,12 @@ public static class Utils
         }
 
         SM64Context instance = SM64Context.Instance;
-        List<Collider> toRemove = instance?.StaticColliders.Keys.Except(StaticSurfaces).GetTempList();
+        List<Collider> toRemove = instance?.Terrain?.StaticColliders.Keys.Except(StaticSurfaces).GetTempList();
         if (toRemove != null)
         {
             foreach (Collider col in toRemove)
             {
-                instance.UnregisterStaticCollider(col);
+                instance?.Terrain?.UnregisterStaticCollider(col);
             }
         }
 
@@ -301,9 +300,7 @@ public static class Utils
 
         if (sortKeySelector != null)
         {
-            query = ascending
-                    ? query.OrderBy(sortKeySelector)
-                    : query.OrderByDescending(sortKeySelector);
+            query = ascending ? query.OrderBy(sortKeySelector) : query.OrderByDescending(sortKeySelector);
         }
 
         return query.ToList();

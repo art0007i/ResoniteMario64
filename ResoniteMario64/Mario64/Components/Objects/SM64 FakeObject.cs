@@ -92,7 +92,7 @@ public sealed class SM64FakeObject : ISM64Object
 
         if (disposing)
         {
-            Context?.UnregisterFakeObject(Collider);
+            Context?.Terrain.UnregisterFakeObject(Collider);
 
             Context = null;
             Collider = null;

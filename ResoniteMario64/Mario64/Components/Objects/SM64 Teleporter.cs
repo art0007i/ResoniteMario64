@@ -74,7 +74,7 @@ public sealed class SM64Teleporter : ISM64Object
 
         teleporterWatch.Reset();
 
-        List<SM64Teleporter> group = Context.Teleporters.Values.Where(x => x.Group == Group).GetTempList();
+        List<SM64Teleporter> group = Context.Terrain.Teleporters.Values.Where(x => x.Group == Group).GetTempList();
         group.Sort((a, b) => a.ID.CompareTo(b.ID));
 
         int index = group.FindIndex(x => x.ID == ID);
@@ -106,7 +106,7 @@ public sealed class SM64Teleporter : ISM64Object
 
         if (disposing)
         {
-            Context.UnregisterTeleporter(Collider);
+            Context.Terrain.UnregisterTeleporter(Collider);
 
             World = null;
             Context = null;

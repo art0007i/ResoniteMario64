@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using FrooxEngine;
 using HarmonyLib;
 using ResoniteMario64.Mario64.Components.Interfaces;
@@ -7,20 +7,40 @@ using ResoniteMario64.Mario64.libsm64;
 
 namespace ResoniteMario64.Mario64.Components.Context;
 
-public sealed partial class SM64Context
+public sealed class SM64ContextTerrain : IDisposable
 {
-    internal readonly Dictionary<Collider, SM64StaticCollider> StaticColliders = new Dictionary<Collider, SM64StaticCollider>();
-    internal readonly Dictionary<Collider, SM64DynamicCollider> DynamicColliders = new Dictionary<Collider, SM64DynamicCollider>();
-    internal readonly Dictionary<Collider, SM64Interactable> Interactables = new Dictionary<Collider, SM64Interactable>();
-    internal readonly Dictionary<Collider, SM64Teleporter> Teleporters = new Dictionary<Collider, SM64Teleporter>();
-    internal readonly Dictionary<Collider, SM64WaterBox> WaterBoxes = new Dictionary<Collider, SM64WaterBox>();
-    internal readonly Dictionary<Collider, SM64FakeObject> FakeObjects = new Dictionary<Collider, SM64FakeObject>();
+    public SM64Context Context { get; }
+
+    public Dictionary<Collider, SM64StaticCollider> StaticColliders { get; } = new Dictionary<Collider, SM64StaticCollider>();
+    public Dictionary<Collider, SM64DynamicCollider> DynamicColliders { get; } = new Dictionary<Collider, SM64DynamicCollider>();
+    public Dictionary<Collider, SM64Interactable> Interactables { get; } = new Dictionary<Collider, SM64Interactable>();
+    public Dictionary<Collider, SM64Teleporter> Teleporters { get; } = new Dictionary<Collider, SM64Teleporter>();
+    public Dictionary<Collider, SM64WaterBox> WaterBoxes { get; } = new Dictionary<Collider, SM64WaterBox>();
+    public Dictionary<Collider, SM64FakeObject> FakeObjects { get; } = new Dictionary<Collider, SM64FakeObject>();
+
+    private bool _staticColliderUpdate;
+    private System.Timers.Timer _staticUpdateTimer;
+
+    public SM64ContextTerrain(SM64Context context)
+    {
+        Context = context;
+        Config.MaxMeshColliderTris.SettingChanged += HandleMaxMeshColliderTrisChanged;
+    }
+
+    public void OnCommonUpdate()
+    {
+        if (_staticColliderUpdate)
+        {
+            _staticColliderUpdate = false;
+            SM64Interop.StaticSurfacesLoad(Utils.GetAllStaticSurfaces(Context.World));
+        }
+    }
 
     public void HandleCollider(Collider collider, bool log = true)
     {
         if (collider == null) return;
 
-        if (collider.World != World) return;
+        if (collider.World != Context.World) return;
         if (collider.IsDestroyed)
         {
             HandleColliderDestroyed(collider);
@@ -105,8 +125,6 @@ public sealed partial class SM64Context
         return null;
     }
 
-    private static System.Timers.Timer _staticUpdateTimer;
-
     private void QueueStaticCollidersUpdate()
     {
         if (_staticUpdateTimer != null) return;
@@ -124,7 +142,6 @@ public sealed partial class SM64Context
         _staticUpdateTimer.Start();
     }
 
-    // Static Colliders
     private ColliderOp RegisterStaticCollider(Collider collider)
     {
         QueueStaticCollidersUpdate();
@@ -140,7 +157,7 @@ public sealed partial class SM64Context
             DynamicColliders.Remove(collider);
         }
 
-        SM64StaticCollider col = new SM64StaticCollider(collider, this);
+        SM64StaticCollider col = new SM64StaticCollider(collider, Context);
         StaticColliders.Add(collider, col);
         return new ColliderOp(ColliderCategory.Static, ColliderOpResult.Added);
     }
@@ -152,7 +169,6 @@ public sealed partial class SM64Context
         StaticColliders.Remove(collider);
     }
 
-    // Dynamic Colliders
     private ColliderOp RegisterDynamicCollider(Collider collider)
     {
         if (DynamicColliders.TryGetValue(collider, out SM64DynamicCollider dynamicCollider))
@@ -178,8 +194,8 @@ public sealed partial class SM64Context
             dynamicCollider.Dispose();
             DynamicColliders.Remove(collider);
         }
-        
-        SM64DynamicCollider col = new SM64DynamicCollider(collider, this);
+
+        SM64DynamicCollider col = new SM64DynamicCollider(collider, Context);
         DynamicColliders.Add(collider, col);
 
         return new ColliderOp(ColliderCategory.Dynamic, ColliderOpResult.Added);
@@ -190,7 +206,6 @@ public sealed partial class SM64Context
         DynamicColliders.Remove(collider);
     }
 
-    // Interactables
     private ColliderOp RegisterInteractable(Collider collider)
     {
         if (Interactables.TryGetValue(collider, out SM64Interactable interactable))
@@ -204,7 +219,7 @@ public sealed partial class SM64Context
             Interactables.Remove(collider);
         }
 
-        SM64Interactable col = new SM64Interactable(collider, this);
+        SM64Interactable col = new SM64Interactable(collider, Context);
         Interactables.Add(collider, col);
         return new ColliderOp(ColliderCategory.Interactable, ColliderOpResult.Added);
     }
@@ -214,7 +229,6 @@ public sealed partial class SM64Context
         Interactables.Remove(collider);
     }
 
-    // WaterBoxes
     private ColliderOp RegisterWaterBox(Collider collider)
     {
         if (WaterBoxes.ContainsKey(collider))
@@ -222,7 +236,7 @@ public sealed partial class SM64Context
             return new ColliderOp(ColliderCategory.WaterBox, ColliderOpResult.AlreadyExists);
         }
 
-        SM64WaterBox col = new SM64WaterBox(collider, this);
+        SM64WaterBox col = new SM64WaterBox(collider, Context);
         WaterBoxes.Add(collider, col);
         return new ColliderOp(ColliderCategory.WaterBox, ColliderOpResult.Added);
     }
@@ -232,7 +246,6 @@ public sealed partial class SM64Context
         WaterBoxes.Remove(collider);
     }
 
-    // Teleporters
     private ColliderOp RegisterTeleporter(Collider collider)
     {
         if (Teleporters.TryGetValue(collider, out SM64Teleporter teleporter))
@@ -246,7 +259,7 @@ public sealed partial class SM64Context
             Teleporters.Remove(collider);
         }
 
-        SM64Teleporter col = new SM64Teleporter(collider, this);
+        SM64Teleporter col = new SM64Teleporter(collider, Context);
         Teleporters.Add(collider, col);
         return new ColliderOp(ColliderCategory.Teleporter, ColliderOpResult.Added);
     }
@@ -255,8 +268,7 @@ public sealed partial class SM64Context
     {
         Teleporters.Remove(collider);
     }
-    
-    // FakeObjects
+
     private ColliderOp RegisterFakeObject(Collider collider)
     {
         if (FakeObjects.TryGetValue(collider, out SM64FakeObject fakeObject))
@@ -275,7 +287,7 @@ public sealed partial class SM64Context
             FakeObjects.Remove(collider);
         }
 
-        SM64FakeObject col = new SM64FakeObject(collider, this);
+        SM64FakeObject col = new SM64FakeObject(collider, Context);
         FakeObjects.Add(collider, col);
         return new ColliderOp(ColliderCategory.FakeObject, ColliderOpResult.Added);
     }
@@ -285,7 +297,6 @@ public sealed partial class SM64Context
         FakeObjects.Remove(collider);
     }
 
-    // Patches
     [HarmonyPatch(typeof(Collider))]
     public class ColliderPatch
     {
@@ -294,7 +305,7 @@ public sealed partial class SM64Context
         {
             if (SM64Context.Instance == null) return;
 
-            __instance.RunInUpdates(1, () => SM64Context.Instance?.HandleCollider(__instance));
+            __instance.RunInUpdates(1, () => SM64Context.Instance?.Terrain.HandleCollider(__instance));
         }
 
         [HarmonyPatch("OnChanges"), HarmonyPostfix]
@@ -302,7 +313,7 @@ public sealed partial class SM64Context
         {
             if (SM64Context.Instance == null) return;
 
-            SM64Context.Instance?.HandleCollider(__instance);
+            SM64Context.Instance?.Terrain.HandleCollider(__instance);
         }
     }
 
@@ -368,10 +379,71 @@ public sealed partial class SM64Context
 
     public void ReloadAllColliders(bool log = true)
     {
-        World.RootSlot.ForeachComponentInChildren<Collider>(c =>
+        Context.World.RootSlot.ForeachComponentInChildren<Collider>(c =>
         {
             TryRemoveCollider(c);
             HandleCollider(c, log);
         });
+    }
+
+    private void HandleMaxMeshColliderTrisChanged(object sender, EventArgs args)
+    {
+        if (Context.IsDisposed) return;
+
+        ReloadAllColliders();
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Config.MaxMeshColliderTris.SettingChanged -= HandleMaxMeshColliderTrisChanged;
+
+            foreach (var staticCol in StaticColliders.Values.GetTempList())
+            {
+                staticCol?.Dispose();
+            }
+
+            foreach (var dynamicCol in DynamicColliders.Values.GetTempList())
+            {
+                dynamicCol?.Dispose();
+            }
+
+            foreach (var interactable in Interactables.Values.GetTempList())
+            {
+                interactable?.Dispose();
+            }
+
+            foreach (var waterBox in WaterBoxes.Values.GetTempList())
+            {
+                waterBox?.Dispose();
+            }
+
+            foreach (var teleporter in Teleporters.Values.GetTempList())
+            {
+                teleporter?.Dispose();
+            }
+
+            foreach (var fakeObject in FakeObjects.Values.GetTempList())
+            {
+                fakeObject?.Dispose();
+            }
+
+            StaticColliders.Clear();
+            DynamicColliders.Clear();
+            Interactables.Clear();
+            WaterBoxes.Clear();
+            Teleporters.Clear();
+            FakeObjects.Clear();
+
+            _staticUpdateTimer?.Stop();
+            _staticUpdateTimer?.Dispose();
+            _staticUpdateTimer = null;
+        }
     }
 }

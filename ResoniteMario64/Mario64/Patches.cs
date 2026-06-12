@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Elements.Core;
 using FrooxEngine;
 using FrooxEngine.UIX;
@@ -10,7 +11,7 @@ using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Mario64;
 
-public class Patches
+public static class Patches
 {
     /*[HarmonyPatch(typeof(World), nameof(World.Destroy))]
         private class WorldCleanupPatch
@@ -27,12 +28,43 @@ public class Patches
     [HarmonyPatch(typeof(UpdateManager), nameof(UpdateManager.RunUpdates))]
     private class WorldUpdatePatch
     {
+        private static readonly Stopwatch updateTimer = new Stopwatch();
+        private static World lastWorld;
+        private static bool initialized;
+
         public static void Prefix(UpdateManager __instance)
         {
-            SM64Context instance = SM64Context.Instance;
-            if (instance == null || instance.World != __instance.World) return;
+            try
+            {
+                World world = __instance.World;
 
-            instance.OnCommonUpdate();
+                SM64Context instance = SM64Context.Instance;
+                if (instance != null && instance.World == world)
+                {
+                    instance.OnCommonUpdate();
+                }
+
+                if (world.Focus != World.WorldFocus.Focused)
+                    return;
+
+                if (!initialized || lastWorld != world)
+                {
+                    updateTimer.Reset();
+                    updateTimer.Start();
+                    initialized = true;
+                    lastWorld = world;
+                }
+
+                if (updateTimer.Elapsed.TotalSeconds >= 5.0)
+                {
+                    SM64Context.CheckForInstance(world);
+                    updateTimer.Restart();
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e);
+            }
         }
     }
 
@@ -82,23 +114,7 @@ public class Patches
             {
                 try
                 {
-                    Slot contextSlot = SM64Context.GetTempSlot(instance).FindChild(x => x.Tag == ContextTag);
-                    if (contextSlot == null)
-                    {
-                        return;
-                    }
-
-                    if (SM64Context.EnsureInstanceExists(instance, out SM64Context context))
-                    {
-                        context.World.RunInUpdates(3, () =>
-                        {
-                            context.MarioContainersSlot?.ForeachChild(slot =>
-                            {
-                                if (slot.Tag != MarioTag) return;
-                                SM64Context.TryAddMario(slot, false);
-                            });
-                        });
-                    }
+                    SM64Context.CheckForInstance(instance);
                 }
                 finally
                 {

@@ -746,17 +746,17 @@ public sealed class SM64Mario : ISM64Object
                 SyncedIsGrabbed = _marioGrabbable.IsGrabbed;
             }
 
-            foreach (SM64Interactable interactable in Context.Interactables.Values.GetTempList())
+            foreach (SM64Interactable interactable in Context.Terrain.Interactables.Values.GetTempList())
             {
                 interactable?.Handle(this);
             }
 
-            foreach (SM64Teleporter teleporter in Context.Teleporters.Values.GetTempList())
+            foreach (SM64Teleporter teleporter in Context.Terrain.Teleporters.Values.GetTempList())
             {
                 teleporter?.Handle(this);
             }
 
-            foreach (var fakeObject in Context.FakeObjects.Values.GetTempList())
+            foreach (var fakeObject in Context.Terrain.FakeObjects.Values.GetTempList())
             {
                 fakeObject?.ContextFixedUpdate();
             }
@@ -858,7 +858,7 @@ public sealed class SM64Mario : ISM64Object
         float waterSurface = float.NaN;
         float3 marioPos = _marioCollider.GlobalBoundingBox.Center;
 
-        foreach (SM64WaterBox waterBox in Context.WaterBoxes.Values.GetTempList())
+        foreach (SM64WaterBox waterBox in Context.Terrain.WaterBoxes.Values.GetTempList())
         {
             waterSurface = waterBox.Handle(marioPos);
         }
@@ -908,12 +908,9 @@ public sealed class SM64Mario : ISM64Object
         }
         else if (!IsTeleporting)
         {
-            if (IsLocal)
+            if (IsLocal && MathX.Abs(_marioAlphaVar.Value.Value - 1f) > 0.001f)
             {
-                if (Math.Abs(_marioAlphaVar.Value.Value - 1f) > 0.001f)
-                {
-                    _marioAlphaVar.Value.Value = 1f;
-                }
+                _marioAlphaVar.Value.Value = 1f;
             }
 
             if (_marioMaterialClipped.AlbedoColor.Value != colorX.White)
@@ -1055,17 +1052,17 @@ public sealed class SM64Mario : ISM64Object
         return (rot * float3.Forward).SetY(0).Normalized;
     }
 
-    private float2 GetJoystickAxes() => Context?.Joystick ?? float2.Zero;
+    private float2 GetJoystickAxes() => Context?.Inputs?.Joystick ?? float2.Zero;
 
     private bool GetButtonHeld(Button button)
     {
-        if (Context == null) return false;
+        if (Context?.Inputs == null) return false;
 
         return button switch
         {
-            Button.Jump  => Context.Jump,
-            Button.Kick  => Context.Kick,
-            Button.Stomp => Context.Stomp,
+            Button.Jump  => Context.Inputs.Jump,
+            Button.Kick  => Context.Inputs.Kick,
+            Button.Stomp => Context.Inputs.Stomp,
             _            => false
         };
     }

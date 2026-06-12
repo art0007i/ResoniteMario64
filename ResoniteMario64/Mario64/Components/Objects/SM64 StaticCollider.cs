@@ -72,7 +72,7 @@ public sealed class SM64StaticCollider : ISM64Object, ISM64Collider
 
         if (disposing)
         {
-            Context?.UnregisterStaticCollider(Collider);
+            Context?.Terrain.UnregisterStaticCollider(Collider);
 
             World = null;
             Context = null;

@@ -102,7 +102,7 @@ public sealed class SM64DynamicCollider : ISM64Object, ISM64Collider
 
         if (disposing)
         {
-            Context?.UnregisterDynamicCollider(Collider);
+            Context?.Terrain.UnregisterDynamicCollider(Collider);
 
             Context = null;
             Collider = null;

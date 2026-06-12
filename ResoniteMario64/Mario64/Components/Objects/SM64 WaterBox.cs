@@ -67,7 +67,7 @@ public sealed class SM64WaterBox : ISM64Object
 
         if (disposing)
         {
-            Context?.UnregisterWaterBox(Collider);
+            Context?.Terrain.UnregisterWaterBox(Collider);
 
             World = null;
             Context = null;

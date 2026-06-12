@@ -146,7 +146,7 @@ public sealed class SM64Interactable : ISM64Object
 
         if (disposing)
         {
-            Context.UnregisterInteractable(Collider);
+            Context.Terrain.UnregisterInteractable(Collider);
 
             World = null;
             Context = null;

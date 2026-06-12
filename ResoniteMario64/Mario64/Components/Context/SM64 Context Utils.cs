@@ -11,14 +11,9 @@ public sealed partial class SM64Context
     public static Slot GetTempSlot(World world)
     {
         World currentWorld = world ?? Engine.Current.WorldManager?.FocusedWorld;
-        if (TempSlot is { IsDestroyed: false } && TempSlot.World == currentWorld) return TempSlot;
+        if (TempSlot?.FilterWorldElement() != null && TempSlot.World == currentWorld) return TempSlot;
 
-        if (currentWorld == null)
-        {
-            return null;
-        }
-
-        Slot newSlot = currentWorld.RootSlot?.FindChildOrAdd(TempSlotName, false);
+        Slot newSlot = currentWorld?.RootSlot?.FindChildOrAdd(TempSlotName, false);
         if (newSlot == null)
         {
             return null;
@@ -33,6 +28,33 @@ public sealed partial class SM64Context
         TempSlot.ChildAdded += HandleSlotAdded;
 
         return TempSlot;
+    }
+
+    public static SM64Context CheckForInstance(World world)
+    {
+        if (SM64Context.Instance != null && SM64Context.Instance.World == world) return SM64Context.Instance;
+
+        Slot contextSlot = GetTempSlot(world).FindChild(x => x.Tag == ContextTag);
+        if (contextSlot == null)
+        {
+            return null;
+        }
+
+        if (SM64Context.EnsureInstanceExists(world, out SM64Context context))
+        {
+            context.World.RunInUpdates(3, () =>
+            {
+                context.MarioContainersSlot?.ForeachChild(slot =>
+                {
+                    if (slot.Tag != MarioTag) return;
+                    SM64Context.TryAddMario(slot, false);
+                });
+            });
+
+            return context;
+        }
+
+        return null;
     }
 
     public static bool EnsureInstanceExists(World world, out SM64Context instance)
@@ -138,7 +160,7 @@ public sealed partial class SM64Context
             SM64Interop.StopMusic();
         }
     }
-    
+
     private static void HandleSlotAdded(Slot slot, Slot child)
     {
         if (child.Tag != ContextTag) return;

@@ -87,6 +87,10 @@
         </EmbeddedResource>
     </ItemGroup>
 
+    <Target Name="PreBuildLibSM64" BeforeTargets="BeforeBuild">
+        <Exec Command="bash &quot;$(MSBuildProjectDirectory)/build_all.sh&quot;" IgnoreExitCode="false" />
+    </Target>
+    
     <!-- Post-build copy to game plugins folder -->
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <ItemGroup>
