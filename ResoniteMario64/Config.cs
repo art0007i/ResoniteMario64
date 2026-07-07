@@ -15,6 +15,8 @@ public class Config
     // CONTROLS
     public static ConfigEntry<bool> UseGamepad;
     public static ConfigEntry<bool> BlockDashWithMarios;
+    public static ConfigEntry<bool> BlockMarioInputWithDash;
+    public static ConfigEntry<bool> BlockMarioInputWithUix;
     public static ConfigEntry<Key> UnlockMovementKey;
     public static ConfigEntry<bool> UnlockMovementKeyToggle;
 
@@ -41,7 +43,7 @@ public class Config
 
     internal static bool ConfigInit(ConfigFile config)
     {
-        GameTickMs = config.Bind("Engine", "Game Tick Ms", 30, new ConfigDescription("How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", new AcceptableValueRange<int>(1, 100)));                                                       // slider 1, 100, 0
+        GameTickMs = config.Bind("Engine", "Game Tick Ms", 33, new ConfigDescription("How many Milliseconds should a game tick last. This will directly impact the speed of Mario's behavior.", new AcceptableValueRange<int>(1, 100)));                                                       // slider 1, 100, 0
         MarioScaleFactor = config.Bind("Engine", "Mario Scale Factor", 200, new ConfigDescription("The base scaling factor used to size Mario and his colliders. Lower values make Mario larger; higher values make him smaller.", new AcceptableValueRange<int>(1, 1000)));                   // slider 1, 1000, 0
         MarioCollisionChecks = config.Bind("Engine", "Mario Collision Checks", 10, new ConfigDescription("The number of evenly spaced points to check along Mario's body for collisions. Higher values increase accuracy but cost more performance.", new AcceptableValueRange<int>(1, 100))); // slider 1, 100, 0
         MarioUrl = config.Bind<Uri>("Engine", "Mario Url", null, "The URL for the Non-Modded Renderer for Mario - Null = Default Mario");
@@ -49,6 +51,8 @@ public class Config
 
         UseGamepad = config.Bind("Controls", "Use Gamepad", false, "Whether to use gamepads for input or not.");
         BlockDashWithMarios = config.Bind("Controls", "Block Dash with Marios", true, "Whether to Block opening the dash with marios or not. !VR-Only!");
+        BlockMarioInputWithDash = config.Bind("Controls", "Block Mario Input with Dash", true, "Whether to Block all mario inputs when the dash is open");
+        BlockMarioInputWithUix = config.Bind("Controls", "Block Mario Input with UIX", true, "Whether to Block all mario inputs when hovering over any UIX");
         UnlockMovementKey = config.Bind("Controls", "Unlock Movement Key", Key.Period, "The key to unlock movement when marios are present.");
         UnlockMovementKeyToggle = config.Bind("Controls", "Unlock Movement Key Toggle", true, "When true the unlock movement key will toggle, when false it needs to be held the entire time.");
 

@@ -1,3 +1,4 @@
+using System.Text;
 using Elements.Assets;
 using Elements.Core;
 using FrooxEngine;
@@ -281,6 +282,38 @@ public static class Utils
         };
 
         return sounds[redIndex];
+    }
+    
+    public static string MakeValidDynvarName(this string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        StringBuilder builder = new StringBuilder(name.Length);
+
+        foreach (char c in name)
+        {
+            switch (c)
+            {
+                case ' ':
+                case '-':
+                case '.':
+                case '_':
+                    builder.Append(c);
+                    break;
+
+                default:
+                    if (!char.IsSymbol(c) &&
+                        !char.IsPunctuation(c) &&
+                        !char.IsWhiteSpace(c))
+                    {
+                        builder.Append(c);
+                    }
+
+                    break;
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     public static Dictionary<TKey, TValue> GetTempDictionary<TKey, TValue>(this Dictionary<TKey, TValue> source) => new Dictionary<TKey, TValue>(source);

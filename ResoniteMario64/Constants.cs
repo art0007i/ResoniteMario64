@@ -26,6 +26,7 @@ public static class Constants
     public const string JumpVarName = "Jump";
     public const string PunchVarName = "Punch";
     public const string CrouchVarName = "Crouch";
+    public const string ViewVarName = "View";
     public const string IsShownVarName = "IsShown";
     public const string IsGrabbedVarName = "IsGrabbed";
     public const string HealthPointsVarName = "HealthPoints";

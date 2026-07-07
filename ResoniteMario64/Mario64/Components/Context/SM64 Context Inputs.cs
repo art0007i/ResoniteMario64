@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Elements.Core;
 using FrooxEngine;
+using FrooxEngine.UIX;
 using HarmonyLib;
 using Renderite.Shared;
 using static ResoniteMario64.Constants;
@@ -44,13 +45,16 @@ public sealed class SM64ContextInputs : IDisposable
             _movementBlocked = !_movementBlocked;
         }
 
-        bool shouldRun = !Context.World.LocalUser.HasActiveFocus() && _movementBlocked || inp.VR_Active;
+        InteractionHandler main = Context.World.LocalUser.GetInteractionHandler(Context.World.LocalUser.Primaryhand);
+        InteractionHandler off = main.OtherTool;
+
+        bool blockWithDash = !Config.BlockMarioInputWithDash.Value || !inp.AppDashOpened;
+        bool blockUix = !Config.BlockMarioInputWithUix.Value || main.Laser.CurrentHit?.GetComponentInParents<Canvas>() == null;
+
+        bool shouldRun = (!Context.World.LocalUser.HasActiveFocus() && _movementBlocked && blockWithDash || inp.VR_Active) && blockUix;
         bool shouldGamepad = Config.UseGamepad.Value && inp.GetDevices<StandardGamepad>().Count != 0;
         if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
-            InteractionHandler main = Context.World.LocalUser.GetInteractionHandler(Context.World.LocalUser.Primaryhand);
-            InteractionHandler off = main.OtherTool;
-
             Joystick = off.Controller is IndexController controller ? controller.Joystick.Value : off.Inputs.Axis.CurrentValue;
             Jump = main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held;
             Stomp = main.Inputs.Grab.Held;

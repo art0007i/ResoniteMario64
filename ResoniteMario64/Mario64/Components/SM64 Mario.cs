@@ -177,6 +177,12 @@ public sealed class SM64Mario : ISM64Object
         set => CrouchStream.Value = value;
     }
 
+    private Slot View
+    {
+        get => MarioSpace.TryReadValue(ViewVarName, out Slot view) ? view : null;
+        set => MarioSpace.TryWriteValue(ViewVarName, value);
+    }
+
     // Input Streams
 
     private ValueStream<float2> JoystickStream
@@ -485,6 +491,10 @@ public sealed class SM64Mario : ISM64Object
             DynamicReferenceVariable<IValue<bool>> stomp1 = inputsSlot.AttachComponent<DynamicReferenceVariable<IValue<bool>>>();
             stomp1.VariableName.Value = CrouchVarName;
             stomp1.Reference.Target = CrouchStream;
+
+            DynamicReferenceVariable<Slot> viewSlot = inputsSlot.AttachComponent<DynamicReferenceVariable<Slot>>();
+            viewSlot.VariableName.Value = ViewVarName;
+            viewSlot.Reference.Target = null;
 
             Slot varsSlot = MarioSlot.AddSlot("Vars");
             varsSlot.Tag = null;
@@ -1043,13 +1053,8 @@ public sealed class SM64Mario : ISM64Object
 
     private float3 GetCameraLookDirection()
     {
-        floatQ rot = MarioUser?.Root?.ViewRotation ?? floatQ.Identity;
-        // add new camerapos here
-        // if (something)
-        // {
-        //      rot = newCameraRotation;
-        // }
-        return (rot * float3.Forward).SetY(0).Normalized;
+        float3 forward = View?.Forward ?? (MarioUser?.Root?.ViewRotation ?? floatQ.Identity) * float3.Forward;
+        return forward.SetY(0).Normalized;
     }
 
     private float2 GetJoystickAxes() => Context?.Inputs?.Joystick ?? float2.Zero;

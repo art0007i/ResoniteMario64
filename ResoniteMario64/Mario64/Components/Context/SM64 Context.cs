@@ -73,9 +73,8 @@ public sealed partial class SM64Context : IDisposable
     public DynamicVariableSpace WorldVariableSpace { get; private set; }
 
     internal double LastTick;
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed { get; private set; }
 
-    private bool _disposed;
     private int _maxMariosAnimatedPerPerson;
 
     private SM64Context(World world)
@@ -227,7 +226,7 @@ public sealed partial class SM64Context : IDisposable
             MyMariosSlot.GetComponentOrAttach<DestroyOnUserLeave>().TargetUser.Target = world.LocalUser;
 
             DynamicReferenceVariable<Slot> myMarioDynvar = MyMariosSlot.GetComponentOrAttach<DynamicReferenceVariable<Slot>>();
-            myMarioDynvar.VariableName.Value = $"{world.LocalUser.UserID}-Marios";
+            myMarioDynvar.VariableName.Value = $"{world.LocalUser.UserID ?? world.LocalUser.UserName.MakeValidDynvarName()}-Marios";
             myMarioDynvar.Reference.Target = MyMariosSlot;
 
             world.RunInUpdates(2, () => MyMariosSlot.SetParent(MarioContainersSlot));
@@ -273,7 +272,7 @@ public sealed partial class SM64Context : IDisposable
 
     public void OnCommonUpdate()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         if (World.InputInterface.GetKeyDown(Config.RefreshCollidersKey.Value) && Config.DebugEnabled.Value)
         {
@@ -302,7 +301,7 @@ public sealed partial class SM64Context : IDisposable
 
     private void SM64GameTick()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         foreach (SM64DynamicCollider dynamicCol in Terrain.DynamicColliders.Values.GetTempList())
         {
@@ -311,7 +310,7 @@ public sealed partial class SM64Context : IDisposable
 
         foreach (SM64FakeObject obj in Terrain.FakeObjects.Values.GetTempList())
         {
-            obj.ContextFixedUpdateSynced();
+            obj?.ContextFixedUpdateSynced();
         }
 
         foreach (SM64Mario mario in AllMarios.Values.GetTempList())
@@ -322,21 +321,21 @@ public sealed partial class SM64Context : IDisposable
 
     private void HandleRemoved(Slot slot)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         Dispose();
     }
 
     private void HandleRemoved(IDestroyable destroyable)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         Dispose();
     }
 
     private void HandleRemoved(World world)
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
 
         Dispose();
     }
@@ -378,8 +377,8 @@ public sealed partial class SM64Context : IDisposable
 
     private void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (IsDisposed) return;
+        IsDisposed = true;
 
         if (disposing)
         {
