@@ -22,6 +22,8 @@
         <RestoreAdditionalProjectSources>
             https://nuget-modding.resonite.net/v3/index.json;
         </RestoreAdditionalProjectSources>
+        
+        <RebuildLibSM>false</RebuildLibSM>
     </PropertyGroup>
 
     <!-- Modding dependencies -->
@@ -87,7 +89,7 @@
         </EmbeddedResource>
     </ItemGroup>
 
-    <Target Name="PreBuildLibSM64" BeforeTargets="BeforeBuild">
+    <Target Name="PreBuildLibSM64" Condition="'$(RebuildLibSM)' == 'true'" BeforeTargets="BeforeBuild">
         <Exec Command="bash &quot;$(MSBuildProjectDirectory)/build_all.sh&quot;" IgnoreExitCode="false" />
     </Target>
     
