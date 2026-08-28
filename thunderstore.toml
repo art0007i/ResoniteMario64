@@ -31,9 +31,9 @@ source = "./ResoniteMario64/bin/Release/ResoniteMario64.pdb"
 target = "plugins/ResoniteMario64/"
 
 # Uncomment the following lines to include CHANGELOG file in your mod package. https://wiki.thunderstore.io/mods/updating-a-package#changelog
-# [[build.copy]]
-# source = "./CHANGELOG.md"
-# target = "/"
+[[build.copy]]
+source = "./CHANGELOG.md"
+target = "/"
 
 # Uncomment the following line to include LICENSE file in your mod package, if you have one.
 # [[build.copy]]
