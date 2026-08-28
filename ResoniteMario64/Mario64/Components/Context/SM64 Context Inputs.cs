@@ -1,31 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
+using System.Diagnostics.CodeAnalysis;
 using Elements.Core;
 using FrooxEngine;
+using FrooxEngine.UIX;
 using HarmonyLib;
 using Renderite.Shared;
 using static ResoniteMario64.Constants;
 
 namespace ResoniteMario64.Mario64.Components.Context;
 
-public sealed partial class SM64Context
+public sealed class SM64ContextInputs : IDisposable
 {
+    public SM64Context Context { get; }
+
+    public float2 Joystick { get; private set; }
+    public bool Jump { get; private set; }
+    public bool Kick { get; private set; }
+    public bool Stomp { get; private set; }
+
     private Comment _inputBlock;
-
-    public float2 Joystick;
-    public bool Jump;
-    public bool Kick;
-    public bool Stomp;
-
     private bool _movementBlocked = true;
+
+    public SM64ContextInputs(SM64Context context)
+    {
+        Context = context;
+        Config.UseGamepad.SettingChanged += HandleKeyUseGamepadChanged;
+    }
+
+    public void OnCommonUpdate()
+    {
+        if (Context == null || Context.World == null || Context.IsDisposed) return;
+
+        HandleInputs();
+    }
 
     private void HandleInputs()
     {
-        InputInterface inp = World.InputInterface;
-        if(!Config.UnlockMovementKeyToggle.Value)
+        InputInterface inp = Context.World.InputInterface;
+        if (!Config.UnlockMovementKeyToggle.Value)
         {
             _movementBlocked = !inp.GetKey(Config.UnlockMovementKey.Value);
         }
@@ -34,13 +45,16 @@ public sealed partial class SM64Context
             _movementBlocked = !_movementBlocked;
         }
 
-        bool shouldRun = !World.LocalUser.HasActiveFocus() && _movementBlocked;
+        InteractionHandler main = Context.World.LocalUser.GetInteractionHandler(Context.World.LocalUser.Primaryhand);
+        InteractionHandler off = main.OtherTool;
+
+        bool blockWithDash = !Config.BlockMarioInputWithDash.Value || !inp.AppDashOpened;
+        bool blockUix = !Config.BlockMarioInputWithUix.Value || main.Laser.CurrentHit?.GetComponentInParents<Canvas>() == null;
+
+        bool shouldRun = (!Context.World.LocalUser.HasActiveFocus() && _movementBlocked && blockWithDash || inp.VR_Active) && blockUix;
         bool shouldGamepad = Config.UseGamepad.Value && inp.GetDevices<StandardGamepad>().Count != 0;
         if (!shouldGamepad && inp.VR_Active && shouldRun)
         {
-            InteractionHandler main = World.LocalUser.GetInteractionHandler(World.LocalUser.Primaryhand);
-            InteractionHandler off = main.OtherTool;
-
             Joystick = off.Controller is IndexController controller ? controller.Joystick.Value : off.Inputs.Axis.CurrentValue;
             Jump = main.SharesUserspaceToggleAndMenus ? main.Inputs.Menu.Held : main.Inputs.UserspaceToggle.Held;
             Stomp = main.Inputs.Grab.Held;
@@ -88,7 +102,7 @@ public sealed partial class SM64Context
 
         if (_inputBlock == null || _inputBlock.IsRemoved)
         {
-            Comment block = World.LocalUser.Root?.Slot?.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
+            Comment block = Context.World.LocalUser.Root?.Slot?.GetComponentOrAttach<Comment>(c => c.Text.Value == InputBlockTag);
             if (block != null)
             {
                 block.Text.Value = InputBlockTag;
@@ -96,10 +110,10 @@ public sealed partial class SM64Context
             }
         }
 
-        LocomotionController loco = World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
+        LocomotionController loco = Context.World.LocalUser.Root?.GetRegisteredComponent<LocomotionController>();
         if (loco == null) return;
 
-        if (AnyControlledMarios && !inp.VR_Active && _movementBlocked && !shouldGamepad)
+        if (Context.AnyControlledMarios && !inp.VR_Active && _movementBlocked && !shouldGamepad)
         {
             Comment currentBlock = loco.SupressSources.OfType<Comment>().FirstOrDefault(c => c.Text.Value == InputBlockTag);
             if (currentBlock == null)
@@ -123,21 +137,19 @@ public sealed partial class SM64Context
         if (right) input += new float2(-1);
 
         float length = MathX.Sqrt(input.x * input.x + input.y * input.y);
-        return length > 1.0f
-                ? new float2(input.x / length, input.y / length)
-                : input;
+        return length > 1.0f ? new float2(input.x / length, input.y / length) : input;
     }
 
     private static bool ShouldBlockInputs(InteractionHandler c, Chirality hand) => ShouldBlockInit() && c.Side.Value == hand;
     private static bool ShouldBlockInputs() => ShouldBlockInit() && Config.BlockDashWithMarios.Value;
-    private static bool ShouldBlockInit() => Instance?.World != null && Instance.AnyControlledMarios && Instance.World.InputInterface.VR_Active && !Instance.World.LocalUser.HasActiveFocus();
-    
+    private static bool ShouldBlockInit() => SM64Context.Instance?.World != null && SM64Context.Instance.AnyControlledMarios && SM64Context.Instance.World.InputInterface.VR_Active && !SM64Context.Instance.World.LocalUser.HasActiveFocus();
+
     [HarmonyPatch(typeof(UserspaceRadiantDash), nameof(UserspaceRadiantDash.Open), MethodType.Setter)]
     public class DashInputBlocker
     {
         public static void Prefix(ref bool value)
         {
-            if (ShouldBlockInputs()) value = false;
+            if (ShouldBlockInputs() && !(Config.UseGamepad.Value && Engine.Current.InputInterface.GetDevices<StandardGamepad>().Count != 0)) value = false;
         }
     }
 
@@ -194,93 +206,138 @@ public sealed partial class SM64Context
     [HarmonyPatch(typeof(InteractionHandler), nameof(InteractionHandler.BeforeInputUpdate))]
     public class MarioInputBlocker
     {
-        private static bool _blockedInputs;
+        private static bool? _lastBlocked;
+        private static Slot _cachedLocomotionModules;
+
         public static void Postfix(InteractionHandler __instance)
         {
-            
             if (__instance.Slot.ActiveUser != __instance.LocalUser) return;
-            
+
             bool isIndex = __instance.Controller is IndexController;
-            if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand.GetOther()))
+            if (isIndex && _cachedLocomotionModules?.FilterWorldElement() == null)
             {
-                if (isIndex)
-                {
-                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
-                    switch (module)
-                    {
-                        case PhysicalLocomotion phys:
-                            if (phys.CharacterController.Gravity == float3.Zero)
-                            {
-                                phys.CharacterController.AirSpeed.Value = 0f;
-                            }
-                            else
-                            {
-                                phys.CharacterController.Speed.Value = 0f;
-                            }
-
-                            break;
-                        case NoclipLocomotion noclip:
-                            noclip.MaxSpeed.Value = 0f;
-                            break;
-                    }
-                }
-                else
-                {
-                    __instance.Inputs.Axis.RegisterBlocks = true;
-                }
-
-                _blockedInputs = true;
+                LocomotionController locomotionController = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>();
+                _cachedLocomotionModules = locomotionController?.ActiveModule?.Slot?.Parent;
             }
-            else if (_blockedInputs)
+
+            bool blocked = ShouldBlockInputs();
+
+            if (_lastBlocked.HasValue && blocked == _lastBlocked) return;
+
+            _lastBlocked = blocked;
+
+            if (isIndex)
             {
-                if (isIndex)
-                {
-                    var module = __instance.LocalUser.Root.GetRegisteredComponent<LocomotionController>()?.ActiveModule;
-                    var builder = __instance.World.RootSlot.GetComponentInChildren<CommonAvatarBuilder>();
-                    switch (module)
-                    {
-                        case PhysicalLocomotion phys:
-
-                            if (phys.CharacterController.Gravity == float3.Zero && phys.CharacterController.AirSpeed.Value == 0f)
-                            {
-                                var fly = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity == float3.Zero);
-                                phys.CharacterController.AirSpeed.Value = fly?.CharacterController.AirSpeed.Value ?? 10f;
-                            }
-                            else if (phys.CharacterController.Speed.Value == 0f)
-                            {
-                                var walk = builder?.LocomotionModules.Target?.GetComponentInChildren<PhysicalLocomotion>(x => x.CharacterController.Gravity != float3.Zero);
-                                phys.CharacterController.Speed.Value = walk?.CharacterController.Speed.Value ?? 4f;
-                            }
-
-                            break;
-                        case NoclipLocomotion noclip:
-                            if (noclip.MaxSpeed.Value == 0f)
-                            {
-                                var noclip2 = builder?.LocomotionModules.Target?.GetComponentInChildren<NoclipLocomotion>();
-                                noclip.MaxSpeed.Value = noclip2?.MaxSpeed.Value ?? 15f;
-                            }
-                            break;
-                    }
-                }
-                else
-                {
-                    __instance.Inputs.Axis.RegisterBlocks = true;
-                }
-
-                _blockedInputs = false;
+                __instance.RunSynchronously(() => _cachedLocomotionModules?.ActiveSelf_Field.Value = !blocked);
             }
-            /*if (ShouldBlockInputs(__instance, __instance.LocalUser.Primaryhand))
+            else
             {
-                __instance.Inputs.UserspaceToggle.RegisterBlocks = true;
-                __instance.Inputs.Interact.RegisterBlocks = true;
-                __instance.Inputs.Grab.RegisterBlocks = true;
-            }*/
+                __instance.Inputs.Axis.RegisterBlocks = blocked;
+            }
+
+            if (!blocked && !__instance.InputInterface.VR_Active && !(_cachedLocomotionModules?.ActiveSelf_Field.Value ?? false))
+            {
+                __instance.RunSynchronously(() => _cachedLocomotionModules?.ActiveSelf_Field.Value = true);
+            }
         }
     }
 
     [HarmonyPatch(typeof(StandardGamepad), nameof(StandardGamepad.Bind))]
     public class GamepadInputBlocker
     {
-        public static bool Prefix() => !Config.UseGamepad.Value;
+        public static bool Prefix()
+        {
+            if (!Config.UseGamepad.Value) return true;
+
+            Logger.Warn("Blocking StandardGamepad binding because SM64 is using gamepad input.");
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(VR_Manager), "UpdateHaptics")]
+    public static class UpdateHapticsPatch
+    {
+        internal volatile static bool PendingHaptics;
+
+        internal static int MarioId = -1;
+        internal static short Level;
+        internal static double Time;
+
+        [SuppressMessage("ReSharper", "CompareOfFloatsByEqualityOperator")]
+        public static void Postfix(Chirality side, ref VR_ControllerOutputState state)
+        {
+            if (!PendingHaptics) return;
+
+            bool shouldRunMario = PendingHaptics && state.hapticState is { force: 0, pain: 0, temperature: 0, vibration: 0 } || state.hapticState.force == Level && state.hapticState.pain == Level && state.hapticState.temperature == Level && state.hapticState.vibration == Level;
+            if (shouldRunMario)
+            {
+                state.vibrateTime = Time;
+
+                state.hapticState.force = Level;
+                state.hapticState.temperature = Level;
+                state.hapticState.pain = Level;
+                state.hapticState.vibration = Level;
+
+                if (side == Chirality.Right)
+                {
+                    PendingHaptics = false;
+                    MarioId = -1;
+                    Level = 0;
+                    Time = 0;
+                }
+            }
+        }
+    }
+
+    public static void VibrateCallback(int marioId, short level, short time)
+    {
+        if (marioId == -1 || level <= 0 || time <= 0) return;
+
+        SM64Context instance = SM64Context.Instance;
+        if (instance == null) return;
+
+        if (instance.World.InputInterface is { } inputInterface && (!inputInterface.VR_Active || !inputInterface.ControllerVibrationEnabled)) return;
+
+        if (instance.MyMarios.All(x => x.MarioId != marioId)) return;
+
+        float durationSeconds = time * 2 / 1000f;
+        if (durationSeconds <= 0) return;
+
+        UpdateHapticsPatch.PendingHaptics = true;
+        UpdateHapticsPatch.MarioId = marioId;
+        UpdateHapticsPatch.Level = level;
+        UpdateHapticsPatch.Time = durationSeconds;
+
+        if (Config.DebugEnabled.Value) Plugin.Log.LogDebug($"Got Vibrate Callback: marioId: {marioId}, level: {level}, time: {UpdateHapticsPatch.Time}");
+    }
+
+    public void Dispose()
+    {
+        Config.UseGamepad.SettingChanged -= HandleKeyUseGamepadChanged;
+
+        if (_inputBlock != null && Context?.World != null)
+        {
+            Context.World.RunSynchronously(() =>
+            {
+                LocomotionController loco = Context.World.LocalUser?.Root?.GetRegisteredComponent<LocomotionController>();
+                if (loco != null)
+                {
+                    loco.SupressSources?.Remove(_inputBlock);
+                }
+            }, true, null, true);
+        }
+
+        _inputBlock = null;
+        Joystick = float2.Zero;
+        Jump = false;
+        Kick = false;
+        Stomp = false;
+    }
+
+    private void HandleKeyUseGamepadChanged(object sender, EventArgs args)
+    {
+        if (Context == null || Context.IsDisposed) return;
+
+        Context.World?.Input.InvalidateBindings();
     }
 }

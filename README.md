@@ -68,7 +68,8 @@ Below are the types of colliders you can give to an object
 
 ### Teleporter
 
-- Soon™️
+- Tag: `"SM64 Teleporter"`
+- Collider must be enabled and active.
 
 ---
 
@@ -182,6 +183,22 @@ example:
 
 - `Damage0`, `Damage1`, `Damage2`, etc., can represent different damage strengths.
 - `RedCoin0`, `RedCoin1`, `RedCoin2`, etc., can play the different red coin sounds.
+
+### Delete_(bool) or (0 - 1)
+
+If set to `true`, the collider/object will be deleted instead of disabled.
+
+---
+
+## Teleporters:
+
+### Teleporter_(int)
+
+The Index of the teleporter.
+
+### Group_(int)
+
+The group of teleporters that this teleporter belongs to.
 
 ---
 

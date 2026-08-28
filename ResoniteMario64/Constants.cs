@@ -21,15 +21,26 @@ public static class Constants
     public const string GasVarName = "GasLevel";
 
     // Tags for Mario Instances
+    public const string MarioOwnerVarName = "Owner";
     public const string JoystickVarName = "Joystick";
     public const string JumpVarName = "Jump";
     public const string PunchVarName = "Punch";
     public const string CrouchVarName = "Crouch";
+    public const string ViewVarName = "View";
     public const string IsShownVarName = "IsShown";
+    public const string IsGrabbedVarName = "IsGrabbed";
     public const string HealthPointsVarName = "HealthPoints";
     public const string CoinsVarName = "Coins";
     public const string RedCoinVarName = "RedCoins";
+    public const string MarioAlphaVarName = "MarioAlpha";
     public const string StarVarName = "Stars";
+    public const string LiveVarName = "Lives";
+    public const string AnimIDVarName = "AnimID";
+    public const string AnimFlagVarName = "AnimFlags";
+    public const string AnimFrameVarName = "AnimFrame";
+    public const string StartFrameVarName = "StartFrame";
+    public const string LoopStartVarName = "LoopStart";
+    public const string LoopEndVarName = "LoopEnd";
     public const string ActionFlagsVarName = "ActionFlags";
     public const string StateFlagsVarName = "StateFlags";
 

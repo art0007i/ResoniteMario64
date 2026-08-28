@@ -67,7 +67,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 
-                if (Utils.CheckDebug()) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
+                if (Config.DebugEnabled.Value) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
 
                 break;
             case ConvexHullCollider col:
@@ -76,7 +76,7 @@ public static class ColliderShapeExtensions
                     return col.Mesh.Target.Asset.Data;
                 }
 
-                if (Utils.CheckDebug()) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
+                if (Config.DebugEnabled.Value) Logger.Warn($"- [{col.GetType()}] {col.Slot.Name} ({col.ReferenceID}) Mesh is null or not readable");
 
                 break;
         }

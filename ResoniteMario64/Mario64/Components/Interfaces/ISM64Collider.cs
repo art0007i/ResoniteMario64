@@ -1,10 +1,10 @@
-﻿using static ResoniteMario64.Mario64.libsm64.SM64Constants;
+﻿using ResoniteMario64.Mario64.libsm64;
 
 namespace ResoniteMario64.Mario64.Components.Interfaces;
 
 public interface ISM64Collider
 {
-    SM64SurfaceType SurfaceType { get; }
-    SM64TerrainType TerrainType { get; }
+    SurfaceType SurfaceType { get; }
+    TerrainType TerrainType { get; }
     int Force { get; }
 }
