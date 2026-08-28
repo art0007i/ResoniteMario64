@@ -214,6 +214,8 @@ public static class Patches
 
         public static void Postfix(Worker worker, UIBuilder ui)
         {
+            if (!Config.DebugEnabled.Value) return;
+            
             if (worker is Slot slot && slot.GetComponent<Collider>() is { } col)
             {
                 if (!_conditionalWeakTable.TryGetValue(worker, out Dictionary<string, Text> texts) || texts == null)
